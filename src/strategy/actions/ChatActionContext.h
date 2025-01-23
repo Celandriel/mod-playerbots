@@ -177,6 +177,7 @@ public:
         creators["tell estimated dps"] = &ChatActionContext::tell_estimated_dps;
         creators["join"] = &ChatActionContext::join;
         creators["calc"] = &ChatActionContext::calc;
+        creators["reset instances"] = &ChatActionContext::reset_instances;
     }
 
 private:
@@ -277,6 +278,7 @@ private:
     static Action* tell_estimated_dps(PlayerbotAI* ai) { return new TellEstimatedDpsAction(ai); }
     static Action* join(PlayerbotAI* ai) { return new JoinGroupAction(ai); }
     static Action* calc(PlayerbotAI* ai) { return new TellCalculateItemAction(ai); }
+    statis Action* reset_instances() { return new ResetInstancesAction(ai); }
 };
 
 #endif

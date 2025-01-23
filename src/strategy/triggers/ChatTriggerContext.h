@@ -126,6 +126,7 @@ public:
         creators["dps"] = &ChatTriggerContext::dps;
         creators["disperse"] = &ChatTriggerContext::disperse;
         creators["calc"] = &ChatTriggerContext::calc;
+        creators["reset instances"] = &ChatTriggerContext::unbind;
     }
 
 private:
@@ -231,6 +232,7 @@ private:
     static Trigger* dps(PlayerbotAI* ai) { return new ChatCommandTrigger(ai, "dps"); }
     static Trigger* disperse(PlayerbotAI* ai) { return new ChatCommandTrigger(ai, "disperse"); }
     static Trigger* calc(PlayerbotAI* ai) { return new ChatCommandTrigger(ai, "calc"); }
+    static Trigger* reset_instances(PlayerbotAI* ai) { return new ChatCommandTrigger(ai, "reset instances"); }
 };
 
 #endif
