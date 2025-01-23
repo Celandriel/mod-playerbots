@@ -48,7 +48,7 @@ static const std::unordered_set<std::string> noReplyMsgs = {
     "stats",
     "react ?",
     "reset strats",
-    "reset_instances"
+    "reset instances"
     "home",
 };
 static const std::unordered_set<std::string> noReplyMsgParts = {
