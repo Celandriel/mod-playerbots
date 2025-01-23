@@ -127,7 +127,7 @@ public:
         creators["dps"] = &ChatTriggerContext::dps;
         creators["disperse"] = &ChatTriggerContext::disperse;
         creators["calc"] = &ChatTriggerContext::calc;
-        creators["reset instances"] = &ChatTriggerContext::unbind;
+        creators["reset instances"] = &ChatTriggerContext::reset_instances;
     }
 
 private:

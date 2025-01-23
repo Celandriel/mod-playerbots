@@ -282,7 +282,7 @@ private:
     static Action* tell_estimated_dps(PlayerbotAI* ai) { return new TellEstimatedDpsAction(ai); }
     static Action* join(PlayerbotAI* ai) { return new JoinGroupAction(ai); }
     static Action* calc(PlayerbotAI* ai) { return new TellCalculateItemAction(ai); }
-    statis Action* reset_instances(PlayerbotAI* ai) { return new ResetInstancesAction(ai); }
+    static Action* reset_instances(PlayerbotAI* ai) { return new ResetInstancesAction(ai); }
 };
 
 #endif
