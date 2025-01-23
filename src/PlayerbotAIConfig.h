@@ -173,12 +173,25 @@ public:
 
     bool randomBotJoinBG;
     bool randomBotAutoJoinBG;
-    uint32 randomBotAutoJoinWarsongBracket;
+
+    std::string randomBotAutoJoinICBrackets;
+    std::string randomBotAutoJoinEYBrackets;
+    std::string randomBotAutoJoinAVBrackets;
+    std::string randomBotAutoJoinABBrackets;
+    std::string randomBotAutoJoinWSBrackets;
+
+    uint32 randomBotAutoJoinBGICCount;
+    uint32 randomBotAutoJoinBGEYCount;
+    uint32 randomBotAutoJoinBGAVCount;
+    uint32 randomBotAutoJoinBGABCount;
+    uint32 randomBotAutoJoinBGWSCount;
+
     uint32 randomBotAutoJoinArenaBracket;
-    uint32 randomBotAutoJoinBGWarsongCount;
+
     uint32 randomBotAutoJoinBGRatedArena2v2Count;
     uint32 randomBotAutoJoinBGRatedArena3v3Count;
     uint32 randomBotAutoJoinBGRatedArena5v5Count;
+
     bool randomBotLoginAtStartup;
     uint32 randomBotTeleLowerLevel, randomBotTeleHigherLevel;
     bool logInGroupOnly, logValuesPerTick;
@@ -247,6 +260,7 @@ public:
         uint32 spellId;
         uint32 factionId = 0;
         uint32 classId = 0;
+        uint32 specId = 0;
         uint32 minLevel = 0;
         uint32 maxLevel = 0;
     };
@@ -261,9 +275,18 @@ public:
     bool randomBotFixedLevel;
     bool disableRandomLevels;
     uint32 playerbotsXPrate;
+    uint32 randomBotAllianceRatio;
+    uint32 randomBotHordeRatio;
     bool disableDeathKnightLogin;
     uint32 botActiveAlone;
+    uint32 BotActiveAloneForceWhenInRadius;
+    bool BotActiveAloneForceWhenInZone;
+    bool BotActiveAloneForceWhenInMap;
+    bool BotActiveAloneForceWhenIsFriend;
+    bool BotActiveAloneForceWhenInGuild;
     bool botActiveAloneSmartScale;
+    uint32 botActiveAloneSmartScaleDiffLimitfloor;
+    uint32 botActiveAloneSmartScaleDiffLimitCeiling;
     uint32 botActiveAloneSmartScaleWhenMinLevel;
     uint32 botActiveAloneSmartScaleWhenMaxLevel;
 
@@ -275,11 +298,14 @@ public:
     bool twoRoundsGearInit;
     bool syncQuestWithPlayer;
     bool syncQuestForPlayer;
+    bool dropObsoleteQuests;
     std::string autoTrainSpells;
     bool autoPickTalents;
     bool autoUpgradeEquip;
+    int32 hunterWolfPet;
     bool autoLearnTrainerSpells;
     bool autoDoQuests;
+    bool enableNewRpgStrategy;
     bool syncLevelWithPlayers;
     bool freeFood;
     bool autoLearnQuestSpells;
@@ -312,7 +338,12 @@ public:
     int32 addClassCommand;
     int32 addClassAccountPoolSize;
     int32 maintenanceCommand;
-    int32 autoGearCommand, autoGearQualityLimit, autoGearScoreLimit;
+    int32 autoGearCommand, autoGearCommandAltBots, autoGearQualityLimit, autoGearScoreLimit;
+
+    uint32 useGroundMountAtMinLevel;
+    uint32 useFastGroundMountAtMinLevel;
+    uint32 useFlyMountAtMinLevel;
+    uint32 useFastFlyMountAtMinLevel;
 
     std::string const GetTimestampStr();
     bool hasLog(std::string const fileName)
@@ -327,7 +358,7 @@ public:
     }
     void log(std::string const fileName, const char* str, ...);
 
-    void loadWorldBuf(uint32 factionId, uint32 classId, uint32 minLevel, uint32 maxLevel);
+    void loadWorldBuf(uint32 factionId, uint32 classId, uint32 specId, uint32 minLevel, uint32 maxLevel);
     static std::vector<std::vector<uint32>> ParseTempTalentsOrder(uint32 cls, std::string temp_talents_order);
     static std::vector<std::vector<uint32>> ParseTempPetTalentsOrder(uint32 spec, std::string temp_talents_order);
 };
