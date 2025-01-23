@@ -15,6 +15,8 @@ float MountingDrakeMultiplier::GetValue(Action* action)
     // It seems like this is due to moving/other actions being processed during the 0.5 secs.
     // If we suppress everything, they seem to mount properly. A bit of a ham-fisted solution but it works
     Player* master = botAI->GetMaster();
+    if (!master) { return 1.0f; }
+    
     if (bot->GetMapId() != OCULUS_MAP_ID || !master->GetVehicleBase() || bot->GetVehicleBase()) { return 1.0f; }
 
     if (!dynamic_cast<MountDrakeAction*>(action))
@@ -24,12 +26,12 @@ float MountingDrakeMultiplier::GetValue(Action* action)
     return 1.0f;
 }
 
-float FlyingMultiplier::GetValue(Action* action)
+float OccFlyingMultiplier::GetValue(Action* action)
 {
     if (bot->GetMapId() != OCULUS_MAP_ID || !bot->GetVehicleBase()) { return 1.0f; }
 
     // Suppresses FollowAction as well as some attack-based movements
-    if (dynamic_cast<MovementAction*>(action) && !dynamic_cast<FlyDrakeAction*>(action))
+    if (dynamic_cast<MovementAction*>(action) && !dynamic_cast<OccFlyDrakeAction*>(action))
     {
         return 0.0f;
     }
@@ -101,7 +103,7 @@ float EregosMultiplier::GetValue(Action* action)
     Unit* boss = AI_VALUE2(Unit*, "find target", "ley-guardian eregos");
     if (!boss) { return 1.0f; }
 
-    if (boss->HasAura(SPELL_PLANAR_SHIFT && dynamic_cast<DrakeAttackAction*>(action)))
+    if (boss->HasAura(SPELL_PLANAR_SHIFT && dynamic_cast<OccDrakeAttackAction*>(action)))
     {
         return 0.0f;
     }

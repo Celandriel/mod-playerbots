@@ -484,10 +484,11 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
 
         if (!groupValid)
         {
-            WorldPacket p;
-            std::string const member = bot->GetName();
-            p << uint32(PARTY_OP_LEAVE) << member << uint32(0);
-            bot->GetSession()->HandleGroupDisbandOpcode(p);
+            bot->RemoveFromGroup();
+            // WorldPacket p;
+            // std::string const member = bot->GetName();
+            // p << uint32(PARTY_OP_LEAVE) << member << uint32(0);
+            // bot->GetSession()->HandleGroupDisbandOpcode(p);
         }
     }
 
@@ -958,9 +959,17 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
 
     if (!strcmp(cmd, "reload"))
     {
-        messages.push_back("Reloading config");
-        sPlayerbotAIConfig->Initialize();
-        return messages;
+        if (master->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+        {
+            sPlayerbotAIConfig->Initialize();
+            messages.push_back("Config reloaded.");
+            return messages;
+        }
+        else
+        {
+            messages.push_back("ERROR: Only GM can use this command.");
+            return messages;
+        }
     }
 
     if (!strcmp(cmd, "tweak"))
