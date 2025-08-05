@@ -200,8 +200,8 @@ bool PlayerbotAIConfig::Initialize()
         restrictedHealerDPSMaps);
 	
     //////////////////////////// Guild RPG
-    enableGuildRPG = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableGuildRPG", true);   
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10,10"), Guild_TypeRatios);
+    enableGuildRPG = sConfigMgr->GetOption<bool>("AiPlayerbot.Enable_Guild_RPG", true);   
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_Type_Ratios", "40,20,20,10,10"), Guild_TypeRatios);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_Num_Bots", "100,100,50,50,50"), Guild_Num_Bots);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_PVE_Spec_Ratio", "12,22,34,32"), Guild_PVE_Spec_Ratio);
 	

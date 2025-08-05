@@ -1001,11 +1001,11 @@ AiPlayerbot.ZoneBracket.4197 = 79,80
 # Set the percentage of guild types and the number of bots per guild. 
 # Entries are in order by type PvP,PvE,Gathering/Crafter,Roleplaying,Adventurer/Explorer"
 AiPlayerbot.Enable_Guild_RPG = 1
-AiPlayerbot.Guild_TypeRatios = "40,20,20,10,10"
+AiPlayerbot.Guild_Type_Ratios = "40,20,20,10,10"
 AiPlayerbot.Guild_Num_Bots = "100,100,50,50,50"
 
 # Set the ratio of Tank, melee dps, ranged dps, and healer dps per guild
-AiPlayerbot.Guild_PVE_SpecRatio = "12,22,34,32"
+AiPlayerbot.Guild_PVE_Spec_Ratio = "12,22,34,32"
 
 #
 #

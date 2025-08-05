@@ -167,7 +167,8 @@ void PlayerbotsGuildMgr::CheckGuildFull(uint32 guildId)
 
 void PlayerbotsGuildMgr::SaveGuildStatus(const std::string& guildName, uint32 status)
 {
-    CharacterDatabase.Execute("UPDATE playerbots_guild_names SET status = {} WHERE name = {}", status, guildName.c_str());
+    LOG_DEBUG("playerbots", "UPDATE playerbots_guild_names SET status = {} WHERE name = {}", status, guildName.c_str());
+    CharacterDatabase.Execute("UPDATE playerbots_guild_names SET status = {} WHERE name = '{}'", status, guildName.c_str());
 }
 
 int PlayerbotsGuildMgr::GetGuildTypeIndex(const std::string& guildType)
