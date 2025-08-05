@@ -1,4 +1,3 @@
-pvp
 CREATE TABLE IF NOT EXISTS `playerbots_guild_names` (
   `name_id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(24) NOT NULL,
@@ -10,7 +9,7 @@ CREATE TABLE IF NOT EXISTS `playerbots_guild_names` (
 ) ENGINE=MyISAM AUTO_INCREMENT=613 DEFAULT CHARSET=utf8mb3 ROW_FORMAT=FIXED COMMENT='Playerbot guild names with types';
 
 
-INSERT INTO `playerbots_guild_names` (`name_id`, `name`, `guild_type`, 'status') VALUES
+INSERT INTO `playerbots_guild_names` (`name_id`, `name`, `guild_type`, `status`) VALUES
 (1,  'Age of Blood', 1, 0),
 (2,  'Aggression', 1, 0),
 (3,  'Allegiance of the Vile', 1, 0),
@@ -615,4 +614,4 @@ INSERT INTO `playerbots_guild_names` (`name_id`, `name`, `guild_type`, 'status')
 (602,  'Worldborne Vanguards', 5, 0),
 (603,  'Mercenary\'s Oath', 5, 0),
 (604,  'Questwarden Collective', 5, 0),
-(605,  'Eventside Rangers', 5);
+(605,  'Eventside Rangers', 5, 0);

@@ -199,7 +199,13 @@ bool PlayerbotAIConfig::Initialize()
                                              "531,532,534,544,548,550,564,565,580,249,533,603,615,616,624,631,649,724"),
         restrictedHealerDPSMaps);
 	
-	//////////////////////////// ICC
+    //////////////////////////// Guild RPG
+    enableGuildRPG = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableGuildRPG", true);   
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10,10"), Guild_TypeRatios);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_Num_Bots", "100,100,50,50,50"), Guild_Num_Bots);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_PVE_Spec_Ratio", "12,22,34,32"), Guild_PVE_Spec_Ratio);
+	
+    //////////////////////////// ICC
 
 	EnableICCBuffs = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableICCBuffs", true);
 
@@ -366,12 +372,6 @@ bool PlayerbotAIConfig::Initialize()
             }
         }
     }
-
-
-    enableGuildRPG = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableGuildRPG", true);
-    Guild_TypeRatios = sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10,10");
-    Guild_Num_Bots = sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_Num_Bots", "100,100,50,50,50");
-    Guild_PVE_Spec_Ratio = sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_PVE_Spec_Ratio", "12,22,34,32");
 
     randomChangeMultiplier = sConfigMgr->GetOption<float>("AiPlayerbot.RandomChangeMultiplier", 1.0);
 

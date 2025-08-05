@@ -257,11 +257,11 @@ public:
     uint32 randomBotAccountCount;
     bool randomBotRandomPassword;
     bool deleteRandomBotAccounts;
-    bool enableGuildRPG
+    bool enableGuildRPG;
     uint32 randomBotGuildCount;
     bool deleteRandomBotGuilds;
     std::vector<uint32> randomBotGuilds;
-    std::vector<uint32> Guild_TypeRatios, Guild_Num_Bots, guild_PVE_Spec_Ratio;
+    std::vector<uint32> Guild_TypeRatios, Guild_Num_Bots, Guild_PVE_Spec_Ratio;
     std::vector<uint32> pvpProhibitedZoneIds;
     std::vector<uint32> pvpProhibitedAreaIds;
     bool fastReactInBG;

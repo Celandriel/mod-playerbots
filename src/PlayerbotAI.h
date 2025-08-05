@@ -22,7 +22,6 @@
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotSecurity.h"
 #include "PlayerbotTextMgr.h"
-#include "GuildProfileMgr.h"
 #include "SpellAuras.h"
 #include "Util.h"
 #include "WorldPacket.h"
@@ -609,7 +608,6 @@ public:
     static SpellFamilyNames Class2SpellFamilyName(uint8 cls);
     NewRpgInfo rpgInfo;
     NewRpgStatistic rpgStatistic;
-    GuildProfile* guildProfile = nullptr;
     std::unordered_set<uint32> lowPriorityQuest;
 
     // Schedules a callback to run once after <delayMs> milliseconds.

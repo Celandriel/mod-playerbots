@@ -8,7 +8,7 @@
 #include "AccountMgr.h"
 #include "ArenaTeamMgr.h"
 #include "DatabaseEnv.h"
-#include "PlayerbotGuildMgr.h"
+#include "PlayerbotsGuildMgr.h"
 #include "GuildMgr.h"
 #include "PlayerbotFactory.h"
 #include "Playerbots.h"
@@ -256,10 +256,10 @@ Player* RandomPlayerbotFactory::CreateRandomBot(WorldSession* session, uint8 cls
     {
         player->learnSpell(50977, false);
     }
-if (sPlayerbotAIConfig->enableGuildRPG && player)
-{
-    sPlayerbotGuildMgr->AssignToGuild(player);
-}
+    if (sPlayerbotAIConfig->enableGuildRPG && player)
+    {
+        sPlayerbotGuildMgr->AssignToGuild(player);
+    }
     LOG_DEBUG("playerbots", "Random bot created for account {} - name: \"{}\"; race: {}; class: {}", accountId,
             name.c_str(), race, cls);
 

@@ -12,22 +12,10 @@ using namespace ai;
 PlayerbotsGuildMgr::PlayerbotsGuildMgr()
 {
     // Initialize guild type ratios and player counts
-    std::string guildTypeRatiosStr = sPlayerbotAIConfig->Guild_TypeRatios;
-    std::string guildPlayersStr = sPlayerbotAIConfig->Guild_Num_Bots;
+    std::vector<uint32> guildTypeRatios = sPlayerbotAIConfig->Guild_TypeRatios;
+    std::vector<uint32> guildPlayers = sPlayerbotAIConfig->Guild_Num_Bots;
 
-    std::istringstream guildTypeRatiosStream(guildTypeRatiosStr);
-    std::string ratio;
-    while (std::getline(guildTypeRatiosStream, ratio, ','))
-    {
-        guildTypeRatios.push_back(std::stoi(ratio));
-    }
-
-    std::istringstream guildPlayersStream(guildPlayersStr);
-    std::string count;
-    while (std::getline(guildPlayersStream, count, ','))
-    {
-        guildPlayers.push_back(std::stoi(count));
-    }
+    // No need to parse strings anymore, using vectors directly
 
     guildTypeNames = { "PvP", "PvE", "Gathering/Crafter", "Roleplaying", "Adventurer/Explorer" };
     LoadGuilds();
@@ -179,7 +167,7 @@ void PlayerbotsGuildMgr::CheckGuildFull(uint32 guildId)
 
 void PlayerbotsGuildMgr::SaveGuildStatus(const std::string& guildName, uint32 status)
 {
-    CharacterDatabase.PExecute("UPDATE playerbots_guild_names SET status = %d WHERE name = '%s'", status, guildName.c_str());
+    CharacterDatabase.Execute("UPDATE playerbots_guild_names SET status = {} WHERE name = {}", status, guildName.c_str());
 }
 
 int PlayerbotsGuildMgr::GetGuildTypeIndex(const std::string& guildType)
@@ -195,9 +183,6 @@ int PlayerbotsGuildMgr::GetGuildTypeIndex(const std::string& guildType)
 }
 void PlayerbotsGuildMgr::AssignToGuild(Player* player)
 {
-    if (!sPlayerbotAIConfig->enableGuild)
-        return;
-
     std::string guildTypeName = DetermineGuildType();
     int typeIndex = GetGuildTypeIndex(guildTypeName);
 
