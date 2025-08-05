@@ -22,6 +22,7 @@
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotSecurity.h"
 #include "PlayerbotTextMgr.h"
+#include "GuildProfileMgr.h"
 #include "SpellAuras.h"
 #include "Util.h"
 #include "WorldPacket.h"
@@ -250,6 +251,16 @@ enum class GuilderType : uint8
     MEDIUM = 70,
     LARGE = 120,
     VERY_LARGE = 250
+};
+
+enum class GuildType : uint8
+{
+    NONE = 0,
+    PVP = 1,
+    PVE = 2,
+    GATHERING_CRAFTER = 3,
+    ROLEPLAYING = 4,
+    ADVENTURER_EXPLORER = 5
 };
 
 enum ActivityType
@@ -598,10 +609,15 @@ public:
     static SpellFamilyNames Class2SpellFamilyName(uint8 cls);
     NewRpgInfo rpgInfo;
     NewRpgStatistic rpgStatistic;
+    GuildProfile* guildProfile = nullptr;
     std::unordered_set<uint32> lowPriorityQuest;
 
     // Schedules a callback to run once after <delayMs> milliseconds.
     void AddTimedEvent(std::function<void()> callback, uint32 delayMs);
+
+    // Guild type functionality
+    GuildType getGuildType() const { return guildType; }
+    void setGuildType(GuildType type) { guildType = type; }
 
 private:
     static void _fillGearScoreData(Player* player, Item* item, std::vector<uint32>* gearScore, uint32& twoHandScore,
@@ -638,6 +654,7 @@ protected:
     BotCheatMask cheatMask = BotCheatMask::none;
     Position jumpDestination = Position();
     uint32 nextTransportCheck = 0;
+    GuildType guildType;
 };
 
 #endif

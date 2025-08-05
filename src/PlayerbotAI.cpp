@@ -113,7 +113,8 @@ PlayerbotAI::PlayerbotAI()
       accountId(0),
       security(nullptr),
       master(nullptr),
-      currentState(BOT_STATE_NON_COMBAT)
+      currentState(BOT_STATE_NON_COMBAT),
+      guildType(GuildType::NONE)
 {
     for (uint8 i = 0; i < BOT_STATE_MAX; i++)
         engines[i] = nullptr;
@@ -131,7 +132,8 @@ PlayerbotAI::PlayerbotAI(Player* bot)
       chatHelper(this),
       chatFilter(this),
       master(nullptr),
-      security(bot)  // reorder args - whipowill
+      security(bot),  // reorder args - whipowill
+      guildType(GuildType::NONE)
 {
     if (!bot->isTaxiCheater() && HasCheat((BotCheatMask::taxi)))
         bot->SetTaxiCheater(true);
