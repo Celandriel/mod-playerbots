@@ -26,7 +26,7 @@ void PlayerbotGuildMgr::LoadGuilds()
 {
     guildCache.clear();
     LOG_INFO("playerbots", "Loading guilds from database");
-    QueryResult result = CharacterDatabase.Query("SELECT name, guild_type, status, guildID FROM playerbots_guild_names");
+    QueryResult result = CharacterDatabase.Query("SELECT name, guild_type, status, guildID, faction FROM playerbots_guild_names");
     if(!result)
     {
         LOG_ERROR("playerbots", "No guild names found in database");
@@ -44,6 +44,7 @@ void PlayerbotGuildMgr::LoadGuilds()
         uint8 type = fields[1].Get<uint8>();
         uint8 status = fields[2].Get<uint8>();
         uint32 guildId = fields[3].Get<uint32>();
+        uint8 faction = fields[4].Get<uint8>();
 
         if (type == 0 || type > guildTypeRatios.size())
         {
@@ -60,6 +61,7 @@ void PlayerbotGuildMgr::LoadGuilds()
         entry.status = status;
         entry.type = type;
         entry.guildID = guildId;
+        entry.faction = faction;
 
         if (entry.guildID != 0)
         {
@@ -166,7 +168,9 @@ void PlayerbotGuildMgr::AssignToGuild(Player* player)
     for (auto& kv : guildCache)
     {
         GuildCache& cached = kv.second;
-        if (cached.status == 1 && cached.guildID != 0 && cached.memberCount < cached.maxMembers)
+        if (cached.status == 1 && cached.guildID != 0 && cached.memberCount < cached.maxMembers && cached.faction == player->GetTeamId())
+        // Only consider guilds of the same faction and not full
+            if (cached.memberCount < cached.maxMembers)
         {
             partiallyfilledguilds.push_back(&cached);
         }
@@ -247,6 +251,7 @@ void PlayerbotGuildMgr::AssignToGuild(Player* player)
         else
             entry.maxMembers = 0;
         entry.status = 1;
+        entry.faction = player->GetTeamId();
         entry.dirty = true;
     }
     else
