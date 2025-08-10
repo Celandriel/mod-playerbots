@@ -22,6 +22,7 @@ namespace ai
         int8 DetermineGuildType();
         void AssignToGuild(Player* player);
         void SaveDirtyGuilds();
+        void CreateRPGGuilds();
 
     private:
         PlayerbotGuildMgr();
@@ -38,6 +39,7 @@ namespace ai
             uint32 memberCount = 0;
             uint8 faction = 0;
             bool dirty = false;
+            Guild* guildPtr = nullptr;   
         };
         std::unordered_map<std::string, GuildCache> guildCache;
     };

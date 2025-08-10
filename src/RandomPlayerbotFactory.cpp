@@ -8,7 +8,6 @@
 #include "AccountMgr.h"
 #include "ArenaTeamMgr.h"
 #include "DatabaseEnv.h"
-#include "PlayerbotGuildMgr.h"
 #include "GuildMgr.h"
 #include "PlayerbotFactory.h"
 #include "Playerbots.h"
@@ -256,11 +255,7 @@ Player* RandomPlayerbotFactory::CreateRandomBot(WorldSession* session, uint8 cls
     {
         player->learnSpell(50977, false);
     }
-    if (sPlayerbotAIConfig->enableGuildRPG && player)
-    {
-        sPlayerbotGuildMgr->AssignToGuild(player);
-      
-    }
+
     LOG_DEBUG("playerbots", "Random bot created for account {} - name: \"{}\"; race: {}; class: {}", accountId,
             name.c_str(), race, cls);
 
@@ -736,7 +731,7 @@ void RandomPlayerbotFactory::CreateRandomBots()
     int bot_creation = 0;
     timer = getMSTime();
     bool nameCached = false;
-    sPlayerbotGuildMgr->LoadGuilds();
+
     for (uint32 accountNumber = 0; accountNumber < totalAccountCount; ++accountNumber)
     {
         std::ostringstream out;
@@ -819,6 +814,7 @@ void RandomPlayerbotFactory::CreateRandomBots()
                     playerBot->CleanupsBeforeDelete();
                     delete playerBot;
                     bot_creation++;
+
                 }
                 else
                 {
@@ -835,10 +831,10 @@ void RandomPlayerbotFactory::CreateRandomBots()
         {
             std::this_thread::sleep_for(1s);
         }
+        
         LOG_INFO("playerbots", ">> {} Characters loaded into database in {} ms", bot_creation, GetMSTimeDiffToNow(timer));
     }
-    
-    sPlayerbotGuildMgr->SaveDirtyGuilds();
+
     
     for (WorldSession* session : sessionBots)
         delete session;

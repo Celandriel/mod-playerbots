@@ -10,6 +10,7 @@
 #include "PlayerbotDungeonSuggestionMgr.h"
 #include "PlayerbotFactory.h"
 #include "Playerbots.h"
+#include "PlayerbotGuildMgr.h"
 #include "RandomItemMgr.h"
 #include "RandomPlayerbotFactory.h"
 #include "RandomPlayerbotMgr.h"
@@ -614,7 +615,10 @@ bool PlayerbotAIConfig::Initialize()
     {
         return true;
     }
-
+    if (sPlayerbotAIConfig->enableGuildRPG && sPlayerbotAIConfig->enabled)
+    {
+        sPlayerbotGuildMgr->CreateRPGGuilds();
+    }
     // Assign account types after accounts are created
     sRandomPlayerbotMgr->AssignAccountTypes();
 

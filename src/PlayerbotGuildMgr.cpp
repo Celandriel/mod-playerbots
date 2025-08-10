@@ -3,6 +3,7 @@
 #include "DatabaseEnv.h"
 #include "Guild.h"
 #include "GuildMgr.h"
+#include "RandomPlayerbotMgr.h"
 #include <vector>
 #include <string>
 #include <sstream>
@@ -20,6 +21,7 @@ PlayerbotGuildMgr::PlayerbotGuildMgr()
         guildTypeRatios = {40, 20, 20, 10, 10}; // Default values
         guildNumPlayers = {100, 100, 50, 50, 50}; // Default values
     }
+    LoadGuilds();
 }
 
 void PlayerbotGuildMgr::LoadGuilds()
@@ -151,26 +153,23 @@ int8 PlayerbotGuildMgr::DetermineGuildType()
             bestType = static_cast<int8>(i + 1);
         }
     }
-    LOG_INFO("playerbots", "Best guild type determined: [{}] with max diff [{}]", bestType, maxDiff);
     return bestType;
 }
 
 
 void PlayerbotGuildMgr::AssignToGuild(Player* player)
 {
-    LOG_INFO("playerbots", "Assigning player [{}] to a guild", player->GetName());
     if (!player || !sPlayerbotAIConfig->enableGuildRPG)
         return;
 
-    // Collect partially filled guild pointers (no copies)
+    LOG_DEBUG("playerbots", "Assigning player [{}] to a guild", player->GetName());
+    
     std::vector<GuildCache*> partiallyfilledguilds;
     partiallyfilledguilds.reserve(guildCache.size());
     for (auto& kv : guildCache)
     {
         GuildCache& cached = kv.second;
-        if (cached.status == 1 && cached.guildID != 0 && cached.memberCount < cached.maxMembers && cached.faction == player->GetTeamId())
-        // Only consider guilds of the same faction and not full
-            if (cached.memberCount < cached.maxMembers)
+        if (cached.status == 1 && cached.memberCount < cached.maxMembers && cached.faction == player->GetTeamId())
         {
             partiallyfilledguilds.push_back(&cached);
         }
@@ -178,31 +177,43 @@ void PlayerbotGuildMgr::AssignToGuild(Player* player)
 
     if (!partiallyfilledguilds.empty())
     {
-        // pick random index safely
         size_t idx = static_cast<size_t>(urand(0, static_cast<int>(partiallyfilledguilds.size()) - 1));
         GuildCache* chosen = partiallyfilledguilds[idx];
 
-        // We need to call sGuildMgr outside the lock if sGuildMgr may call back into other systems to avoid deadlocks.
         uint32 chosenGuildId = chosen->guildID;
-
-        if (Guild* guild = sGuildMgr->GetGuildById(chosenGuildId))
+        Guild* guild = chosen->guildPtr ? chosen->guildPtr : sGuildMgr->GetGuildById(chosen->guildID);
+        if (guild)
         {
-            guild->AddMember(player->GetGUID());
-
-           chosen->memberCount++;
-
-            if (chosen->memberCount >= chosen->maxMembers)
+            if (!chosen->guildPtr)
             {
-                chosen->status = 2;
-                chosen->dirty = true;
+                chosen->guildPtr = guild;
+            }
+            if (guild->AddMember(player->GetGUID()))
+            {
+                chosen->memberCount++;
+                if (chosen->memberCount >= chosen->maxMembers)
+                {
+                    chosen->status = 2;
+                    chosen->dirty = true;
+                }
+                LOG_DEBUG("playerbots", "Successfully added player [{}] to guild [{}] (ID: {})", 
+                        player->GetName(), guild->GetName(), guild->GetId());
+                return;
+            }
+            else
+            {
+                LOG_ERROR("playerbots", "Failed to add player [{}] to guild [{}]", 
+                        player->GetName(), guild->GetName());
+                return;
             }
         }
         else
         {
-            // failed to find guild in manager; log and return
-            LOG_WARN("playerbots", "Attempted to add player to guild id {} but guild not found", chosenGuildId);
+            LOG_ERROR("playerbots", "Guild ID {} not found in GuildMgr", chosen->guildID);
+            // Mark this cache entry as invalid
+            chosen->guildPtr = nullptr;
+            chosen->status = 0; // or some error status
         }
-        return;
     }
 
     // No partial guilds: determine type and pick an available one
@@ -230,43 +241,26 @@ void PlayerbotGuildMgr::AssignToGuild(Player* player)
     GuildCache* chosenCache = availableGuilds[chosenIdx];
     std::string chosenName = chosenCache->name;
 
-    // If we are creating a new Guild to satisfy this name:
-    // Ensure sGuildMgr->AddGuild takes ownership; better to call sGuildMgr to create the guild properly.
     Guild* existing = sGuildMgr->GetGuildByName(chosenName);
     if (!existing)
     {
-        // Prefer an sGuildMgr factory method if available, else create and add
-        auto* newGuild = new Guild();
-        // make sure newGuild has proper name/initialization if necessary
-        sGuildMgr->AddGuild(newGuild); // assume ownership
+        Guild* newGuild = new Guild();
+        newGuild->Create(player, chosenName);
         newGuild->AddMember(player->GetGUID());
 
-        // re-lock to update the cache entry
         GuildCache& entry = guildCache[chosenName];
         entry.guildID = newGuild->GetId();
         entry.memberCount = 1;
-        // validate type index before indexing guildNumPlayers
-        if (entry.type > 0 && static_cast<size_t>(entry.type) <= guildNumPlayers.size())
-            entry.maxMembers = guildNumPlayers[entry.type - 1];
-        else
-            entry.maxMembers = 0;
+        entry.maxMembers = guildNumPlayers[entry.type - 1];
         entry.status = 1;
         entry.faction = player->GetTeamId();
         entry.dirty = true;
+        entry.guildPtr = newGuild;
+        return;
     }
-    else
-    {
-        // existing guild found - add member safely
-        existing->AddMember(player->GetGUID());
-        GuildCache& entry = guildCache[chosenName];
-        entry.guildID = existing->GetId();
-        entry.memberCount++;
-        if (entry.memberCount >= entry.maxMembers)
-        {
-            entry.status = 2;
-            entry.dirty = true;
-        }
-    }
+    LOG_ERROR("playerbots", "Unable to assign player [{}] to guild [{}].", 
+            player->GetName(), chosenName);
+    return;
 }
 
 
@@ -290,3 +284,21 @@ void PlayerbotGuildMgr::SaveDirtyGuilds()
 
 
 
+
+void PlayerbotGuildMgr::CreateRPGGuilds()
+{
+    if (!sPlayerbotAIConfig->enableGuildRPG)
+        return;
+
+    LOG_INFO("playerbots", "Scanning bots for guild assignment");
+    PlayerBotMap bots = sRandomPlayerbotMgr->GetAllBots();
+    LOG_INFO("playerbots", "{} bots found for guild assignment", bots.size());
+    for (auto const& [guid, bot] : bots)
+    {
+        if (bot && !bot->GetGuildId())
+        {
+            LOG_INFO("playerbots", "Assigning bot [{}] to a guild", bot->GetName());
+            AssignToGuild(bot);
+        }
+    }
+}
