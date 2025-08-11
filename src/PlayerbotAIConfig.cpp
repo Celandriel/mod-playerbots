@@ -615,11 +615,8 @@ bool PlayerbotAIConfig::Initialize()
     {
         return true;
     }
-    if (sPlayerbotAIConfig->enableGuildRPG && sPlayerbotAIConfig->enabled)
-    {
-        sPlayerbotGuildMgr->CreateRPGGuilds();
-    }
-    // Assign account types after accounts are created
+
+// Assign account types after accounts are created
     sRandomPlayerbotMgr->AssignAccountTypes();
 
     if (sPlayerbotAIConfig->enabled)
@@ -640,6 +637,7 @@ bool PlayerbotAIConfig::Initialize()
         sPlayerbotDungeonSuggestionMgr->LoadDungeonSuggestions();
     }
 
+    
     excludedHunterPetFamilies.clear();
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.ExcludedHunterPetFamilies", ""), excludedHunterPetFamilies);
 

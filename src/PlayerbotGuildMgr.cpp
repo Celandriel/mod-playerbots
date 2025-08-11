@@ -4,9 +4,7 @@
 #include "Guild.h"
 #include "GuildMgr.h"
 #include "RandomPlayerbotMgr.h"
-#include <vector>
-#include <string>
-#include <sstream>
+#include "ScriptMgr.h"
 
 using namespace ai;
 
@@ -263,6 +261,123 @@ void PlayerbotGuildMgr::AssignToGuild(Player* player)
     return;
 }
 
+void PlayerbotGuildMgr::resetGuildCache()
+{
+    for (auto it = guildCache.begin(); it != guildCache.end();)
+        {
+            GuildCache& cached = it->second;
+            cached.guildID = 0
+            cached.guildPtr == nullptr
+            cached.memberCount = 0;
+            cached.faction = 2;
+            cached.status = 0;
+            cached.dirty = true;
+        }
+}
+
+void PlayerbotGuildMgr::ValidateGuildCache()
+{
+    QueryResult guild_members = CharacterDatabase.Query("SELECT guildID, guid FROM guild_member");
+    if (!guild_members)
+    {
+        LOG_ERROR("playerbots", "No guilds found in database, resetting guild cache");
+        resetGuildCache();
+        return;
+    }
+    
+    QueryResult guild_table = CharacterDatabase.Query("SELECT guildid, name FROM guild");
+    //process guild table data
+    std::unordered_map<uint32, std::string> guildIdToName;
+    do
+    {
+        Field* fields = guild_table->Fetch();
+        uint32 guildId = fields[0].GetUInt32();
+        std::string guildName = fields[1].GetString();
+        guildIdToName[guildId] = guildName;
+    } while (guild_table->NextRow());
+
+    // process guild members data
+    std::unordered_map<uint32, uint32> memberCountByGuildId;
+    do
+    {
+        Field* fields = guild_members->Fetch();
+        uint32 guildId = fields[0].GetUInt32();
+        memberCountByGuildId[guildId]++;
+    } while (guild_members->NextRow());
+
+    for (auto& [guildName, cached] : guildCache)
+    {
+        auto dbGuildIt = guildNameToId.find(guildName);
+
+        if (dbGuildIt == guildNameToId.end())
+        {
+            // Guild name not found in DB - reset status to 0 if not already
+            if (cached.status != 0)
+            {
+                cached.status = 0;
+                cached.guildID = 0;
+                cached.memberCount = 0;
+                cached.faction = 2; // Neutral faction
+                cached.guildPtr = nullptr;
+                cached.dirty = true;
+                LOG_INFO("playerbots", "Cached guild [{}] not found in DB, resetting status to 0", guildName);
+            }
+            continue;
+        }
+
+        // 2) Guild exists in DB - get guildId and member count
+        uint32 guildId = dbGuildIt->second;
+        uint32 dbMemberCount = guildMemberCounts[guildId];
+
+        cached.memberCount = dbMemberCount;
+
+        // 3) Determine expected status based on member count and maxMembers
+        uint8 expectedStatus = 0;
+        if (dbMemberCount == 0)
+            expectedStatus = 0; // empty
+        else if (dbMemberCount < cached.maxMembers)
+            expectedStatus = 1; // partially filled
+        else
+            expectedStatus = 2; // full
+
+        // 4) Update status if different
+        if (cached.status != expectedStatus)
+        {
+            LOG_INFO("playerbots", "Updating status of guild [{}] from {} to {}", guildName, cached.status, expectedStatus);
+            cached.status = expectedStatus;
+            cached.dirty = true;
+        }
+
+        // Step 5: Faction consistency check
+        uint8 expectedFaction = cache.faction;
+        bool factionMismatchFound = false;
+
+        for (auto& botGuid : members)
+        {
+            Player* bot = ObjectAccessor::FindConnectedPlayer(botGuid);
+            if (!bot)
+                continue; // Offline, skip
+
+            uint8 botFaction = bot->GetTeamId();
+            if (botFaction != expectedFaction)
+            {
+                factionMismatchFound = true;
+
+                // Remove bot from guild
+                if (Guild* guild = sGuildMgr->GetGuildById(guildId))
+                {
+                    guild->DeleteMember(botGuid);
+                    LOG_WARN("playerbots", "Removed bot [{}] from guild [{}] due to faction mismatch",
+                             bot->GetName(), cache.name);
+                }
+            }
+        }
+
+        if (factionMismatchFound)
+            cache.dirty = true;
+    }
+}
+
 
 void PlayerbotGuildMgr::SaveDirtyGuilds()
 {
@@ -272,33 +387,45 @@ void PlayerbotGuildMgr::SaveDirtyGuilds()
     {
         if (cached.dirty)
         {
-            LOG_INFO("playerbots", "Saving guild [{}] with status [{}]", name, cached.status);
-            trans->Append("UPDATE playerbots_guild_names SET status = {} WHERE name = '{}'",
-                          cached.status, name);
+            trans->Append("UPDATE playerbots_guild_names SET status = {}, guildID = {}, faction = {} WHERE name = '{}'",
+                          cached.status, cached.guildID, cached.faction, name);
             cached.dirty = false;
         }
     }
-    LOG_INFO("playerbots", "Saving guild cache to database");
     CharacterDatabase.CommitTransaction(trans);
 }
 
 
 
-
-void PlayerbotGuildMgr::CreateRPGGuilds()
+class BotGuildCacheWorldScript : public WorldScript
 {
-    if (!sPlayerbotAIConfig->enableGuildRPG)
-        return;
+public:
+    BotGuildCacheWorldScript() : WorldScript("BotGuildCacheWorldScript"), m_saveInterval(900000), m_timer(0) { }
 
-    LOG_INFO("playerbots", "Scanning bots for guild assignment");
-    PlayerBotMap bots = sRandomPlayerbotMgr->GetAllBots();
-    LOG_INFO("playerbots", "{} bots found for guild assignment", bots.size());
-    for (auto const& [guid, bot] : bots)
+    void OnStartup() override
     {
-        if (bot && !bot->GetGuildId())
+        if (sPlayerbotAIConfig->enableGuildRPG)
         {
-            LOG_INFO("playerbots", "Assigning bot [{}] to a guild", bot->GetName());
-            AssignToGuild(bot);
+            sPlayerbotGuildMgr->LoadGuilds();
+            sPlayerbotGuildMgr->ValidateGuildCache();
+            LOG_INFO("playerbots", "Bot guild cache initialized and validated");
         }
     }
-}
+    void OnUpdate(uint32 diff) override
+    {
+        if (!sPlayerbotAIConfig->enableGuildRPG)
+            return;
+        m_timer += diff;
+        if (m_timer >= m_saveInterval)
+        {
+            m_timer = 0;
+            sPlayerbotGuildMgr->ValidateGuildCache();
+            sPlayerbotGuildMgr->SaveDirtyGuilds();
+        }
+    }
+
+private:
+    uint32 m_saveInterval;  
+    uint32 m_timer;
+
+};

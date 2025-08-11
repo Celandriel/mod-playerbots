@@ -22,7 +22,6 @@ namespace ai
         int8 DetermineGuildType();
         void AssignToGuild(Player* player);
         void SaveDirtyGuilds();
-        void CreateRPGGuilds();
 
     private:
         PlayerbotGuildMgr();
