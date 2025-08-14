@@ -27,6 +27,7 @@
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotDbStore.h"
 #include "PlayerbotFactory.h"
+#include "PlayerbotGuildMgr.h"
 #include "PlayerbotSecurity.h"
 #include "Playerbots.h"
 #include "RandomPlayerbotMgr.h"
@@ -472,6 +473,11 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
         // Log a warning here to indicate that the botAI is null
         LOG_DEBUG("mod-playerbots", "PlayerbotAI is null for bot with GUID: {}", bot->GetGUID().GetRawValue());
         return;
+    }
+    
+    if (!bot->GetGuildId()) // No guild assigned
+    {
+        sPlayerbotGuildMgr->AssignToGuild(bot);
     }
 
     Player* master = botAI->GetMaster();

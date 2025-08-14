@@ -54,7 +54,15 @@ enum NewRpgStatus : int
     RPG_REST = 6,
     // Initial status
     RPG_IDLE = 7,
-    RPG_STATUS_END = 8
+    RPG_PVP_QUEUE,
+    RPG_PVP_PATROL,
+    RPG_GATHER_NODE,
+    RPG_KILL_AND_GATHER,
+    RPG_CRAFT_WORKSHOP,
+    RPG_EXPLORE_POI,
+    RPG_WORLD_EVENT,
+    RPG_RETURN_TO_BANK,
+    RPG_STATUS_END
 };
 
 #define MAX_SPECNO 20
@@ -261,9 +269,11 @@ public:
     uint32 randomBotAccountCount;
     bool randomBotRandomPassword;
     bool deleteRandomBotAccounts;
+    bool enableGuildRPG;
     uint32 randomBotGuildCount;
     bool deleteRandomBotGuilds;
     std::vector<uint32> randomBotGuilds;
+    std::vector<uint32> Guild_TypeRatios, Guild_Num_Bots, Guild_PVE_Spec_Ratio;
     std::vector<uint32> pvpProhibitedZoneIds;
     std::vector<uint32> pvpProhibitedAreaIds;
     bool fastReactInBG;
