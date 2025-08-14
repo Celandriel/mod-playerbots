@@ -306,6 +306,7 @@ void PlayerbotGuildMgr::ValidateGuildCache()
         Field* fields = guild_table->Fetch();
         std::string guildName = fields[1].Get<std::string>();
         uint32 guildId = fields[0].Get<uint32>();
+        guildNameToId[guildName] = guildId;
     } while (guild_table->NextRow());
 
     for (auto& [guildName, cached] : guildCache)
