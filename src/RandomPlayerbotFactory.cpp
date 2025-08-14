@@ -255,6 +255,7 @@ Player* RandomPlayerbotFactory::CreateRandomBot(WorldSession* session, uint8 cls
     {
         player->learnSpell(50977, false);
     }
+
     LOG_DEBUG("playerbots", "Random bot created for account {} - name: \"{}\"; race: {}; class: {}", accountId,
             name.c_str(), race, cls);
 
@@ -730,6 +731,7 @@ void RandomPlayerbotFactory::CreateRandomBots()
     int bot_creation = 0;
     timer = getMSTime();
     bool nameCached = false;
+
     for (uint32 accountNumber = 0; accountNumber < totalAccountCount; ++accountNumber)
     {
         std::ostringstream out;
@@ -812,6 +814,7 @@ void RandomPlayerbotFactory::CreateRandomBots()
                     playerBot->CleanupsBeforeDelete();
                     delete playerBot;
                     bot_creation++;
+
                 }
                 else
                 {
@@ -820,7 +823,6 @@ void RandomPlayerbotFactory::CreateRandomBots()
             }
         }
     }
-
     if (bot_creation)
     {
         LOG_INFO("playerbots", "Waiting for {} characters loading into database ({} queries)...", bot_creation, CharacterDatabase.QueueSize());
@@ -829,9 +831,11 @@ void RandomPlayerbotFactory::CreateRandomBots()
         {
             std::this_thread::sleep_for(1s);
         }
+        
         LOG_INFO("playerbots", ">> {} Characters loaded into database in {} ms", bot_creation, GetMSTimeDiffToNow(timer));
     }
 
+    
     for (WorldSession* session : sessionBots)
         delete session;
 

@@ -10,6 +10,7 @@
 #include "PlayerbotDungeonSuggestionMgr.h"
 #include "PlayerbotFactory.h"
 #include "Playerbots.h"
+#include "PlayerbotGuildMgr.h"
 #include "RandomItemMgr.h"
 #include "RandomPlayerbotFactory.h"
 #include "RandomPlayerbotMgr.h"
@@ -199,7 +200,13 @@ bool PlayerbotAIConfig::Initialize()
                                              "531,532,534,544,548,550,564,565,580,249,533,603,615,616,624,631,649,724"),
         restrictedHealerDPSMaps);
 	
-	//////////////////////////// ICC
+    //////////////////////////// Guild RPG
+    enableGuildRPG = sConfigMgr->GetOption<bool>("AiPlayerbot.Enable_Guild_RPG", true);   
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_Type_Ratios", "40,20,20,10,10"), Guild_TypeRatios);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_Num_Bots", "100,100,50,50,50"), Guild_Num_Bots);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_PVE_Spec_Ratio", "12,22,34,32"), Guild_PVE_Spec_Ratio);
+	
+    //////////////////////////// ICC
 
 	EnableICCBuffs = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableICCBuffs", true);
 
@@ -609,7 +616,7 @@ bool PlayerbotAIConfig::Initialize()
         return true;
     }
 
-    // Assign account types after accounts are created
+// Assign account types after accounts are created
     sRandomPlayerbotMgr->AssignAccountTypes();
 
     if (sPlayerbotAIConfig->enabled)
@@ -617,6 +624,10 @@ bool PlayerbotAIConfig::Initialize()
         sRandomPlayerbotMgr->Init();
     }
 
+    if (enableGuildRPG)
+    {
+        sPlayerbotGuildMgr->Init();
+    }
     sRandomItemMgr->Init();
     sRandomItemMgr->InitAfterAhBot();
     sPlayerbotTextMgr->LoadBotTexts();
@@ -630,6 +641,7 @@ bool PlayerbotAIConfig::Initialize()
         sPlayerbotDungeonSuggestionMgr->LoadDungeonSuggestions();
     }
 
+    
     excludedHunterPetFamilies.clear();
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.ExcludedHunterPetFamilies", ""), excludedHunterPetFamilies);
 

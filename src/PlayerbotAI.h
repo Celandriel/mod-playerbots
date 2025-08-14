@@ -252,6 +252,16 @@ enum class GuilderType : uint8
     VERY_LARGE = 250
 };
 
+enum class GuildType : uint8
+{
+    NONE = 0,
+    PVP = 1,
+    PVE = 2,
+    GATHERING_CRAFTER = 3,
+    ROLEPLAYING = 4,
+    ADVENTURER_EXPLORER = 5
+};
+
 enum ActivityType
 {
     GRIND_ACTIVITY = 1,
@@ -603,6 +613,10 @@ public:
     // Schedules a callback to run once after <delayMs> milliseconds.
     void AddTimedEvent(std::function<void()> callback, uint32 delayMs);
 
+    // Guild type functionality
+    GuildType getGuildType() const { return guildType; }
+    void setGuildType(GuildType type) { guildType = type; }
+
 private:
     static void _fillGearScoreData(Player* player, Item* item, std::vector<uint32>* gearScore, uint32& twoHandScore,
                                    bool mixed = false);
@@ -638,6 +652,7 @@ protected:
     BotCheatMask cheatMask = BotCheatMask::none;
     Position jumpDestination = Position();
     uint32 nextTransportCheck = 0;
+    GuildType guildType;
 };
 
 #endif
