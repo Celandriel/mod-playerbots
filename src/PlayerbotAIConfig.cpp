@@ -624,6 +624,10 @@ bool PlayerbotAIConfig::Initialize()
         sRandomPlayerbotMgr->Init();
     }
 
+    if (enableGuildRPG)
+    {
+        sPlayerbotGuildMgr->Init();
+    }
     sRandomItemMgr->Init();
     sRandomItemMgr->InitAfterAhBot();
     sPlayerbotTextMgr->LoadBotTexts();

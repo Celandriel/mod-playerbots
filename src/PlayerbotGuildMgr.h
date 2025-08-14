@@ -2,8 +2,8 @@
 #define _PLAYERBOT_PLAYERBOTGUILDMGR_H
 
 #include "Player.h"
-#include <vector>
-#include <string>
+#include "Guild.h"
+
 
 class PlayerbotAI;
 
@@ -18,17 +18,18 @@ namespace ai
             return &instance;
         }
 
-        void LoadGuilds();
+        void Init();
         int8 DetermineGuildType();
         void AssignToGuild(Player* player);
         void SaveDirtyGuilds();
-
+        void ValidateGuildCache();
+        void ResetGuildCache();
+    
     private:
         PlayerbotGuildMgr();
         std::vector<uint32> guildTypeRatios;
         std::vector<uint32> guildNumPlayers;
 
-        // Guild cache structure
         struct GuildCache {
             std::string name;
             uint8 type;
@@ -43,6 +44,8 @@ namespace ai
         std::unordered_map<std::string, GuildCache> guildCache;
     };
 }
+
+void PlayerBotsGuildValidationScript();
 
 #define sPlayerbotGuildMgr ai::PlayerbotGuildMgr::instance()
 
