@@ -266,7 +266,7 @@ void PlayerbotGuildMgr::ResetGuildCache()
         {
             GuildCache& cached = it->second;
             cached.guildID = 0;
-            cached.guildPtr == nullptr;
+            cached.guildPtr = nullptr;
             cached.memberCount = 0;
             cached.faction = 2;
             cached.status = 0;
