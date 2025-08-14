@@ -1,13 +1,12 @@
 DROP TABLE IF EXISTS `playerbots_guild_names`;
-CREATE TABLE IF NOT EXISTS `playerbots_guild_names` (
+CREATE TABLE  `playerbots_guild_names` (
   `name_id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(24) NOT NULL,
   `guild_type` tinyint(1) NOT NULL COMMENT '1=PvP, 2=PvE, 3=GatheringCrafter, 4=Roleplaying, 5=AdventurerExplorer',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0=Not UsedActive, 1=In Use, 2=Full',
-  `guildID` int(4) unsigned zerofill NOT NULL,
-  `faction` tinyint(1) unsigned zerofill NOT NULL DEFAULT '2',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0=Available, 1=In Use, 2=Full',
+  `guildID` int(4) unsigned NOT NULL,
+  `faction` tinyint(1) unsigned NOT NULL DEFAULT '2',
   PRIMARY KEY (`name_id`),
-  UNIQUE KEY `name_id` (`name_id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=MyISAM AUTO_INCREMENT=613 DEFAULT CHARSET=utf8mb3 ROW_FORMAT=FIXED COMMENT='Playerbot guild names with types';
 
@@ -619,3 +618,5 @@ INSERT INTO `playerbots_guild_names` (`name_id`, `name`, `guild_type`, `status`,
 	(603, 'Mercenarys Oath', 5, 0, 0000, 2),
 	(604, 'Questwarden Collective', 5, 0, 0000, 2),
 	(605, 'Eventside Rangers', 5, 0, 0000, 2);
+
+	/*!40000 ALTER TABLE `playerbots_guild_names` ENABLE KEYS */;
