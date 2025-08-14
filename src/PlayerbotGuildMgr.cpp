@@ -374,7 +374,7 @@ class BotGuildCacheWorldScript : public WorldScript
 {
     public:
 
-        BotGuildCacheWorldScript() : WorldScript("BotGuildCacheWorldScript"){}
+        BotGuildCacheWorldScript() : WorldScript("BotGuildCacheWorldScript"), m_validateTimer(0), m_timer(0){}
 
         void OnStartup() override
         {
