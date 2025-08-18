@@ -24,6 +24,7 @@
 #include "GameObjectData.h"
 #include "GameTime.h"
 #include "GuildMgr.h"
+#include "GuildRPGStrategy.h"
 #include "GuildTaskMgr.h"
 #include "LFGMgr.h"
 #include "LastMovementValue.h"
