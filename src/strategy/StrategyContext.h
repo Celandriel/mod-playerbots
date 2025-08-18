@@ -23,6 +23,7 @@
 #include "GroupStrategy.h"
 #include "GuardStrategy.h"
 #include "GuildStrategy.h"
+#include "GuildRPGStrategy.h"
 #include "KiteStrategy.h"
 #include "LfgStrategy.h"
 #include "LootNonCombatStrategy.h"
@@ -120,6 +121,7 @@ public:
         creators["formation"] = &StrategyContext::combat_formation;
         creators["move from group"] = &StrategyContext::move_from_group;
         creators["worldbuff"] = &StrategyContext::world_buff;
+        creators["guild rpg"] = &StrategyContext::guild_rpg;
     }
 
 private:
@@ -188,6 +190,7 @@ private:
     static Strategy* combat_formation(PlayerbotAI* ai) { return new CombatFormationStrategy(ai); }
     static Strategy* move_from_group(PlayerbotAI* botAI) { return new MoveFromGroupStrategy(botAI); }
     static Strategy* world_buff(PlayerbotAI* botAI) { return new WorldBuffStrategy(botAI); }
+    static Strategy* guild_rpg(PlayerbotAI* botAI) { return new GuildRPGStrategy(botAI); }
 };
 
 class MovementStrategyContext : public NamedObjectContext<Strategy>
