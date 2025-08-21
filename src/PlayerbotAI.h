@@ -43,6 +43,7 @@ class WorldPosition;
 
 struct CreatureData;
 struct GameObjectData;
+struct TargetGroupComposition;
 
 enum StrategyType : uint32;
 
@@ -354,6 +355,18 @@ enum WARRIOR_TABS
     WARRIOR_TAB_PROTECTION,
 };
 
+struct TargetGroupComposition
+{
+    uint8_t groupSize;
+    uint8_t tanks;
+    uint8_t minHealers;
+    uint8_t maxHealers;
+    uint8_t minDps;
+    uint8_t maxDps;
+    uint8_t lowerLevelLimit;
+    uint8_t upperLevelLimit;
+};
+
 class PacketHandlingHelper
 {
 public:
@@ -618,6 +631,8 @@ public:
     // Guild type functionality
     GuildType getGuildType() const { return guildType; }
     void setGuildType(GuildType type) { guildType = type; }
+    const TargetGroupComposition& GetTargetGroupComposition() const { return m_targetComposition; }
+    void SetTargetGroupComposition(const TargetGroupComposition& comp) { m_targetComposition = comp; }
 
 private:
     static void _fillGearScoreData(Player* player, Item* item, std::vector<uint32>* gearScore, uint32& twoHandScore,
@@ -655,6 +670,7 @@ protected:
     Position jumpDestination = Position();
     uint32 nextTransportCheck = 0;
     GuildType guildType;
+    TargetGroupComposition m_targetComposition {};
 };
 
 #endif

@@ -269,7 +269,7 @@ public:
     uint32 randomBotAccountCount;
     bool randomBotRandomPassword;
     bool deleteRandomBotAccounts;
-    bool enableGuildRPG;
+    bool enableGuildRPGStrategy;
     uint32 randomBotGuildCount;
     bool deleteRandomBotGuilds;
     std::vector<uint32> randomBotGuilds;

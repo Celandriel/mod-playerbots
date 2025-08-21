@@ -156,7 +156,7 @@ int8 PlayerbotGuildMgr::DetermineGuildType()
 
 void PlayerbotGuildMgr::AssignToGuild(Player* player)
 {
-    if (!player || !sPlayerbotAIConfig->enableGuildRPG)
+    if (!player || !sPlayerbotAIConfig->enableGuildRPGStrategy)
         return;
 
     LOG_DEBUG("playerbots", "Assigning player [{}] to a guild", player->GetName());
@@ -378,7 +378,7 @@ class BotGuildCacheWorldScript : public WorldScript
 
         void OnStartup() override
         {
-            if (sPlayerbotAIConfig->enableGuildRPG)
+            if (sPlayerbotAIConfig->enableGuildRPGStrategy)
             {
                 sPlayerbotGuildMgr->ValidateGuildCache();
                 LOG_INFO("server.loading", "Bot guild cache initialized and validated");
@@ -387,7 +387,7 @@ class BotGuildCacheWorldScript : public WorldScript
 
         void OnUpdate(uint32 diff) override
         {
-            if (!sPlayerbotAIConfig->enableGuildRPG)
+            if (!sPlayerbotAIConfig->enableGuildRPGStrategy)
                 return;
             m_timer += diff;
             m_validateTimer += diff;
