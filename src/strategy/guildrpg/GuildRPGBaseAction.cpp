@@ -81,7 +81,7 @@ bool CreateGroupAction::ValidateTargetComposition(TargetGroupComposition& comp)
     if (comp.maxDps < comp.minDps)
         return false;
     //Check level limits. 
-    if (comp.LowerLevelLimit > comp.UpperLevelLimit)
+    if (comp.lowerLevelLimit > comp.upperLevelLimit)
         return false;
         
     return true;
