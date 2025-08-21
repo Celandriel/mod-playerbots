@@ -67,7 +67,7 @@ bool CreateGroupAction::isUseful()
 
 bool CreateGroupAction::ValidateTargetComposition(TargetGroupComposition& comp)
 {
-    if (comp.groupSize == 0 || comp.groupSize > 5)
+    if (comp.groupSize == 0)
         return false;
         
     // Validate role requirements don't exceed group size

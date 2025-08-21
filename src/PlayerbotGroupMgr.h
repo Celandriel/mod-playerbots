@@ -43,7 +43,6 @@ private:
     Guild* m_guild;
     int totalMembers;
     bool checklevel = false;
-    bool groupready = false;
 
     BotRoles GetBotRole(ObjectGuid guid);
     void UpdateComposition(); 
