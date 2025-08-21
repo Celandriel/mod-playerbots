@@ -1,79 +1,86 @@
+#include "PlayerbotAI.h"
 #include "Action.h"
 #include "GroupMgr.h"
 #include "Group.h"
 #include "Guild.h"
 #include "Player.h"
 #include "Playerbots.h"
-#include "PlayerbotAI.h"
 #include "PlayerbotGroupMgr.h"
 
 
 
-PlayerbotGroupMgr::PlayerbotGroupMgr(PlayerbotAI* botAI) 
+PlayerbotGroupMgr::PlayerbotGroupMgr(PlayerbotAI* botAI)
     : m_botAI(botAI), m_group(nullptr)
 {
-    m_composition[BOT_ROLE_TANK] = 0;
-    m_composition[BOT_ROLE_HEALER] = 0;
-    m_composition[BOT_ROLE_DPS] = 0;
+    m_roleComposition[BOT_ROLE_TANK] = 0;
+    m_roleComposition[BOT_ROLE_HEALER] = 0;
+    m_roleComposition[BOT_ROLE_DPS] = 0;
 }
 
 PlayerbotGroupMgr::~PlayerbotGroupMgr()
 {
     if (m_group)
-        DisbandGroup();
+    {
+        delete m_group;
+        m_group = nullptr;
+    }
 }
 
-bool PlayerbotGroupMgr::CreateGroup(const TargetComposition& targetComposition)
+bool PlayerbotGroupMgr::CreateGroup()
 {
     if (!m_botAI)
         return false;
-
+    if (m_targetComposition.groupSize==0)
+        return false;
     Player* leader = m_botAI->GetBot();
+    if (!leader)
+        return false;
+
     ObjectGuid leaderGuid = leader->GetGUID();
-    Guild* guild = leader->GetGuild();
-    if (!guild)
+    Guild* m_guild = leader->GetGuild();
+    if (!m_guild)
         return false;
     
-    if (targetComposition.groupSize == 0)
+    if (m_targetComposition.groupSize == 0)
         return false;
 
-    std::vector<GuildMember> availableMembers = FindAvailableGuildMembers(guild, targetComposition); 
+    std::vector<GuildMember> availableMembers = FindAvailableGuildMembers(); 
     if (availableMembers.empty())
         return false;
 
     if (!m_group)
     {
-        Group* group = new Group();
-        if (!group->Create(leader))
+        Group* m_group = new Group();
+        if (!m_group->Create(leader))
         {
-            delete group;
+            delete m_group;
             return false;
         }
-        sGroupMgr->AddGroup(group);
-        m_group = group;
+        sGroupMgr->AddGroup(m_group);
+        BotRoles leaderRole = GetBotRole(leaderGuid);
+        m_roleComposition[leaderRole] = 1;
     }
-    BotRoles leaderRole = GetBotRole(leaderGuid);
-    m_composition[leaderRole] = 1;
-    
+
+    UpdateComposition();
     // Shuffle the available members to randomize selection
     std::random_device rd;
     std::default_random_engine rng(rd());
     std::shuffle(availableMembers.begin(), availableMembers.end(), rng);
     
-    int totalMembers = 1;
+
     for (auto& member : availableMembers)
     {
-        if (totalMembers >= targetComposition.groupSize)
+        if (totalMembers >= m_targetComposition.groupSize)
             break;
         
-        if (totalMembers > 1 && targetComposition.groupSize > 5 && !m_group->isRaidGroup())
+        if (totalMembers > 1 && m_targetComposition.groupSize > 5 && !m_group->isRaidGroup())
             m_group->ConvertToRaid();
 
-        if (CanInviteMore(GetBotRole(member.guid), targetComposition))
+        if (CanInviteMore(member.role))
         {
             if (InviteBot(member.guid))
             {
-                m_composition[member.role]++;
+                m_roleComposition[member.role]++;
                 totalMembers++;
             }
         }
@@ -81,12 +88,12 @@ bool PlayerbotGroupMgr::CreateGroup(const TargetComposition& targetComposition)
     return true;
 }
 
-std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers(Guild* guild, const TargetComposition& targetComposition)
+std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers()
 {
     std::vector<GuildMember> availableMembers;
-    if (!guild)
+    if (!m_guild)
         return availableMembers;
-    std::vector<ObjectGuid> guildMembers = GetGuildMembers(guild->GetId());
+    std::vector<ObjectGuid> guildMembers = GetGuildMembers(m_guild->GetId());
     for (const auto& memberGuid : guildMembers)
     {
         Player* player = ObjectAccessor::FindPlayer(memberGuid);
@@ -96,10 +103,9 @@ std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers(Guild* gui
             continue;
         
         uint8_t playerlevel = player->GetLevel();
-        if ((targetComposition.LowerLevelLimit > 0 && 
-            playerlevel < targetComposition.LowerLevelLimit )||
-            (targetComposition.UpperLevelLimit > 0 && 
-            playerlevel > targetComposition.UpperLevelLimit))
+        if (checklevel &&
+            (playerlevel < m_targetComposition.LowerLevelLimit || 
+            playerlevel > m_targetComposition.UpperLevelLimit))
             continue;
 
         BotRoles role = GetBotRole(memberGuid);
@@ -132,17 +138,21 @@ bool PlayerbotGroupMgr::RemoveBot(ObjectGuid guid)
     if (!bot)
         return false;
 
-    Group* group = bot->GetGroup();
-    if (!group)
+    if (!m_group)
         return false;
 
-    group->RemoveMember(guid);
+    if (guid == m_group->GetLeaderGUID())
+    {
+        DisbandGroup();
+        return true;
+    }
+    m_group->RemoveMember(guid);
     UpdateComposition();
 
-    if (group->GetMembersCount() == 0) 
+    if (m_group->GetMembersCount() == 0) 
     {
-        sGroupMgr->RemoveGroup(group);
-        delete group;
+        sGroupMgr->RemoveGroup(m_group);
+        delete m_group;
         m_group = nullptr;
     }
     return true;
@@ -153,13 +163,11 @@ bool PlayerbotGroupMgr::DisbandGroup()
     if (!m_group)
         return false;
 
-    if (m_group)
-    {
-        m_group->Disband();
-        sGroupMgr->RemoveGroup(m_group);
-        delete m_group;
-        m_group = nullptr;
-    }
+    m_group->Disband();
+    sGroupMgr->RemoveGroup(m_group);
+    delete m_group;
+    m_group = nullptr;
+    return true;
 }
 
 BotRoles PlayerbotGroupMgr::GetBotRole(ObjectGuid guid)
@@ -182,16 +190,16 @@ BotRoles PlayerbotGroupMgr::GetBotRole(ObjectGuid guid)
     return BOT_ROLE_NONE;
 }
 
-bool PlayerbotGroupMgr::CanInviteMore(BotRoles role, const TargetComposition& composition)
+bool PlayerbotGroupMgr::CanInviteMore(BotRoles role)
 {
     switch (role)
     {
         case BOT_ROLE_TANK:
-            return m_composition[BOT_ROLE_TANK] < composition.tanks;
+            return m_roleComposition[BOT_ROLE_TANK] < m_targetComposition.tanks;
         case BOT_ROLE_HEALER:
-            return m_composition[BOT_ROLE_HEALER] < composition.maxHealers;
+            return m_roleComposition[BOT_ROLE_HEALER] < m_targetComposition.maxHealers;
         case BOT_ROLE_DPS:
-            return m_composition[BOT_ROLE_DPS] < composition.maxDps;
+            return m_roleComposition[BOT_ROLE_DPS] < m_targetComposition.maxDps;
         default:
             return false;
     }
@@ -200,12 +208,14 @@ bool PlayerbotGroupMgr::CanInviteMore(BotRoles role, const TargetComposition& co
 void PlayerbotGroupMgr::UpdateComposition()
 {
     // Reset composition
-    for (auto& pair : m_composition)
+    for (auto& pair : m_roleComposition)
         pair.second = 0;
         
     if (!m_group)
         return;
     
+    totalMembers = m_group->GetMembersCount();
+
     Group::MemberSlotList const& members = m_group->GetMemberSlots();
     for (Group::MemberSlot const& slot : members)
     {
@@ -213,7 +223,7 @@ void PlayerbotGroupMgr::UpdateComposition()
         if (member)
         {
             BotRoles role = GetBotRole(slot.guid);
-            m_composition[role]++;
+            m_roleComposition[role]++;
         }
     }
 }
@@ -232,3 +242,102 @@ std::vector<ObjectGuid> PlayerbotGroupMgr::GetGuildMembers(uint32 guildId)
     
     return guids;
 }
+
+//Figure out if the group is complete
+bool PlayerbotGroupMgr::CheckGroupComposition()
+{
+    UpdateComposition();
+    if (totalMembers != m_targetComposition.groupSize)
+        return false;
+    if (m_roleComposition[BOT_ROLE_TANK] != m_targetComposition.tanks)
+        return false;
+    if (m_roleComposition[BOT_ROLE_HEALER] <= m_targetComposition.maxHealers || 
+        m_roleComposition[BOT_ROLE_HEALER] >= m_targetComposition.minHealers)
+        return false;
+    if (m_roleComposition[BOT_ROLE_DPS] <= m_targetComposition.maxDps ||
+        m_roleComposition[BOT_ROLE_DPS] >= m_targetComposition.minDps)
+        return false;
+    if (checklevel)
+        {
+            int8 playerlevel = 0;
+            for (auto& member : m_group->GetMemberSlots())
+            {   
+                playerlevel = ObjectAccessor::FindPlayer(member.guid)->GetLevel();
+                if (playerlevel < m_targetComposition.LowerLevelLimit || 
+                playerlevel > m_targetComposition.UpperLevelLimit)
+                    return false;
+            }
+        }
+    return true;
+}
+
+void PlayerbotGroupMgr::SetTargetComposition(const TargetGroupComposition& composition)
+{
+    m_targetComposition = composition;
+    if (m_targetComposition.LowerLevelLimit == 0 && m_targetComposition.UpperLevelLimit == 0)
+        checklevel = false;
+    else
+        checklevel = true;
+
+}
+void PlayerbotGroupMgr::CleanGroup()
+{
+    if (!m_group)
+        return;
+
+    if (m_targetComposition.groupSize == 0)
+        return;
+    
+    int8 playerlevel = 0;
+    m_roleComposition[BOT_ROLE_TANK] = 0;
+    m_roleComposition[BOT_ROLE_HEALER] = 0;
+    m_roleComposition[BOT_ROLE_DPS] = 0;
+    
+    for (auto& member : m_group->GetMemberSlots())
+    {   
+        if (checklevel)
+        {
+            playerlevel = ObjectAccessor::FindPlayer(member.guid)->GetLevel();
+            if (playerlevel < m_targetComposition.LowerLevelLimit || 
+            playerlevel > m_targetComposition.UpperLevelLimit)
+            {   
+                RemoveBot(member.guid);
+                continue;
+            }
+        }
+        BotRoles role = GetBotRole(member.guid);
+        switch (role)
+        {
+            case BOT_ROLE_TANK:
+            {
+                if (m_roleComposition[BOT_ROLE_TANK] >= m_targetComposition.tanks)
+                    RemoveBot(member.guid);
+                    continue;
+            }
+            case BOT_ROLE_HEALER:
+            {
+                if (m_roleComposition[BOT_ROLE_HEALER] >= m_targetComposition.maxHealers)
+                    RemoveBot(member.guid);
+                    continue;
+            }
+            case BOT_ROLE_DPS:
+            {
+                if (m_roleComposition[BOT_ROLE_DPS] >= m_targetComposition.maxDps)
+                    RemoveBot(member.guid);
+                    continue;
+            }
+        }
+        m_roleComposition[role]++;
+        totalMembers++;
+    }
+    bool success = CreateGroup();
+}
+bool PlayerbotGroupMgr::WaitingforResponse()
+{
+    if(m_group->GetInviteeCount() != 0)
+    {
+        return true;
+    }
+    return false;
+}
+    

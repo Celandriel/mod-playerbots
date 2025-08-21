@@ -8,6 +8,7 @@
 GuildRPGBaseAction::~GuildRPGBaseAction()
 {
     delete m_groupMgr;
+    m_groupMgr = nullptr;
 }
 
 PlayerbotGroupMgr* GuildRPGBaseAction::GetGroupMgr()
@@ -24,17 +25,23 @@ Guild* GuildRPGBaseAction::GetGuild() const
 }
 
 
-bool CreateGroupAction::Execute(Event& event)
-{
-    if (!ValidateComposition())
-        return false;
-    
+bool CreateGroupAction::Execute(Event event)
+{  
     if (!m_groupMgr)
-        m_groupMgr = new PlayerbotGroupMgr(botAI);
-
-    if (m_groupMgr->CreateGroup(m_targetComposition))
-    {
+    {    
+        m_groupMgr = GetGroupMgr();
+        TargetGroupComposition comp = botAI->GetTargetGroupComposition();
+        if (!ValidateTargetComposition(comp))
+            return false;
+        
+        m_groupMgr->SetTargetComposition(comp);
+        m_groupMgr->CreateGroup();
         return true;
+    }
+    if (m_groupMgr)
+    {
+        CheckGroupAction check(botAI);   
+        return check.Execute(event);
     }
     return false;
 }
@@ -50,32 +57,84 @@ bool CreateGroupAction::isUseful()
 
     if (player->GetGroup())
         return false;
-
-    return ValidateComposition();
-}
-bool CreateGroupAction::isPossible()
-{
-    return isUseful();
-}
-
-bool CreateGroupAction::ValidateComposition()
-{
-    if (m_targetComposition.groupSize == 0 || m_targetComposition.groupSize > 5)
-        return false;
-        
-    // Validate role requirements don't exceed group size
-    uint32 minRequired = m_targetComposition.tanks + m_targetComposition.minHealers + m_targetComposition.minDps;
-    if (minRequired > m_targetComposition.groupSize)
-        return false;
-        
-    // Validate max roles
-    if (m_targetComposition.maxHealers < m_targetComposition.minHealers)
-        return false;
-    if (m_targetComposition.maxDps < m_targetComposition.minDps)
-        return false;
         
     return true;
 }
 
+bool CreateGroupAction::ValidateTargetComposition(TargetGroupComposition& comp)
+{
+    if (comp.groupSize == 0 || comp.groupSize > 5)
+        return false;
+        
+    // Validate role requirements don't exceed group size
+    uint32 minRequired = comp.tanks + comp.minHealers + comp.minDps;
+    if (minRequired > comp.groupSize)
+        return false;
+        
+    // Validate max roles
+    if (comp.maxHealers < comp.minHealers)
+        return false;
+    if (comp.maxDps < comp.minDps)
+        return false;
+    //Check level limits. 
+    if (comp.LowerLevelLimit > comp.UpperLevelLimit)
+        return false;
+        
+    return true;
+}    
 
+bool CheckGroupAction::Execute(Event event)
+{
+    if (!m_groupMgr)
+    {
+        return false;
+    }
+    if (m_groupMgr->WaitingforResponse())
+        return false;
+    if (m_groupMgr->CheckGroupComposition())
+        return true;
+    m_groupMgr->CleanGroup();
+    return false;
+}
     
+
+
+bool CheckGroupAction::isUseful()
+{
+    if (!m_groupMgr)
+    {
+        return false;
+    }
+    return true;
+}
+
+
+bool DisbandGroupAction::isPossible()
+{
+    if (!m_groupMgr) 
+    {
+        return false;
+    }
+    return true;
+}
+
+bool DisbandGroupAction::isUseful()
+{
+    //TODO Change to check on GuildRPG State. if the state is reset to 0 then disband group.
+    return isPossible(); 
+}
+
+bool DisbandGroupAction::Execute(Event event)
+{
+    PlayerbotGroupMgr* groupMgr = GetGroupMgr();
+    if (!groupMgr) return false;
+
+    bool success = groupMgr->DisbandGroup();
+    
+    if (success)
+    {
+        delete m_groupMgr;
+        m_groupMgr = nullptr;
+    }   
+    return success;
+}

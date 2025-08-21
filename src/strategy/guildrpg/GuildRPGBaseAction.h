@@ -11,14 +11,12 @@ class PlayerbotGroupMgr;
 class GuildRPGBaseAction : public Action
 {
 public:
-    GuildRPGBaseAction(PlayerbotAI* botAI, const std::string& name) : Action(botAI, "guild rpg base action"), m_groupMgr(nullptr) {}
+    GuildRPGBaseAction(PlayerbotAI* botAI, const std::string& name) : Action(botAI, name), m_groupMgr(nullptr) {}
     virtual ~GuildRPGBaseAction();
 
 protected:
     PlayerbotGroupMgr* GetGroupMgr();
     Guild* GetGuild() const;
-    
-private:
     PlayerbotGroupMgr* m_groupMgr;
 };
 
@@ -26,21 +24,33 @@ class CreateGroupAction : public GuildRPGBaseAction
 {
 public:
     CreateGroupAction(PlayerbotAI* botAI) : GuildRPGBaseAction(botAI, "create group") {}
-    virtual ~CreateGroupAction() { delete m_groupMgr; }
+  
+    virtual bool Execute(Event event);
+    virtual bool isUseful();
 
-    virtual bool Execute(Event& event);
+private:   
+    bool ValidateTargetComposition(TargetGroupComposition& comp);
+};
+
+class CheckGroupAction : public GuildRPGBaseAction
+{
+public:
+    CheckGroupAction(PlayerbotAI* botAI) : GuildRPGBaseAction(botAI, "check group") {}
+  
+    virtual bool Execute(Event event);
+    virtual bool isUseful();
+};
+
+class DisbandGroupAction : public GuildRPGBaseAction
+{
+public:
+    DisbandGroupAction(PlayerbotAI* botAI) : GuildRPGBaseAction(botAI, "disband group") {}
+  
+    virtual bool Execute(Event event);
     virtual bool isUseful();
     virtual bool isPossible();
-
-    void SetTargetComposition(const TargetComposition& composition) { m_targetComposition = composition; }
-    const TargetComposition& GetTargetComposition() const { return m_targetComposition; }
-
-private:
-    PlayerbotGroupMgr* m_groupMgr;
-    TargetComposition m_targetComposition;
-    
-    bool ValidateComposition();
-    bool HasSufficientGuildMembers() const;
 };
+
+
 
 #endif

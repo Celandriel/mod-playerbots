@@ -5,18 +5,8 @@
 #include "Group.h"
 #include "Action.h"
 
-struct TargetComposition
-{
-    uint8_t groupSize;
-    uint8_t tanks;
-    uint8_t minHealers;
-    uint8_t maxHealers;
-    uint8_t minDps;
-    uint8_t maxDps;
-    uint8_t LowerLevelLimit;
-    uint8_t UpperLevelLimit;
-};
-  
+class PlayerbotAI;
+ 
 struct GuildMember
 {
     ObjectGuid guid;
@@ -24,34 +14,41 @@ struct GuildMember
     BotRoles role;
 };
 
-class PlayerbotAI;
-
 class PlayerbotGroupMgr
 {
 public:
     explicit PlayerbotGroupMgr(PlayerbotAI* botAI);
     ~PlayerbotGroupMgr();
 
-    bool CreateGroup(const TargetComposition& targetComposition);
-    std::vector<GuildMember> FindAvailableGuildMembers(Guild* guild, const TargetComposition& targetComposition);
+    bool CreateGroup();
+    std::vector<GuildMember> FindAvailableGuildMembers();
     bool InviteBot(ObjectGuid guid);
     bool RemoveBot(ObjectGuid guid);
     bool DisbandGroup();
+    bool CheckGroupComposition();
+    void CleanGroup();
+
+    bool WaitingforResponse();
+    void SetTargetComposition(const TargetGroupComposition& composition);
     
     Group* GetGroup() const { return m_group; }
-    const std::map<BotRoles, int>& GetComposition() const { return m_composition; }
+    const std::map<BotRoles, int>& GetComposition() const { return m_roleComposition; }
+    const TargetGroupComposition& GetTargetComposition() const { return m_targetComposition; }
 
 private:
+    TargetGroupComposition m_targetComposition;
     PlayerbotAI* m_botAI;
-    std::map<BotRoles, int> m_composition;
+    std::map<BotRoles, int> m_roleComposition;
     Group* m_group;
+    Guild* m_guild;
+    int totalMembers;
+    bool checklevel = false;
+    bool groupready = false;
 
     BotRoles GetBotRole(ObjectGuid guid);
     void UpdateComposition(); 
-    bool CanInviteMore(BotRoles role, const TargetComposition& composition);
+    bool CanInviteMore(BotRoles role);
     std::vector<ObjectGuid> GetGuildMembers(uint32_t guildId);
 };
-
-
 
 #endif // _PLAYERBOT_GROUPMGR_H
