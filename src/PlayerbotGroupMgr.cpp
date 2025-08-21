@@ -41,9 +41,6 @@ bool PlayerbotGroupMgr::CreateGroup()
     if (!m_guild)
         return false;
     
-    if (m_targetComposition.groupSize == 0)
-        return false;
-
     std::vector<GuildMember> availableMembers = FindAvailableGuildMembers(); 
     if (availableMembers.empty())
         return false;
@@ -102,7 +99,7 @@ std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers()
         if (player->GetGroup())
             continue;
         
-        uint8_t playerlevel = player->GetLevel();
+        uint8 playerlevel = player->GetLevel();
         if (checklevel &&
             (playerlevel < m_targetComposition.lowerLevelLimit || 
             playerlevel > m_targetComposition.upperLevelLimit))
@@ -223,11 +220,8 @@ void PlayerbotGroupMgr::UpdateComposition()
         if (!member)
             continue;
 
-        if (member)
-        {
-            BotRoles role = GetBotRole(slot.guid);
-            m_roleComposition[role]++;
-        }
+        BotRoles role = GetBotRole(slot.guid);
+        m_roleComposition[role]++;
     }
 }
 
@@ -303,12 +297,13 @@ void PlayerbotGroupMgr::CleanGroup()
     {   
         if (checklevel)
         {
-            playerlevel = ObjectAccessor::FindPlayer(member.guid)->GetLevel();
-            if (!playerlevel)
+            Player* player = ObjectAccessor::FindPlayer(member.guid);   
+            if (!player)
             {
                 RemoveBot(member.guid);
                 continue;
             }
+            playerlevel = player->GetLevel();
             if (playerlevel < m_targetComposition.lowerLevelLimit || 
             playerlevel > m_targetComposition.upperLevelLimit)
             {   
@@ -350,7 +345,7 @@ void PlayerbotGroupMgr::CleanGroup()
         m_roleComposition[role]++;
         totalMembers++;
     }
-    bool success = CreateGroup();
+    CreateGroup();
 }
 bool PlayerbotGroupMgr::WaitingforResponse()
 {

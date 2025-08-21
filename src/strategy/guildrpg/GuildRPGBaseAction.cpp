@@ -36,9 +36,9 @@ bool CreateGroupAction::Execute(Event event)
         
         m_groupMgr->SetTargetComposition(comp);
         m_groupMgr->CreateGroup();
-        return true;
+        return false;
     }
-    if (m_groupMgr)
+    else if (m_groupMgr)
     {
         if (m_groupMgr->WaitingforResponse())
             return false;
@@ -65,7 +65,7 @@ bool CreateGroupAction::isUseful()
     return true;
 }
 
-bool CreateGroupAction::ValidateTargetComposition(TargetGroupComposition& comp)
+bool CreateGroupAction::ValidateTargetComposition(const TargetGroupComposition& comp)
 {
     if (comp.groupSize == 0)
         return false;

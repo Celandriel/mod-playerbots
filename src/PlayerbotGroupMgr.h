@@ -41,13 +41,13 @@ private:
     std::map<BotRoles, int> m_roleComposition;
     Group* m_group;
     Guild* m_guild;
-    int totalMembers;
+    uint8_t totalMembers;
     bool checklevel = false;
 
     BotRoles GetBotRole(ObjectGuid guid);
     void UpdateComposition(); 
     bool CanInviteMore(BotRoles role);
-    std::vector<ObjectGuid> GetGuildMembers(uint32_t guildId);
+    std::vector<ObjectGuid> GetGuildMembers(uint32 guildId);
 };
 
 #endif // _PLAYERBOT_GROUPMGR_H

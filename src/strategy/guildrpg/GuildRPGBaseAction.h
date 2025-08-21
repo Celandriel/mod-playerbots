@@ -29,7 +29,7 @@ public:
     virtual bool isUseful();
 
 private:   
-    bool ValidateTargetComposition(TargetGroupComposition& comp);
+    bool ValidateTargetComposition(const TargetGroupComposition& comp);
 };
 
 class CheckGroupAction : public GuildRPGBaseAction
