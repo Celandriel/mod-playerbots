@@ -363,8 +363,8 @@ struct TargetGroupComposition
     uint8_t maxHealers;
     uint8_t minDps;
     uint8_t maxDps;
-    uint8_t LowerLevelLimit;
-    uint8_t UpperLevelLimit;
+    uint8_t lowerLevelLimit;
+    uint8_t upperLevelLimit;
 };
 
 class PacketHandlingHelper

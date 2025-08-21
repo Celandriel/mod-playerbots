@@ -10,7 +10,7 @@
 
 
 PlayerbotGroupMgr::PlayerbotGroupMgr(PlayerbotAI* botAI)
-    : m_botAI(botAI), m_group(nullptr)
+    : m_botAI(botAI), m_group(nullptr), m_guild(nullptr), totalMembers(0)
 {
     m_roleComposition[BOT_ROLE_TANK] = 0;
     m_roleComposition[BOT_ROLE_HEALER] = 0;
@@ -37,7 +37,7 @@ bool PlayerbotGroupMgr::CreateGroup()
         return false;
 
     ObjectGuid leaderGuid = leader->GetGUID();
-    Guild* m_guild = leader->GetGuild();
+    m_guild = leader->GetGuild();
     if (!m_guild)
         return false;
     
@@ -50,7 +50,7 @@ bool PlayerbotGroupMgr::CreateGroup()
 
     if (!m_group)
     {
-        Group* m_group = new Group();
+        m_group = new Group();
         if (!m_group->Create(leader))
         {
             delete m_group;
@@ -104,8 +104,8 @@ std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers()
         
         uint8_t playerlevel = player->GetLevel();
         if (checklevel &&
-            (playerlevel < m_targetComposition.LowerLevelLimit || 
-            playerlevel > m_targetComposition.UpperLevelLimit))
+            (playerlevel < m_targetComposition.lowerLevelLimit || 
+            playerlevel > m_targetComposition.upperLevelLimit))
             continue;
 
         BotRoles role = GetBotRole(memberGuid);
@@ -251,10 +251,10 @@ bool PlayerbotGroupMgr::CheckGroupComposition()
         return false;
     if (m_roleComposition[BOT_ROLE_TANK] != m_targetComposition.tanks)
         return false;
-    if (m_roleComposition[BOT_ROLE_HEALER] <= m_targetComposition.maxHealers || 
+    if (m_roleComposition[BOT_ROLE_HEALER] <= m_targetComposition.maxHealers &&
         m_roleComposition[BOT_ROLE_HEALER] >= m_targetComposition.minHealers)
         return false;
-    if (m_roleComposition[BOT_ROLE_DPS] <= m_targetComposition.maxDps ||
+    if (m_roleComposition[BOT_ROLE_DPS] <= m_targetComposition.maxDps &&
         m_roleComposition[BOT_ROLE_DPS] >= m_targetComposition.minDps)
         return false;
     if (checklevel)
@@ -263,8 +263,8 @@ bool PlayerbotGroupMgr::CheckGroupComposition()
             for (auto& member : m_group->GetMemberSlots())
             {   
                 playerlevel = ObjectAccessor::FindPlayer(member.guid)->GetLevel();
-                if (playerlevel < m_targetComposition.LowerLevelLimit || 
-                playerlevel > m_targetComposition.UpperLevelLimit)
+                if (playerlevel < m_targetComposition.lowerLevelLimit || 
+                playerlevel > m_targetComposition.upperLevelLimit)
                     return false;
             }
         }
@@ -274,7 +274,7 @@ bool PlayerbotGroupMgr::CheckGroupComposition()
 void PlayerbotGroupMgr::SetTargetComposition(const TargetGroupComposition& composition)
 {
     m_targetComposition = composition;
-    if (m_targetComposition.LowerLevelLimit == 0 && m_targetComposition.UpperLevelLimit == 0)
+    if (m_targetComposition.lowerLevelLimit == 0 && m_targetComposition.upperLevelLimit == 0)
         checklevel = false;
     else
         checklevel = true;
@@ -298,8 +298,8 @@ void PlayerbotGroupMgr::CleanGroup()
         if (checklevel)
         {
             playerlevel = ObjectAccessor::FindPlayer(member.guid)->GetLevel();
-            if (playerlevel < m_targetComposition.LowerLevelLimit || 
-            playerlevel > m_targetComposition.UpperLevelLimit)
+            if (playerlevel < m_targetComposition.lowerLevelLimit || 
+            playerlevel > m_targetComposition.upperLevelLimit)
             {   
                 RemoveBot(member.guid);
                 continue;
@@ -311,20 +311,26 @@ void PlayerbotGroupMgr::CleanGroup()
             case BOT_ROLE_TANK:
             {
                 if (m_roleComposition[BOT_ROLE_TANK] >= m_targetComposition.tanks)
+                {
                     RemoveBot(member.guid);
                     continue;
+                }
             }
             case BOT_ROLE_HEALER:
             {
                 if (m_roleComposition[BOT_ROLE_HEALER] >= m_targetComposition.maxHealers)
+                 {
                     RemoveBot(member.guid);
                     continue;
+                 }
             }
             case BOT_ROLE_DPS:
             {
                 if (m_roleComposition[BOT_ROLE_DPS] >= m_targetComposition.maxDps)
+                {
                     RemoveBot(member.guid);
                     continue;
+                }
             }
         }
         m_roleComposition[role]++;
@@ -334,7 +340,7 @@ void PlayerbotGroupMgr::CleanGroup()
 }
 bool PlayerbotGroupMgr::WaitingforResponse()
 {
-    if(m_group->GetInviteeCount() != 0)
+    if(!m_group || m_group->GetInviteeCount() != 0)
     {
         return true;
     }

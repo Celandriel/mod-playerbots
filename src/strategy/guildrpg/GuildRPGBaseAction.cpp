@@ -40,8 +40,12 @@ bool CreateGroupAction::Execute(Event event)
     }
     if (m_groupMgr)
     {
-        CheckGroupAction check(botAI);   
-        return check.Execute(event);
+        if (m_groupMgr->WaitingforResponse())
+            return false;
+        if (m_groupMgr->CheckGroupComposition())
+            return true;
+        m_groupMgr->CleanGroup();
+        return false;
     }
     return false;
 }
