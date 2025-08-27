@@ -266,7 +266,7 @@ public:
     uint32 randomBotGuildCount;
     bool deleteRandomBotGuilds;
     std::vector<uint32> randomBotGuilds;
-    std::vector<uint32> GuildTypeRatios, GuildNumBots, GuildPVESpecRatio, GuildPVESpecRatio, GuildRpgPVPWeights, GuildRpgPVEWeights, GuildRpgProfWeights, GuildRpgRpgWeights;
+    std::vector<uint32> GuildTypeRatios, GuildSize, GuildPVESpecRatio, GuildPVESpecRatio, GuildRpgPVPWeights, GuildRpgPVEWeights, GuildRpgProfWeights, GuildRpgRpgWeights;
     std::vector<uint32> pvpProhibitedZoneIds;
     std::vector<uint32> pvpProhibitedAreaIds;
     bool fastReactInBG;

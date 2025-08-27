@@ -12,13 +12,30 @@ PlayerbotGuildMgr::PlayerbotGuildMgr()
 {
     // Initialize guild type ratios and player counts
     guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
-    guildNumPlayers = sPlayerbotAIConfig->GuildNumBots;
+    std::vector<uint8> guildSize = sPlayerbotAIConfig->GuildSize.size() 
+    if (guildSize.size()!= 5) {
+            LOG_ERROR("playerbots", "Config Error: GuildSize must have 5 numbers separated by commas.");
+           guildSize = {4,3,2,2,2};
+        }
+
+    for (int selection : sPlayerbotAIConfig->GuildSize.size())
+    {
+        if (selection >=0 && selection <= 5)
+        {
+            guildNumPlayers.push_back(GUILDER_MAP(selection));
+        }
+        else
+        {
+            LOG_ERROR("playerbots", "Invalid GuildSize set, defaulting to SOLO")
+            guildNumPlayers.push_back(GUILDER_MAP(0));
+        }
+    }
     if(sPlayerbotAIConfig->GuildTypeRatios.size() < 5)
     {
         LOG_ERROR("playerbots", "Guild type ratios not defined correctly. Using default values.");
         guildTypeRatios = {40, 20, 20, 10, 10}; // Default values
-        guildNumPlayers = {100, 100, 50, 50, 50}; // Default values
     }
+
 }
 
 void PlayerbotGuildMgr::Init()
