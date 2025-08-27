@@ -11,9 +11,9 @@ using namespace ai;
 PlayerbotGuildMgr::PlayerbotGuildMgr()
 {
     // Initialize guild type ratios and player counts
-    guildTypeRatios = sPlayerbotAIConfig->Guild_TypeRatios;
-    guildNumPlayers = sPlayerbotAIConfig->Guild_Num_Bots;
-    if(sPlayerbotAIConfig->Guild_TypeRatios.size() < 5)
+    guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
+    guildNumPlayers = sPlayerbotAIConfig->GuildNumBots;
+    if(sPlayerbotAIConfig->GuildTypeRatios.size() < 5)
     {
         LOG_ERROR("playerbots", "Guild type ratios not defined correctly. Using default values.");
         guildTypeRatios = {40, 20, 20, 10, 10}; // Default values
@@ -102,9 +102,9 @@ int8 PlayerbotGuildMgr::DetermineGuildType()
     const size_t nTypes = guildTypeRatios.size();
 
     // Validate that config ratios vector length matches expected:
-    if (sPlayerbotAIConfig->Guild_TypeRatios.size() < nTypes)
+    if (sPlayerbotAIConfig->GuildTypeRatios.size() < nTypes)
     {
-        LOG_WARN("playerbots", "Guild_TypeRatios length ({}) < number of type names ({}). Missing values default to 0.", sPlayerbotAIConfig->Guild_TypeRatios.size(), nTypes);
+        LOG_WARN("playerbots", "GuildTypeRatios length ({}) < number of type names ({}). Missing values default to 0.", sPlayerbotAIConfig->GuildTypeRatios.size(), nTypes);
     }
 
     // If no guilds loaded, default to 1:
@@ -138,8 +138,8 @@ int8 PlayerbotGuildMgr::DetermineGuildType()
     for (size_t i = 0; i < nTypes; ++i)
     {
         float desired = 0.0f;
-        if (i < sPlayerbotAIConfig->Guild_TypeRatios.size())
-            desired = sPlayerbotAIConfig->Guild_TypeRatios[i];
+        if (i < sPlayerbotAIConfig->GuildTypeRatios.size())
+            desired = sPlayerbotAIConfig->GuildTypeRatios[i];
 
         float diff = desired - currentRatios[i];
         if (diff > maxDiff)
@@ -153,7 +153,7 @@ int8 PlayerbotGuildMgr::DetermineGuildType()
 
 void PlayerbotGuildMgr::AssignToGuild(Player* player)
 {
-    if (!player || !sPlayerbotAIConfig->enableGuildRPGStrategy)
+    if (!player || !sPlayerbotAIConfig->enableGuildRpgStrategy)
         return;
 
     LOG_DEBUG("playerbots", "Assigning player [{}] to a guild", player->GetName());
@@ -407,7 +407,7 @@ class BotGuildCacheWorldScript : public WorldScript
 
         void OnStartup() override
         {
-            if (sPlayerbotAIConfig->enableGuildRPGStrategy)
+            if (sPlayerbotAIConfig->enableGuildRpgStrategy)
             {
                 sPlayerbotGuildMgr->ValidateGuildCache();
                 LOG_INFO("server.loading", "Bot guild cache initialized and validated");
@@ -416,7 +416,7 @@ class BotGuildCacheWorldScript : public WorldScript
 
         void OnUpdate(uint32 diff) override
         {
-            if (!sPlayerbotAIConfig->enableGuildRPGStrategy)
+            if (!sPlayerbotAIConfig->enableGuildpgGStrategy)
                 return;
             m_timer += diff;
             m_validateTimer += diff;

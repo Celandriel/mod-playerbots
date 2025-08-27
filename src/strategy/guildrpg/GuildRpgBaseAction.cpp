@@ -11,14 +11,14 @@ GuildRPGBaseAction::~GuildRPGBaseAction()
     m_groupMgr = nullptr;
 }
 
-PlayerbotGroupMgr* GuildRPGBaseAction::GetGroupMgr()
+PlayerbotGroupMgr* GuildRpgBaseAction::GetGroupMgr()
 {
     if (!m_groupMgr)
         m_groupMgr = new PlayerbotGroupMgr(botAI);
     return m_groupMgr;
 }
 
-Guild* GuildRPGBaseAction::GetGuild() const
+Guild* GuildRpgBaseAction::GetGuild() const
 {
     Player* player = botAI->GetBot();
     return player ? player->GetGuild() : nullptr;

@@ -8,11 +8,11 @@
 
 class PlayerbotGroupMgr;
 
-class GuildRPGBaseAction : public Action
+class GuildRpgBaseAction : public Action
 {
 public:
-    GuildRPGBaseAction(PlayerbotAI* botAI, const std::string& name) : Action(botAI, name), m_groupMgr(nullptr) {}
-    virtual ~GuildRPGBaseAction();
+    GuildRpgBaseAction(PlayerbotAI* botAI, const std::string& name) : Action(botAI, name), m_groupMgr(nullptr) {}
+    virtual ~GuildRpgBaseAction();
 
 protected:
     PlayerbotGroupMgr* GetGroupMgr();
@@ -20,10 +20,10 @@ protected:
     PlayerbotGroupMgr* m_groupMgr;
 };
 
-class CreateGroupAction : public GuildRPGBaseAction
+class CreateGroupAction : public GuildRpgBaseAction
 {
 public:
-    CreateGroupAction(PlayerbotAI* botAI) : GuildRPGBaseAction(botAI, "create group") {}
+    CreateGroupAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "create group") {}
   
     virtual bool Execute(Event event);
     virtual bool isUseful();
@@ -32,7 +32,7 @@ private:
     bool ValidateTargetComposition(const TargetGroupComposition& comp);
 };
 
-class CheckGroupAction : public GuildRPGBaseAction
+class CheckGroupAction : public GuildRpgBaseAction
 {
 public:
     CheckGroupAction(PlayerbotAI* botAI) : GuildRPGBaseAction(botAI, "check group") {}
@@ -41,16 +41,13 @@ public:
     virtual bool isUseful();
 };
 
-class DisbandGroupAction : public GuildRPGBaseAction
+class DisbandGroupAction : public GuildRpgBaseAction
 {
 public:
-    DisbandGroupAction(PlayerbotAI* botAI) : GuildRPGBaseAction(botAI, "disband group") {}
+    DisbandGroupAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "disband group") {}
   
     virtual bool Execute(Event event);
     virtual bool isUseful();
     virtual bool isPossible();
 };
-
-
-
 #endif

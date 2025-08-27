@@ -201,10 +201,15 @@ bool PlayerbotAIConfig::Initialize()
         restrictedHealerDPSMaps);
 	
     //////////////////////////// Guild RPG
-    enableGuildRPGStrategy = sConfigMgr->GetOption<bool>("AiPlayerbot.Enable_Guild_RPG", true);   
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_Type_Ratios", "40,20,20,10,10"), Guild_TypeRatios);
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_Num_Bots", "100,100,50,50,50"), Guild_Num_Bots);
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.Guild_PVE_Spec_Ratio", "12,22,34,32"), Guild_PVE_Spec_Ratio);
+    enableGuildRpgStrategy = sConfigMgr->GetOption<bool>("AiPlayerbot.Enable_Guild_RPG", true);   
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10,10"), GuildTypeRatios);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildNumBots", "100,100,50,50,50"), GuildNumBots);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVPSpecRatio", "0,33,33,33"), GuildPVPSpecRatio);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVESpecRatio", "12,22,34,32"), GuildPVESpecRatio);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVPWeights", "0.2,0.2,0.2,0.2,0.2"), GuildRpgPVPWeights);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVEWeights", "0.3,0.3,0.3", GuildRpgPVEWeights);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgProfWeights", "0.2,0.2,0.2,0.2"), GuildRpgProfWeights);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgRoleplayWeights", "0.3,0.3,0.3"), GuildRpgRpgWeights);
 	
     //////////////////////////// ICC
 
@@ -624,7 +629,7 @@ bool PlayerbotAIConfig::Initialize()
         sRandomPlayerbotMgr->Init();
     }
 
-    if (enableGuildRPGStrategy)
+    if (enableGuildRpgStrategy)
     {
         sPlayerbotGuildMgr->Init();
     }
