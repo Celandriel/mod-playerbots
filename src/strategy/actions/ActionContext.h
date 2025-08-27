@@ -34,7 +34,7 @@
 #include "GuildAcceptAction.h"
 #include "GuildCreateActions.h"
 #include "GuildManagementActions.h"
-#include "GuildRPGBaseAction.h"
+#include "GuildRpgBaseAction.h"
 #include "ImbueAction.h"
 #include "InviteToGroupAction.h"
 #include "LeaveGroupAction.h"

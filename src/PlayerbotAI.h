@@ -16,6 +16,7 @@
 #include "CreatureData.h"
 #include "Event.h"
 #include "Item.h"
+#include "GuildRpsTasks.h"
 #include "NewRpgInfo.h"
 #include "NewRpgStrategy.h"
 #include "PlayerbotAIBase.h"
@@ -43,7 +44,6 @@ class WorldPosition;
 
 struct CreatureData;
 struct GameObjectData;
-struct TargetGroupComposition;
 
 enum StrategyType : uint32;
 
@@ -641,6 +641,7 @@ public:
     void setGuildType(GuildType type) { guildType = type; }
     const TargetGroupComposition& GetTargetGroupComposition() const { return m_targetComposition; }
     void SetTargetGroupComposition(const TargetGroupComposition& comp) { m_targetComposition = comp; }
+    GuildTask guildRpgInfo; 
 
 private:
     static void _fillGearScoreData(Player* player, Item* item, std::vector<uint32>* gearScore, uint32& twoHandScore,

@@ -23,7 +23,7 @@
 #include "GroupStrategy.h"
 #include "GuardStrategy.h"
 #include "GuildStrategy.h"
-#include "GuildRPGStrategy.h"
+#include "GuildRpgStrategy.h"
 #include "KiteStrategy.h"
 #include "LfgStrategy.h"
 #include "LootNonCombatStrategy.h"

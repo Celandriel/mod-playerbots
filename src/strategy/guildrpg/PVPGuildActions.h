@@ -2,7 +2,7 @@ ifndef PVPGUILD_ACTIONS_H
 define PVPGUILD_ACTIONS_H
 
 #include 'Action.h'
-#include 'GuildRPGBaseAction.h'
+#include 'GuildRpgBaseAction.h'
 
 /*
 Actions for PVP guilds
@@ -26,26 +26,53 @@ World PVP actions
     Wintergrasp
 */
 
-class FriendlyDuelAction : public GuildRPGBaseAction
+
+bool ExecutePvpTask(const GuildTask& task)
+{
+    switch (task.objectiveId) // <- task.objectiveId = 3 (ATTACK_CITY)
+    {
+        case PvpActivity::QUEUE_FOR_BG:
+        // Get the number of available bots to do PVP in the correct level bracket (Check before trying?)
+        // Form Group
+        //Qeueue for target BG
+        case PvpActivity::PATROL_AREA:
+        // Check Availability 
+        // Form group size
+        // GO to Target Area (Make common list of target areas to attaack and patrol)
+        case PvpActivity::ATTACK_CITY:
+        // Determine if Guild is available to do raid (Can We manage to recruit multiple guilds?)
+        // First, set phase to ASSEMBLING and move to rally point (task.location)
+        //  Then, set phase to EXECUTING and attack the city gates, then npcs.
+         //   return HandlePvpAttackCity(task); // task.params tells us *which* city.
+        case PVPActivity::DEFEND_BASE:
+        // This is Triggered defensively based on some 'Under Attack' value
+        case PVPActivity::WORLD_PVP:
+        // Choose area to attack. 
+        //group min number of bots to acheive. 
+        //travel to area and Pillage.
+    }
+}
+
+class FriendlyDuelAction : public GuildRpgBaseAction
 {
     public:
-        FriendlyDuelAction() : GuildRPGBaseAction("Friendly Duel") {}
+        FriendlyDuelAction() : GuildRpgBaseAction("Friendly Duel") {}
         bool isUseful() override;
         bool Execute(Event event) override;
 };
 
-class RaidCapitolCityAction : public GuildRPGBaseAction
+class AttackCityAction : public GuildRpgBaseAction
 {
     public:
-        RaidCapitolCityAction() : GuildRPGBaseAction("Raid Capitol City") {}
+        RaidCapitolCityAction() : GuildRpgBaseAction("Raid Capitol City") {}
         bool isUseful() override;
         bool Execute(Event event) override;
 };
 
-class RaidHighProbabilityLocationAction : public GuildRPGBaseAction
+class RaidHighProbabilityLocationAction : public GuildRpgBaseAction
 {
     public:
-        RaidHighProbabilityLocationAction() : GuildRPGBaseAction("Raid High Probability Location") {}
+        RaidHighProbabilityLocationAction() : GuildRpgBaseAction("Raid High Probability Location") {}
         bool isUseful() override;
         bool Execute(Event event) override;
 };
