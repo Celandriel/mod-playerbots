@@ -4,6 +4,11 @@
 #include "Player.h"
 #include "Guild.h"
 
+struct BotGuildStatus
+{
+    ObjectGuid guid;
+    BotAvailabilityStatus availability = BOT_STATUS_OFFLINE;
+};
 
 class PlayerbotAI;
 
@@ -24,6 +29,10 @@ namespace ai
         void SaveDirtyGuilds();
         void ValidateGuildCache();
         void ResetGuildCache();
+
+        void SetBotAvailability(uint32 guildId, ObjectGuid guid, BotAvailabilityStatus status);
+        std::vector<ObjectGuid> GetAvailableGuildMembers(uint32 guildId);)
+        BotAvailabilityStatus GetBotAvailability(uint32 guildId, ObjectGuid guid) const;
     
     private:
         PlayerbotGuildMgr();
@@ -42,6 +51,7 @@ namespace ai
             Guild* guildPtr = nullptr;   
         };
         std::unordered_map<std::string, GuildCache> guildCache;
+        std::unordered_map<uint32, std::unordered_map<ObjectGuid, BotGuildStatus>> m_guildBotStates;
     };
 }
 

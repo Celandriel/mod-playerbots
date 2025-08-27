@@ -227,17 +227,7 @@ void PlayerbotGroupMgr::UpdateComposition()
 
 std::vector<ObjectGuid> PlayerbotGroupMgr::GetGuildMembers(uint32 guildId)
 {
-    std::vector<ObjectGuid> guids;
-    
-    HashMapHolder<Player>::MapType const& players = ObjectAccessor::GetPlayers();
-    for (const auto& pair : players) {
-        Player* player = pair.second;
-        if (player && player->GetGuildId() == guildId) {
-            guids.push_back(player->GetGUID());
-        }
-    }
-    
-    return guids;
+    return sPlayerbotGuildMgr->GetAvailableGuildMembers(guildId);
 }
 
 //Figure out if the group is complete

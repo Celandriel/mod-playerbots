@@ -363,7 +363,15 @@ void PlayerbotHolder::LogoutPlayerBot(ObjectGuid guid)
 
         // Peiru: Allow bots to always instant logout to see if this resolves logout crashes
         logout = true;
-
+        
+        guildID = bot->GetGuildID()
+        if(guildID) 
+        {
+            sPlayerbotGuildMgr->SetBotStatus(
+                guildID,
+                bot->GetGUID(),
+                BOT_STATUS_OFFLINE
+        }
         // if no instant logout, request normal logout
         if (!logout)
         {
@@ -399,7 +407,6 @@ void PlayerbotHolder::LogoutPlayerBot(ObjectGuid guid)
             botWorldSessionPtr->LogoutPlayer(true);  // this will delete the bot Player object and PlayerbotAI object
             delete botWorldSessionPtr;               // finally delete the bot's WorldSession
         }
-    }
 }
 
 void PlayerbotHolder::DisablePlayerBot(ObjectGuid guid)
@@ -670,6 +677,34 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
 
             if (new_channel)
                 new_channel->JoinChannel(bot, "");
+        }
+    }
+    guildID = bot->GetGuildID()
+    if(!guildID)
+        continue;
+    else 
+    {
+        sPlayerbotGuildMgr->SetBotStatus(
+            guildID,
+            bot->GetGUID(),
+            BOT_STATUS_IDLE
+        
+        if (botAI->IsRealPlayer())
+        {
+            sPlayerbotGuildMgr->SetBotStatus(
+                guildID,
+                bot->GetGUID(),
+                BOT_STATUS_WITH_MASTER
+        }
+        else
+        {
+            if (group)
+            {
+                sPlayerbotGuildMgr->SetBotStatus(
+                    guildID,
+                    bot->GetGUID(),
+                    BOT_STATUS_IN_GROUP
+            }
         }
     }
 }

@@ -367,6 +367,14 @@ struct TargetGroupComposition
     uint8_t upperLevelLimit;
 };
 
+enum BotAvailabilityStatus : uint8
+{
+    BOT_STATUS_OFFLINE = 0,
+    BOT_STATUS_ONLINE = 1,
+    BOT_STATUS_IN_GROUP = 2,
+    BOT_STATUS_WITH_MASTER = 3
+};
+
 class PacketHandlingHelper
 {
 public:
