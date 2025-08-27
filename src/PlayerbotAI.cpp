@@ -4071,28 +4071,21 @@ GrouperType PlayerbotAI::GetGrouperType()
 
 GuilderType PlayerbotAI::GetGuilderType()
 {
-    uint32 grouperNumber = GetFixedBotNumer(100, 0);
-
-    if (grouperNumber < 20 && !HasRealPlayerMaster())
-        return GuilderType::SOLO;
-
-    if (grouperNumber < 30)
-        return GuilderType::TINY;
 
     if (grouperNumber < 40)
         return GuilderType::SMALL;
 
     if (grouperNumber < 60)
-        return GuilderType::MEDIUM;
+    if (grouperNumber < 30)
 
     if (grouperNumber < 80)
-        return GuilderType::LARGE;
+    if (grouperNumber < 40)
 
     return GuilderType::VERY_LARGE;
-}
+    if (grouperNumber < 60)
 
 bool PlayerbotAI::HasPlayerNearby(WorldPosition* pos, float range)
-{
+    if (grouperNumber < 80)
     float sqRange = range * range;
     bool nearPlayer = false;
     for (auto& player : sRandomPlayerbotMgr->GetPlayers())
