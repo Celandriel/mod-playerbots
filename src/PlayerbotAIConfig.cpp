@@ -203,7 +203,7 @@ bool PlayerbotAIConfig::Initialize()
     //////////////////////////// Guild RPG
     enableGuildRpgStrategy = sConfigMgr->GetOption<bool>("AiPlayerbot.Enable_Guild_RPG", true);   
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10,10"), GuildTypeRatios);
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildNumBots", "100,100,50,50,50"), GuildNumBots);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildSize", "4,3,2,2,2"), GuildSize);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVPSpecRatio", "0,33,33,33"), GuildPVPSpecRatio);
 	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVESpecRatio", "12,22,34,32"), GuildPVESpecRatio);
 	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVPWeights", "0.2,0.2,0.2,0.2,0.2"), GuildRpgPVPWeights);

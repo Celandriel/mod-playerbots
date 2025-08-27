@@ -52,6 +52,15 @@ namespace ai
         };
         std::unordered_map<std::string, GuildCache> guildCache;
         std::unordered_map<uint32, std::unordered_map<ObjectGuid, BotGuildStatus>> m_guildBotStates;
+        
+        constexpr std::array<GuilderType, 6> GuilderMap = {
+            GuilderType::SOLO,
+            GuilderType::TINY,
+            GuilderType::SMALL,
+            GuilderType::MEDIUM,
+            GuilderType::LARGE,
+            GuilderType::VERY_LARGE
+        };
     };
 }
 
