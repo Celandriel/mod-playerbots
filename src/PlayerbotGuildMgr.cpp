@@ -91,8 +91,6 @@ void PlayerbotGuildMgr::Init()
         } while (result->NextRow());
 }
 
-
-
 int8 PlayerbotGuildMgr::DetermineGuildType()
 {
     if (guildTypeRatios.empty())
@@ -152,7 +150,6 @@ int8 PlayerbotGuildMgr::DetermineGuildType()
     }
     return bestType;
 }
-
 
 void PlayerbotGuildMgr::AssignToGuild(Player* player)
 {
@@ -353,7 +350,6 @@ void PlayerbotGuildMgr::ValidateGuildCache()
     }
 }
 
-
 void PlayerbotGuildMgr::SaveDirtyGuilds()
 {
     CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
@@ -369,6 +365,39 @@ void PlayerbotGuildMgr::SaveDirtyGuilds()
     }
     CharacterDatabase.CommitTransaction(trans);
 }
+
+void PlayerbotGuildMgr::SetBotAvailability(uint32 guildId, ObjectGuid guid, BotAvailabilityStatus status)
+{
+    m_guildBotStates[guildId][guid] = status;
+}
+
+std::unordered_map<ObjectGuid, BotState>* PlayerbotGuildMgr::GetBotAvailability(uint32 guildId, ObjectGuid guid)
+{
+    auto botguild = guildBotStates.find(guildId);
+    if (botguild == guildBotStates.end())
+        return BOT_STATUS_OFFLINE;
+
+    auto member = botguild->second.find(guid);
+    if (member == botguild->second.end())
+        return BOT_STATUS_OFFLINE;
+
+    return member->second.status;
+}
+std::vector<ObjectGuid> PlayerbotGuildMgr::GetAvailableGuildMembers(uint32 guildId)
+{
+    std::vector<ObjectGuid> availableMembers;
+    auto botguild = m_guildBotStates.find(guildId)
+    if (botguild == m_guildBotStates.end())
+        return availableMembers;
+
+    for (const auto& [guid, state] : botguild->second)
+    {
+        if (state = BOT_STATUS_ONLINE)
+            availableMembers.push_back(guid);
+    }
+    return availableMembers;
+}
+
 
 class BotGuildCacheWorldScript : public WorldScript
 {
