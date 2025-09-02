@@ -13,6 +13,7 @@ class GuildRpgBaseAction : public Action
 public:
     GuildRpgBaseAction(PlayerbotAI* botAI, const std::string& name) : Action(botAI, name), m_groupMgr(nullptr) {}
     virtual ~GuildRpgBaseAction();
+    uint8 RollRandomAction(std::vector<uint32> weights);
 
 protected:
     PlayerbotGroupMgr* GetGroupMgr();
