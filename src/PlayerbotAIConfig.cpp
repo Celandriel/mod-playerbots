@@ -223,10 +223,10 @@ bool PlayerbotAIConfig::Initialize()
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildSize", "4,3,2,2,2"), GuildSize);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVPSpecRatio", "0,33,33,33"), GuildPVPSpecRatio);
 	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVESpecRatio", "12,22,34,32"), GuildPVESpecRatio);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVPWeights", "0.2,0.2,0.2,0.2,0.2"), GuildRpgPVPWeights);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVEWeights", "0.3,0.3,0.3", GuildRpgPVEWeights);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgProfWeights", "0.2,0.2,0.2,0.2"), GuildRpgProfWeights);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgRoleplayWeights", "0.3,0.3,0.3"), GuildRpgRpgWeights);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVPWeights", "20,20,20,20,20"), GuildRpgPVPWeights);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVEWeights", "33,33,33", GuildRpgPVEWeights);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgProfWeights", "20,20,20,20,20"), GuildRpgProfWeights);
+	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgRoleplayWeights", "33,33,33"), GuildRpgRpgWeights);
 	
     //////////////////////////// ICC
 

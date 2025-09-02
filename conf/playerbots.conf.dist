@@ -1022,10 +1022,10 @@ AiPlayerbot.GuildPVESpecRatio = "12, 22, 34, 32"
 # Dungeons, Raids, World Bosses
 #
 
-AiPlayerbot.GuildRpgPVPWeights = "0.2, 0.2, 0.2, 0.2, 0.2"
-AiPlayerbot.GuildRpgPvEWeights = "0.3, 0.3, 0.3"
-AiPlayerbot.GuildRpgProfWeights = "0.2, 0.2, 0.2, 0.2"
-AiPlayerbot.GuildRpgRoleplayWeights = "0.3, 0.3, 0.3"
+AiPlayerbot.GuildRpgPVPWeights = "20, 20, 20, 20, 20"
+AiPlayerbot.GuildRpgPvEWeights = "30, 30, 30"
+AiPlayerbot.GuildRpgProfWeights = "20, 20, 20, 20"
+AiPlayerbot.GuildRpgRoleplayWeights = "30, 30, 30"
 
 #
 #
