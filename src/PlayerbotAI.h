@@ -21,6 +21,7 @@
 #include "NewRpgStrategy.h"
 #include "PlayerbotAIBase.h"
 #include "PlayerbotAIConfig.h"
+#include "PlayerbotGuildMgr.h"
 #include "PlayerbotSecurity.h"
 #include "PlayerbotTextMgr.h"
 #include "SpellAuras.h"
@@ -258,7 +259,7 @@ enum class GuildType : uint8
     NONE = 0,
     PVP = 1,
     PVE = 2,
-    GATHERING_CRAFTER = 3,
+    PROFESSION = 3,
     ROLEPLAYING = 4,
     ADVENTURER_EXPLORER = 5
 };
@@ -639,7 +640,8 @@ public:
     void setGuildType(GuildType type) { guildType = type; }
     const TargetGroupComposition& GetTargetGroupComposition() const { return m_targetComposition; }
     void SetTargetGroupComposition(const TargetGroupComposition& comp) { m_targetComposition = comp; }
-    GuildTask guildRpgInfo; 
+    GuildTask guildRpgInfo;
+    const BotAvailabilityStatus GetAvailabilityStatus() const { return availabilityStatus; }
 
 private:
     static void _fillGearScoreData(Player* player, Item* item, std::vector<uint32>* gearScore, uint32& twoHandScore,
@@ -654,6 +656,7 @@ private:
 protected:
     Player* bot;
     Player* master;
+    std::unique_ptr<PlayerbotGroupMgr> m_groupMgr;
     uint32 accountId;
     AiObjectContext* aiObjectContext;
     Engine* currentEngine;
@@ -678,6 +681,7 @@ protected:
     uint32 nextTransportCheck = 0;
     GuildType guildType;
     TargetGroupComposition m_targetComposition {};
+    BotAvailabilityStatus availabilityStatus = 0;
 };
 
 #endif

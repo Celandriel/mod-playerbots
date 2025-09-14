@@ -1,7 +1,6 @@
 #ifndef _PLAYERBOT_GROUPMGR_H
 #define _PLAYERBOT_GROUPMGR_H
 
-#include "PlayerbotAI.h"
 #include "Group.h"
 #include "Action.h"
 
@@ -26,6 +25,7 @@ public:
     bool RemoveBot(ObjectGuid guid);
     bool DisbandGroup();
     bool CheckGroupComposition();
+    bool IsCompositionAvailable(const TargetGroupComposition& composition);
     void CleanGroup();
 
     bool WaitingforResponse();
@@ -42,8 +42,9 @@ private:
     Group* m_group;
     Guild* m_guild;
     uint8_t totalMembers;
-    bool checklevel = false;
+    bool levelrangeset = false;
 
+    bool IsInLevelRange(uint8 level);
     BotRoles GetBotRole(ObjectGuid guid);
     void UpdateComposition(); 
     bool CanInviteMore(BotRoles role);
