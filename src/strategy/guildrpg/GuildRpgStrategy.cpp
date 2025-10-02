@@ -9,12 +9,13 @@
 GuildRpgStrategy::GuildRpgStrategy::getDefaultActions()
 {
     return NextAction::array(0,
-        new NextAction("guild rpg status update", 11.0f),
+        new NextAction("guild queue for bg", 12.0f),
         nullptr)
 }
 
 void GuildRpgStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
     triggers.push_back(
-        new TriggerNode(".......", NextAction::array(0, new NextAction(".....",3.0f), nullptr)));
+        new TriggerNode("no guild task", NextAction::array(0, new NextAction("guild rpg set objective", 1.0f), nullptr))
+    );
 }

@@ -16,7 +16,7 @@
 #include "CreatureData.h"
 #include "Event.h"
 #include "Item.h"
-#include "GuildRpsTasks.h"
+#include "GuildRpgInfo.h"
 #include "NewRpgInfo.h"
 #include "NewRpgStrategy.h"
 #include "PlayerbotAIBase.h"
@@ -260,8 +260,7 @@ enum class GuildType : uint8
     PVP = 1,
     PVE = 2,
     PROFESSION = 3,
-    ROLEPLAYING = 4,
-    ADVENTURER_EXPLORER = 5
+    ROLEPLAYING = 4
 };
 
 enum ActivityType
@@ -640,7 +639,8 @@ public:
     void setGuildType(GuildType type) { guildType = type; }
     const TargetGroupComposition& GetTargetGroupComposition() const { return m_targetComposition; }
     void SetTargetGroupComposition(const TargetGroupComposition& comp) { m_targetComposition = comp; }
-    GuildTask guildRpgInfo;
+    GuildRpgInfo guildRpgInfo;
+
     const BotAvailabilityStatus GetAvailabilityStatus() const { return availabilityStatus; }
 
 private:

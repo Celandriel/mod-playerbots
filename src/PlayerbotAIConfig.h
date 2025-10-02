@@ -251,6 +251,7 @@ public:
     bool randomBotRandomPassword;
     bool deleteRandomBotAccounts;
     bool enableGuildRpgStrategy;
+    float guildRpgProbability;
     uint32 randomBotGuildCount;
     bool deleteRandomBotGuilds;
     std::vector<uint32> randomBotGuilds;
