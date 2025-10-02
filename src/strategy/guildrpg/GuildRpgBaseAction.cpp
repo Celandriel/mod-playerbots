@@ -3,7 +3,7 @@
 #include "Guild.h"
 #include "Group.h"
 
-uint8 GuildRpgBaseAction::RollRandomAction(std::vector<uint32> weights)
+uint8 GuildRpgBaseAction::RollRandomActivity(std::vector<uint32> weights)
 {
     uint32 totalRatio = 0;
     for (float ratio : weights) 
@@ -14,20 +14,146 @@ uint8 GuildRpgBaseAction::RollRandomAction(std::vector<uint32> weights)
 
     uint32 roll = urand(1, totalRatio);
     uint32 accumulate = 0;
-    uint8 objective;
+    uint8 activity;
     for (uint8 i = 0; i < weights.size(); ++i) {
         accumulate += weights[i];
         if (roll <= accumulate)
         {
-            objective = i;
+            activity = i;
             break;
         }
     }    
-    return objective;
+    return activity;
 }
 
-Guild* GuildRpgBaseAction::GetGuild() const
+bool GuildRpgBaseAction::isUseful()
 {
-    Player* player = botAI->GetBot();
-    return player ? player->GetGuild() : nullptr;
+    Guild* guild = GetGuild();
+    if (!guild)
+        return false;
+
+    if (botAI->getGuildType() == GuildType::NONE)
+        return false;
+
+    // If no current activity, choose one
+    if (botAI->guildRpgInfo.activity.objectiveNumber == 0) //Check this.
+    {
+        return true;
+    }
+
+    return False;
+}
+
+bool GuildRpgBaseAction::Execute(Event event)
+{
+    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
+    if (!taskInfo)
+        return false;
+
+    switch (taskInfo->phase)
+    {
+        case GuildTaskPhase::IDLE:
+            HandleGrouping();
+            break;
+        case GuildTaskPhase::GROUPING:
+            HandleGrouping();
+            break;
+        case GuildTaskPhase::PREPARATION:
+            HandlePreparation();
+            break;
+        case GuildTaskPhase::EXECUTING:
+            HandleExecution();
+            break;
+        case GuildTaskPhase::COMPLETION:
+            HandleCompletion();
+            break;
+        default:
+            break;
+    }
+    return true;
+}
+
+
+bool GuildRpgBaseAction::ChooseRandomActivity()
+{
+    GuildType guildType = botAI->getGuildType();
+    switch (guildType)
+    {
+        case GuildType::PVP:
+            {
+                std::vector<uint32> weights = sPlayerbotAIConfig->GuildRpgPvpWeights;
+                break;
+            }
+        case GuildType::PVE:
+        case GuildType::PROFESSION:
+        case GuildType::ROLEPLAYING:
+        case GuildType::ADVENTURER_EXPLORER:
+        case GuildType::NONE:
+        default:
+            return false;
+    }
+    uint8 objective = RollRandomAction(weights);
+    botAI->guildRpgInfo.SetGuildRpgActivity(objective);
+    return true;
+}
+
+void GuildRpgBaseAction::HandleGrouping()
+
+class GuildPvpActions::HandleGrouping()
+{
+    Player* bot = botAI->GetBot();
+    PlayerbotGroupMgr* groupMgr = botAI->GetGroupMgr();
+    if (!groupMgr)
+    {
+        LOG_ERROR("playerbots", "Bot {} has no group manager available", bot->GetName().c_str());
+        return false;
+    }
+
+    // Check if composition is available
+    if (!groupMgr->IsCompositionAvailable(botAI->GetTargetGroupComposition()))
+    {
+        LOG_INFO("playerbots", "Bot {}: Required group composition not available", bot->GetName().c_str());
+        return false;
+    }
+
+    // Create the group
+    if (!groupMgr->CreateGroup())
+    {
+        LOG_ERROR("playerbots", "Bot {}: Failed to create group", bot->GetName().c_str());
+        return false;
+    }
+
+    LOG_INFO("playerbots", "Bot {} created group for PVP activity", bot->GetName().c_str());
+
+    // Wait for group formation to complete
+    if (groupMgr->WaitingforResponse())
+    {
+        LOG_INFO("playerbots", "Bot {} waiting for group invites to be accepted", bot->GetName().c_str());
+        return true; // Return true to continue waiting
+    }
+
+    // Check if group is complete
+    if (!groupMgr->CheckGroupComposition())
+    {
+        LOG_DEBUG("playerbots", "Bot {}: Group composition not yet complete for PVP activity", bot->GetName().c_str());
+        return true; // Continue waiting for complete group
+    }
+
+    // Group is ready. Transition to PREPARATION phase.
+    LOG_INFO("playerbots", "Bot {} group is ready for PVP activity. Updating task phase to PREPARATION.", bot->GetName().c_str());
+    botAI->UpdateGuildTaskPhase(GuildRpgPhase::PREPARATION);
+
+    return true;
+}
+
+bool GuildRpgActivityUpdateAction::Execute(Event event)
+{
+    //random float 0-1 and check against guildrpgprobability
+    float roll = (float)rand() / RAND_MAX;
+    if (roll < sPlayerbotAIConfig->GuildRpgProbability)
+    {
+        ChooseRandomActivity();
+        LOG_INFO("playerbots", "Bot {} selected new guild RPG activity: {}", botAI->GetBot()->GetName().c_str(), botAI->guildRpgInfo.activity.objectiveNumber);
+        return true;
+    }
 }
