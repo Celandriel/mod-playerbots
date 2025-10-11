@@ -2,8 +2,8 @@
 #define _PLAYERBOT_GROUPACTION_H
 
 #include "Action.h"
+#include "PlayerbotAI.h"
 
-class PlayerbotAI;
 class PlayerbotGroupMgr;
 
 class CreateGroupAction : public Action

@@ -2,7 +2,7 @@
 #define _PLAYERBOT_GUILDPVPACTIONS_H
 
 #include "GuildRpgBaseAction.h"
-#include "GuildRpgTasks.h"
+#include "GuildRpgInfo.h"
 #include "PlayerbotAI.h"
 
 /*
@@ -30,21 +30,12 @@ class GuildPvpActions : public GuildRpgBaseAction
 {
 public:
     GuildPvpActions(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild pvp rpg") {}
+    
+    bool HandleSelection(Event event) override;
+    bool HandlePreparation(Event event) override;
+    bool HandleExecution(Event event) override;
+    bool HandleCompletion(Event event) override;
 
-    void HandleSelection() override;
-    void HandlePreparation() override;
-    void HandleExecution() override;
-    void HandleCompletion() override;
-
-};
-
-
-class QueueForBgAction : public GuildRpgBaseAction
-{
-public:
-    QueueForBgAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild queue for bg") {}
-    bool isUseful() override;
-    bool Execute(Event event) override;
 };
 
 class FriendlyDuelAction : public GuildRpgBaseAction

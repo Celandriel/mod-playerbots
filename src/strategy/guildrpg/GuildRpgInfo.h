@@ -1,6 +1,14 @@
-#ifndef _PLAYERBOT_GUILDRPGTASKS_H
-#define _PLAYERBOT_GUILDRPGTASKS_H
+#ifndef _PLAYERBOT_GUILDRPGINFO_H
+#define _PLAYERBOT_GUILDRPGINFO_H
 
+#include <utility>
+#include <string>
+#include <vector>
+#include <map>
+#include <unordered_map>
+#include "Define.h"
+
+class PlayerbotAI;
 
 enum class GuildRpgPhase
 {
@@ -9,42 +17,61 @@ enum class GuildRpgPhase
     GROUPING,
     PREPARATION,
     EXECUTING,
-    COMPLETED,
+    COMPLETED
 };
 
-GuildRpgActivityKey = std::pair<GuildType, int>;
-GuildRpgActivityMap = std::map<ActivityKey, std::string>;
+enum class GuildType
+{
+    NONE,
+    PVP,
+    PVE,
+    PROFESSION,
+    ROLEPLAY
+};
 
-GuildRpgActivityMap Activities = {
-    // PVP
-    {{GuildType::PVP, 1}, "QUEUE_FOR_BG"},
-    {{GuildType::PVP, 2}, "PATROL_AREA"},
-    {{GuildType::PVP, 3}, "ATTACK_CITY"},
-    {{GuildType::PVP, 4}, "DEFEND_BASE"},
-    {{GuildType::PVP, 5}, "WORLD_PVP"},
-    
-    // PvE
-    {{GuildType::PVE, 1}, "RUN_DUNGEON"},
-    {{GuildType::PVE, 2}, "RUN_RAID"},
-    {{GuildType::PVE, 3}, "WORLD_EVENT"},
-    
-    // Profession
-    {{GuildType::PROFESSION, 1}, "GATHER_NODES"},
-    {{GuildType::PROFESSION, 2}, "FARM_MOBS"},
-    {{GuildType::PROFESSION, 3}, "MASS_CRAFT"},
-    {{GuildType::PROFESSION, 4}, "FISHING"},
-    
-    // Roleplay
-    {{GuildType::ROLEPLAY, 1}, "INNS_MEETUP"},
-    {{GuildType::ROLEPLAY, 2}, "EMOTE_EVENT"}
+using GuildRpgActivityMap = std::map<GuildType, std::map<uint8_t, std::string>>;
+
+static const GuildRpgActivityMap Activities =
+{
+    {GuildType::NONE, {{ 0, "IDLE"}}},
+    {GuildType::PVP, {
+        {0, "IDLE"},
+        {1, "QUEUE_FOR_BG"},
+        {2, "PATROL_AREA"},
+        {3, "ATTACK_CITY"},
+        {4, "DEFEND_BASE"},
+        {5, "WORLD_PVP"}
+    }},
+    {GuildType::PVE, {
+        {0, "IDLE"},
+        {1, "RUN_DUNGEON"},
+        {2, "RUN_RAID"},
+        {3, "WORLD_EVENT"}
+    }},
+    {GuildType::PROFESSION, {
+        {0, "IDLE"},
+        {1, "GATHER_NODES"},
+        {2, "FARM_MOBS"},
+        {3, "MASS_CRAFT"},
+        {4, "FISHING"}
+    }},
+    {GuildType::ROLEPLAY, {
+        {0, "IDLE"},
+        {1, "INNS_MEETUP"},
+        {2, "EMOTE_EVENT"}
+    }}
 };
 
 
 struct GuildRpgInfo
 {
-    GuildRpgActivityKey activity;
-    void SetGuildRpgActivity(uint8 activity);
+    GuildType type = GuildType::NONE;
+    uint8_t activityNumber = 0;
+    GuildRpgPhase phase = GuildRpgPhase::IDLE;
+    void SetGuildRpgActivity(PlayerbotAI* botAI, uint8_t activity);
     void ResetGuildActivity();
-}
+    std::string GetActivityName() const;
+    void SetGuildRpgPhase(GuildRpgPhase newPhase) { phase = newPhase; }
+};
 
 #endif

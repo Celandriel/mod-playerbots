@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS `playerbots_guild_names`;
 CREATE TABLE  `playerbots_guild_names` (
   `name_id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(24) NOT NULL,
-  `guild_type` tinyint(1) NOT NULL COMMENT '1=PvP, 2=PvE, 3=GatheringCrafter, 4=Roleplaying, 5=AdventurerExplorer',
+  `guild_type` tinyint(1) NOT NULL COMMENT '1=PvP, 2=PvE, 3=Profession, 4=Roleplaying, 5=AdventurerExplorer',
   `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0=Available, 1=In Use, 2=Full',
   `guildID` int(4) unsigned NOT NULL,
   `faction` tinyint(1) unsigned NOT NULL DEFAULT '2',

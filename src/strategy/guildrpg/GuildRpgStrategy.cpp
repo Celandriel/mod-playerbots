@@ -6,11 +6,14 @@
 #include "GuildRpgStrategy.h"
 #include "Playerbots.h"
 
-GuildRpgStrategy::GuildRpgStrategy::getDefaultActions()
+
+GuildRpgStrategy::GuildRpgStrategy(PlayerbotAI* botAI) : Strategy(botAI) {}
+
+NextAction** GuildRpgStrategy::getDefaultActions()
 {
     return NextAction::array(0,
         new NextAction("guild queue for bg", 12.0f),
-        nullptr)
+        nullptr);
 }
 
 void GuildRpgStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)

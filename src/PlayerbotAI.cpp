@@ -44,6 +44,7 @@
 #include "PlayerbotDbStore.h"
 #include "PlayerbotMgr.h"
 #include "Playerbots.h"
+#include "PlayerbotGroupMgr.h"
 #include "PointMovementGenerator.h"
 #include "PositionValue.h"
 #include "RandomPlayerbotMgr.h"
@@ -4206,21 +4207,28 @@ GrouperType PlayerbotAI::GetGrouperType()
 
 GuilderType PlayerbotAI::GetGuilderType()
 {
+    uint32 grouperNumber = GetFixedBotNumer(100, 0);
+
+    if (grouperNumber < 20 && !HasRealPlayerMaster())
+        return GuilderType::SOLO;
+
+    if (grouperNumber < 30)
+        return GuilderType::TINY;
 
     if (grouperNumber < 40)
         return GuilderType::SMALL;
 
     if (grouperNumber < 60)
-    if (grouperNumber < 30)
+        return GuilderType::MEDIUM;
 
     if (grouperNumber < 80)
-    if (grouperNumber < 40)
+        return GuilderType::LARGE;
 
     return GuilderType::VERY_LARGE;
-    if (grouperNumber < 60)
+}
 
 bool PlayerbotAI::HasPlayerNearby(WorldPosition* pos, float range)
-    if (grouperNumber < 80)
+{
     float sqRange = range * range;
     bool nearPlayer = false;
     for (auto& player : sRandomPlayerbotMgr->GetPlayers())

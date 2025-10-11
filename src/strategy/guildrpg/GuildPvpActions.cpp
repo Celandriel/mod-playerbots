@@ -6,7 +6,9 @@
 #include "DBCEnums.h"
 #include "Random.h"
 #include "Log.h"
-#include "GuildRpgTasks.h"
+#include "GuildRpgInfo.h"
+#include "AiObjectContext.h"
+#include "Value.h"
 
 
 BattlegroundQueueTypeId SelectBattlegroundForLevel(uint8 botLevel)
@@ -88,7 +90,7 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
     }
     else
     {
-        composition.lowerLevelLimit = (level / 10) * 10;    // e.g. 47 → 40
+        composition.lowerLevelLimit = (botLevel / 10) * 10;    // e.g. 47 → 40
         composition.upperLevelLimit = composition.lowerLevelLimit + 9;              // e.g. 40 → 49
     }
     
@@ -115,9 +117,9 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
     return composition;
 }
 
-void GuildPvpActions::HandleSelection()
+bool GuildPvpActions::HandleSelection(Event event)
 {
-    activity = botAI->guildRpgInfo.activity;
+    uint8_t activity = botAI->guildRpgInfo.activityNumber;
     if (activity == 1)
     {
         uint8 botLevel = bot->GetLevel();
@@ -125,60 +127,62 @@ void GuildPvpActions::HandleSelection()
         if (battleground == BATTLEGROUND_QUEUE_NONE)
         {
             LOG_ERROR("playerbots", "Bot {} could not find suitable battleground for level {} reseting task", bot->GetName().c_str(), botLevel);
-            botAI->GuildRpgInfo.ResetGuildActivity();
-            return;
+            botAI->guildRpgInfo.ResetGuildActivity();
+            return false;
         }
+        botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(battleground);
         TargetGroupComposition groupComp = CreatePvpGroupComposition(battleground, botLevel);
         botAI->SetTargetGroupComposition(groupComp);
-        botAI->SetGuildRpgPhase(GuildRpgPhase::GROUPING);
+        botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::GROUPING);
         return true;
     }
-    return;
+    return false;
 }
 
-void GuildPvpActions::HandlePreparation()
+bool GuildPvpActions::HandlePreparation(Event event)
 {
-    activity = botAI->guildRpgInfo.activity;
-    if (activity == 1)
+    uint8 activityNumber = botAI->guildRpgInfo.activityNumber;
+    if (activityNumber == 1)
     {
         //check if in queue
         //If not queue as group 
         if (bot->InBattlegroundQueue())
         {
-            return;
+            return false;
         }
         if (bot->InBattleground())
         {
-            botAI->SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
-            return;
+            botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
+            return false;
         }
         BGJoinAction bgJoinAction(botAI);
-        return bgJoinAction.JoinQueue(battleground);
+        return bgJoinAction.Execute(event);
     }
-    return;
-    }
+    return false;
 }
 
-void GuildPvpActions::HandleExecution()
+
+bool GuildPvpActions::HandleExecution(Event event)
 {
-    activity = botAI->guildRpgInfo.activity;
+    uint8 activity = botAI->guildRpgInfo.activityNumber;
     if (activity == 1)
     {
         //check if in bg
         //If not in bg check if in queue
         if (bot->InBattleground())
         {
-            return;
+            return true;
         }
-        botAI->SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
-        return;
+        botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
+        return true;
     }
-    return;
+    return false;
 }
 
-void GuildPvpActions::HandleCompletion()
+bool GuildPvpActions::HandleCompletion(Event event)
 {
-    activity = botAI->guildRpgInfo.activity;
+    GuildRpgInfo guildRpgInfo = botAI->guildRpgInfo;
+    uint8 activity = guildRpgInfo.activityNumber;
     if (activity == 1)
     {
         //Not in queue or bg, decide to queue again or abandon task
@@ -186,22 +190,25 @@ void GuildPvpActions::HandleCompletion()
         if (queueAgain)
         {
             LOG_INFO("playerbots", "Bot {} BG completed, queuing again", bot->GetName().c_str());
-            botAI->SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
+            botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
             return true;
         }
         else
         {
             LOG_INFO("playerbots", "Bot {} BG completed, disbanding", bot->GetName().c_str());
-            botAI->CompleteCurrentGuildTask(true);
+            guildRpgInfo.SetGuildRpgActivity(botAI, 0);
+            guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::IDLE);
+            //botAI->DisbandGroup();
             return true;
         }
     }
 }
+
 /*
 bool FriendlyDuelAction::isUseful()
 {
     // Check if bot has a task to duel
-    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
+    GuildTaskInfo* taskInfo = botAI->guildRpgInfo;
     if (!taskInfo || taskInfo->task.type != ActivityType::PVP)
         return false;
 
@@ -219,7 +226,7 @@ bool FriendlyDuelAction::Execute(Event event)
 bool AttackCityAction::isUseful()
 {
     // Check if bot has a task to attack city
-    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
+    GuildTaskInfo* taskInfo = botAI->guildRpgInfo;
     if (!taskInfo || taskInfo->task.objectiveId != PvpActivity::ATTACK_CITY)
         return false;
 
@@ -236,7 +243,7 @@ bool AttackCityAction::Execute(Event event)
 bool RaidHighProbabilityLocationAction::isUseful()
 {
     // Check if bot has a raid task
-    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
+    GuildTaskInfo* taskInfo = botAI->guildRpgInfo;
     if (!taskInfo || taskInfo->task.type != ActivityType::PVP)
         return false;
 
@@ -253,7 +260,7 @@ bool RaidHighProbabilityLocationAction::Execute(Event event)
 bool PatrolAreaAction::isUseful()
 {
     // Check if bot has a patrol task
-    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
+    GuildTaskInfo* taskInfo = botAI->guildRpgInfo;
     if (!taskInfo || taskInfo->task.objectiveId != PvpActivity::PATROL_AREA)
         return false;
 
@@ -270,7 +277,7 @@ bool PatrolAreaAction::Execute(Event event)
 bool DefendBaseAction::isUseful()
 {
     // Check if bot has a defend task
-    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
+    GuildTaskInfo* taskInfo = botAI->guildRpgInfo;
     if (!taskInfo || taskInfo->task.objectiveId != PvpActivity::DEFEND_BASE)
         return false;
 
@@ -287,7 +294,7 @@ bool DefendBaseAction::Execute(Event event)
 bool WorldPvpAction::isUseful()
 {
     // Check if bot has a world PvP task
-    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
+    GuildTaskInfo* taskInfo = botAI->guildRpgInfo;
     if (!taskInfo || taskInfo->task.objectiveId != PvpActivity::WORLD_PVP)
         return false;
 
@@ -301,23 +308,4 @@ bool WorldPvpAction::Execute(Event event)
     return false;
 }
 
-// BG Preparation Action - handles queuing during PREPARATION phase
-bool BGPreparationAction::isUseful()
-{
-    // Check if bot has a BG queue task in PREPARATION phase
-    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
-    if (!taskInfo || taskInfo->task.objectiveId != PvpActivity::QUEUE_FOR_BG)
-        return false;
-
-    // Only useful during PREPARATION phase
-    if (taskInfo->phase != GuildTaskPhase::PREPARATION)
-        return false;
-
-    // Check if already queued or in BG
-    Player* bot = botAI->GetBot();
-    if (bot->InBattleground() || bot->InBattlegroundQueue())
-        return false;
-
-    return true;
-}
 */

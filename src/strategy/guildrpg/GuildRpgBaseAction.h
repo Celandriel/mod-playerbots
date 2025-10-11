@@ -2,13 +2,15 @@
 #define _PLAYERBOT_GUILDRPGBASEACTION_H
 
 #include "Action.h"
+#include "Guild.h"
+#include "GuildRpgInfo.h"
 
-class TellGuildRpgStatusAction public Action
+class TellGuildRpgStatusAction : public Action
 {
 public:
-    TellGuildRpgStatusAction(PlayerbotAI* botAI, "guild rpg status") {}
+    TellGuildRpgStatusAction(PlayerbotAI* botAI) : Action(botAI, "guild rpg status") {}
     bool Execute(Event event) override;
-}
+};
 
 class GuildRpgBaseAction : public Action
 {
@@ -18,18 +20,18 @@ public:
     bool isUseful() override;
 
     void UpdatePhase(PlayerbotAI* botAI);
-    bool isPhaseComplete()
-    uint8 ChooseRandomActivity(std::vector<uint32> weights);
+    bool isPhaseComplete();
+    uint8 RollRandomActivity(std::vector<uint32> weights);
+    bool ChooseRandomActivity();
 
-    virtual void HandleSelection();
-    virtual void HandleGrouping();
-    virtual void HandlePreparation();
-    virtual void HandleExecution();
-    virtual void HandleCompletion();
+    virtual bool HandleSelection(Event event);
+    virtual bool HandleGrouping(Event event);
+    virtual bool HandlePreparation(Event event);
+    virtual bool HandleExecution(Event event);
+    virtual bool HandleCompletion(Event event);
 
 protected:
     Guild* GetGuild() const;
-    bool SetGuildRpgActivity();
     
 };
 
