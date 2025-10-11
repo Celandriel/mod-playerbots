@@ -190,7 +190,7 @@ private:
     static Strategy* combat_formation(PlayerbotAI* ai) { return new CombatFormationStrategy(ai); }
     static Strategy* move_from_group(PlayerbotAI* botAI) { return new MoveFromGroupStrategy(botAI); }
     static Strategy* world_buff(PlayerbotAI* botAI) { return new WorldBuffStrategy(botAI); }
-    static Strategy* guild_rpg(PlayerbotAI* botAI) { return new GuildRPGStrategy(botAI); }
+    static Strategy* guild_rpg(PlayerbotAI* botAI) { return new GuildRpgStrategy(botAI); }
 };
 
 class MovementStrategyContext : public NamedObjectContext<Strategy>

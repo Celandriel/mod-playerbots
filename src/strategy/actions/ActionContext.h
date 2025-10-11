@@ -31,6 +31,7 @@
 #include "GenericSpellActions.h"
 #include "GiveItemAction.h"
 #include "GreetAction.h"
+#include "GroupAction.h"
 #include "GuildAcceptAction.h"
 #include "GuildCreateActions.h"
 #include "GuildManagementActions.h"

@@ -8,7 +8,7 @@
 
 bool CreateGroupAction::Execute(Event event)
 {
-    PlayerbotGroupMgr& groupMgr = *botAI->m_groupMgr;
+    PlayerbotGroupMgr& groupMgr = *botAI->GetGroupMgr();
     TargetGroupComposition comp = botAI->GetTargetGroupComposition();
 
     // Set composition for the manager
@@ -49,7 +49,7 @@ bool CreateGroupAction::isPossible()
     TargetGroupComposition comp = botAI->GetTargetGroupComposition();
     if (!ValidateTargetComposition(comp))
         return false;
-    return botAI->m_groupMgr->IsCompositionAvailable(comp);
+    return botAI->GetGroupMgr()->IsCompositionAvailable(comp);
 }
 
 bool DisbandGroupAction::Execute(Event event)
@@ -58,7 +58,7 @@ bool DisbandGroupAction::Execute(Event event)
         return false;
     if (!botAI->GetBot()->GetGroup())
         return false;
-    return botAI->m_groupMgr->DisbandGroup();
+    return botAI->GetGroupMgr()->DisbandGroup();
 }
 
 bool CreateGroupAction::ValidateTargetComposition(const TargetGroupComposition& comp)

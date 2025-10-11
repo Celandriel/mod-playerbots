@@ -3,8 +3,7 @@
 
 #include "Group.h"
 #include "Action.h"
-
-class PlayerbotAI;
+#include "PlayerbotAI.h"
  
 struct GuildMember
 {
@@ -44,7 +43,7 @@ private:
     uint8_t totalMembers;
     bool levelrangeset = false;
 
-    bool IsInLevelRange(uint8 level);
+    bool IsLevelWithinRange(uint8 level);
     BotRoles GetBotRole(ObjectGuid guid);
     void UpdateComposition(); 
     bool CanInviteMore(BotRoles role);

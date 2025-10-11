@@ -659,11 +659,11 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
             // nonCombatEngine->addStrategy("guild");
             nonCombatEngine->addStrategy("grind", false);
 
-            if (sPlayerbotAIConfig->enableGuildRPGStrategy)
+            if (sPlayerbotAIConfig->enableGuildRpgStrategy)
             {
                 nonCombatEngine->addStrategy("guild rpg", false);
             }
-            else if (sPlayerbotAIConfig->enableNewRpgStrategy)
+            if (sPlayerbotAIConfig->enableNewRpgStrategy)
             {
                 nonCombatEngine->addStrategy("new rpg", false);
             }

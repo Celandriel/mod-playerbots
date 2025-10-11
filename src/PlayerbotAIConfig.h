@@ -53,6 +53,7 @@ enum NewRpgStatus : int
     RPG_REST = 6,
     // Initial status
     RPG_IDLE = 7,
+    RPG_STATUS_END = 8
     /*RPG_AH_BUY
     RPG_AH_SELL */
 };
@@ -255,7 +256,7 @@ public:
     uint32 randomBotGuildCount;
     bool deleteRandomBotGuilds;
     std::vector<uint32> randomBotGuilds;
-    std::vector<uint32> GuildTypeRatios, GuildSize, GuildPVESpecRatio, GuildPVESpecRatio, GuildRpgPVPWeights, GuildRpgPVEWeights, GuildRpgProfWeights, GuildRpgRpgWeights;
+    std::vector<uint32> GuildTypeRatios, GuildSize, GuildPveSpecRatio, GuildPvpSpecRatio, GuildRpgPvpWeights, GuildRpgPveWeights, GuildRpgProfWeights, GuildRpRpgWeights;
     std::vector<uint32> pvpProhibitedZoneIds;
     std::vector<uint32> pvpProhibitedAreaIds;
     bool fastReactInBG;

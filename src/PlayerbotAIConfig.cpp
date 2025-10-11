@@ -199,22 +199,22 @@ bool PlayerbotAIConfig::Initialize()
                                              "575,576,578,595,599,600,601,602,604,608,619,632,650,658,668,409,469,509,"
                                              "531,532,534,544,548,550,564,565,580,249,533,603,615,616,624,631,649,724"),
         restrictedHealerDPSMaps);
-	
+
     //////////////////////////// Guild RPG
     enableGuildRpgStrategy = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableGuildRPG", true);
     guildRpgProbability = sConfigMgr->GetOption<float>("AiPlayerbot.GuildRPGProbability", 10);   
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10,10"), GuildTypeRatios);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10"), GuildTypeRatios);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildSize", "4,3,2,2,2"), GuildSize);
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVPSpecRatio", "0,33,33,33"), GuildPVPSpecRatio);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVESpecRatio", "12,22,34,32"), GuildPVESpecRatio);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVPWeights", "20,20,20,20,20"), GuildRpgPVPWeights);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVEWeights", "33,33,33", GuildRpgPVEWeights);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgProfWeights", "20,20,20,20,20"), GuildRpgProfWeights);
-	LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgRoleplayWeights", "33,33,33"), GuildRpgRpgWeights);
-	
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVPSpecRatio", "0,33,33,33"), GuildPvpSpecRatio);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVESpecRatio", "12,22,34,32"), GuildPveSpecRatio);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVPWeights", "20,20,20,20,20"), GuildRpgPvpWeights);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVEWeights", "33,33,33"), GuildRpgPveWeights);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgProfWeights", "20,20,20,20,20"), GuildRpgProfWeights);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgRoleplayWeights", "33,33,33"), GuildRpRpgWeights);
+
     //////////////////////////// ICC
 
-	EnableICCBuffs = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableICCBuffs", true);
+    EnableICCBuffs = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableICCBuffs", true);
 
     //////////////////////////// CHAT
     enableBroadcasts = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableBroadcasts", true);

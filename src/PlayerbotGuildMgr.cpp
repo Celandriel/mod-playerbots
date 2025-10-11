@@ -6,34 +6,37 @@
 #include "RandomPlayerbotMgr.h"
 #include "ScriptMgr.h"
 
-using namespace ai;
-
 PlayerbotGuildMgr::PlayerbotGuildMgr()
 {
     // Initialize guild type ratios and player counts
     guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
-    std::vector<uint8> guildSize = sPlayerbotAIConfig->GuildSize.size() 
-    if (guildSize.size()!= 5) {
-            LOG_ERROR("playerbots", "Config Error: GuildSize must have 5 numbers separated by commas.");
-           guildSize = {4,3,2,2,2};
-        }
+    std::vector<uint32> guildSizes = sPlayerbotAIConfig->GuildSize; 
+    if (guildSizes.size()!= 4)
+    {
+        LOG_ERROR("playerbots", "Config Error: GuildSize must have 5 numbers separated by commas.");
+        guildSizes = {4,3,2,2};
+    }
 
-    for (int selection : sPlayerbotAIConfig->GuildSize.size())
+    for (int selection : guildSizes)
     {
         if (selection >=0 && selection <= 5)
         {
-            guildNumPlayers.push_back(GUILDER_MAP(selection));
+            guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[selection]));
         }
         else
         {
-            LOG_ERROR("playerbots", "Invalid GuildSize set, defaulting to SOLO")
-            guildNumPlayers.push_back(GUILDER_MAP(0));
+            LOG_ERROR("playerbots", "Invalid GuildSize set, defaulting to SOLO");
+            guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[0]));
         }
     }
-    if(sPlayerbotAIConfig->GuildTypeRatios.size() < 5)
+    if(sPlayerbotAIConfig->GuildTypeRatios.size() == 5)
+    {
+        guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
+    }
+    else
     {
         LOG_ERROR("playerbots", "Guild type ratios not defined correctly. Using default values.");
-        guildTypeRatios = {40, 20, 20, 10, 10}; // Default values
+        guildTypeRatios = {40, 20, 20, 10}; // Default values
     }
 
 }
@@ -385,10 +388,10 @@ void PlayerbotGuildMgr::SaveDirtyGuilds()
 
 void PlayerbotGuildMgr::SetBotAvailability(uint32 guildId, ObjectGuid guid, BotAvailabilityStatus status)
 {
-    m_guildBotStates[guildId][guid] = status;
+    guildBotStates[guildId][guid] = status;
 }
 
-std::unordered_map<ObjectGuid, BotState>* PlayerbotGuildMgr::GetBotAvailability(uint32 guildId, ObjectGuid guid)
+BotAvailabilityStatus PlayerbotGuildMgr::GetBotAvailability(uint32 guildId, ObjectGuid guid)
 {
     auto botguild = guildBotStates.find(guildId);
     if (botguild == guildBotStates.end())
@@ -398,18 +401,18 @@ std::unordered_map<ObjectGuid, BotState>* PlayerbotGuildMgr::GetBotAvailability(
     if (member == botguild->second.end())
         return BOT_STATUS_OFFLINE;
 
-    return member->second.status;
+    return member->second;
 }
 std::vector<ObjectGuid> PlayerbotGuildMgr::GetAvailableGuildMembers(uint32 guildId)
 {
     std::vector<ObjectGuid> availableMembers;
-    auto botguild = m_guildBotStates.find(guildId)
-    if (botguild == m_guildBotStates.end())
+    auto botguild = guildBotStates.find(guildId);
+    if (botguild == guildBotStates.end())
         return availableMembers;
 
     for (const auto& [guid, state] : botguild->second)
     {
-        if (state = BOT_STATUS_ONLINE)
+        if (state == BOT_STATUS_ONLINE)
             availableMembers.push_back(guid);
     }
     return availableMembers;
@@ -433,7 +436,7 @@ class BotGuildCacheWorldScript : public WorldScript
 
         void OnUpdate(uint32 diff) override
         {
-            if (!sPlayerbotAIConfig->enableGuildpgGStrategy)
+            if (!sPlayerbotAIConfig->enableGuildRpgStrategy)
                 return;
             m_timer += diff;
             m_validateTimer += diff;

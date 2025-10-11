@@ -2,6 +2,7 @@
 #include "PlayerbotAI.h"
 #include "Guild.h"
 #include "Group.h"
+#include "PlayerbotGroupMgr.h"
 
 uint8 GuildRpgBaseAction::RollRandomActivity(std::vector<uint32> weights)
 {
@@ -26,6 +27,29 @@ uint8 GuildRpgBaseAction::RollRandomActivity(std::vector<uint32> weights)
     return activity;
 }
 
+bool GuildRpgBaseAction::ChooseRandomActivity()
+{
+    std::vector<uint32> weights;
+    GuildType guildType = botAI->getGuildType();
+    switch (guildType)
+    {
+        case GuildType::PVP:
+            {
+                weights = sPlayerbotAIConfig->GuildRpgPvpWeights;
+                break;
+            }
+        case GuildType::PVE:
+        case GuildType::PROFESSION:
+        case GuildType::ROLEPLAY:
+        case GuildType::NONE:
+        default:
+            return false;
+    }
+    uint8 objective = RollRandomActivity(weights);
+    botAI->guildRpgInfo.SetGuildRpgActivity(botAI, objective);
+    return true;
+}
+
 bool GuildRpgBaseAction::isUseful()
 {
     Guild* guild = GetGuild();
@@ -35,37 +59,31 @@ bool GuildRpgBaseAction::isUseful()
     if (botAI->getGuildType() == GuildType::NONE)
         return false;
 
-    // If no current activity, choose one
-    if (botAI->guildRpgInfo.activity.objectiveNumber == 0) //Check this.
-    {
-        return true;
-    }
-
-    return False;
+    if (bot->GetGroup() && bot->GetGroup()->GetLeaderGUID() != bot->GetGUID())
+            return false;
+    return true;
 }
 
 bool GuildRpgBaseAction::Execute(Event event)
 {
-    GuildTaskInfo* taskInfo = botAI->GetGuildTaskInfo();
-    if (!taskInfo)
-        return false;
+    GuildRpgInfo rpgInfo = botAI->guildRpgInfo;
 
-    switch (taskInfo->phase)
+    switch (rpgInfo.phase)
     {
-        case GuildTaskPhase::IDLE:
-            HandleGrouping();
+        case GuildRpgPhase::IDLE:
+            HandleGrouping(event);
             break;
-        case GuildTaskPhase::GROUPING:
-            HandleGrouping();
+        case GuildRpgPhase::GROUPING:
+            HandleGrouping(event);
             break;
-        case GuildTaskPhase::PREPARATION:
-            HandlePreparation();
+        case GuildRpgPhase::PREPARATION:
+            HandlePreparation(event);
             break;
-        case GuildTaskPhase::EXECUTING:
-            HandleExecution();
+        case GuildRpgPhase::EXECUTING:
+            HandleExecution(event);
             break;
-        case GuildTaskPhase::COMPLETION:
-            HandleCompletion();
+        case GuildRpgPhase::COMPLETED:
+            HandleCompletion(event);
             break;
         default:
             break;
@@ -73,33 +91,12 @@ bool GuildRpgBaseAction::Execute(Event event)
     return true;
 }
 
-
-bool GuildRpgBaseAction::ChooseRandomActivity()
+bool GuildRpgBaseAction::HandleSelection(Event event)
 {
-    GuildType guildType = botAI->getGuildType();
-    switch (guildType)
-    {
-        case GuildType::PVP:
-            {
-                std::vector<uint32> weights = sPlayerbotAIConfig->GuildRpgPvpWeights;
-                break;
-            }
-        case GuildType::PVE:
-        case GuildType::PROFESSION:
-        case GuildType::ROLEPLAYING:
-        case GuildType::ADVENTURER_EXPLORER:
-        case GuildType::NONE:
-        default:
-            return false;
-    }
-    uint8 objective = RollRandomAction(weights);
-    botAI->guildRpgInfo.SetGuildRpgActivity(objective);
-    return true;
+    return false;
 }
 
-void GuildRpgBaseAction::HandleGrouping()
-
-class GuildPvpActions::HandleGrouping()
+bool GuildRpgBaseAction::HandleGrouping(Event event)
 {
     Player* bot = botAI->GetBot();
     PlayerbotGroupMgr* groupMgr = botAI->GetGroupMgr();
@@ -141,19 +138,36 @@ class GuildPvpActions::HandleGrouping()
 
     // Group is ready. Transition to PREPARATION phase.
     LOG_INFO("playerbots", "Bot {} group is ready for PVP activity. Updating task phase to PREPARATION.", bot->GetName().c_str());
-    botAI->UpdateGuildTaskPhase(GuildRpgPhase::PREPARATION);
+    botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
 
     return true;
 }
+
+bool GuildRpgBaseAction::HandlePreparation(Event event)
+{
+    return false;
+}
+
+bool GuildRpgBaseAction::HandleExecution(Event event)
+{
+    return false;
+}
+
+bool GuildRpgBaseAction::HandleCompletion(Event event)
+{
+    return false;
+}
+
+
 
 bool GuildRpgActivityUpdateAction::Execute(Event event)
 {
     //random float 0-1 and check against guildrpgprobability
     float roll = (float)rand() / RAND_MAX;
-    if (roll < sPlayerbotAIConfig->GuildRpgProbability)
+    if (roll < sPlayerbotAIConfig->guildRpgProbability)
     {
         ChooseRandomActivity();
-        LOG_INFO("playerbots", "Bot {} selected new guild RPG activity: {}", botAI->GetBot()->GetName().c_str(), botAI->guildRpgInfo.activity.objectiveNumber);
+        LOG_INFO("playerbots", "Bot {} selected new guild RPG activity: {}", botAI->GetBot()->GetName().c_str(), botAI->guildRpgInfo.activityNumber);
         return true;
     }
 }
