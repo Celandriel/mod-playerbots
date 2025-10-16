@@ -4,6 +4,17 @@
 #include "Group.h"
 #include "PlayerbotGroupMgr.h"
 
+bool TellGuildRpgStatusAction::Execute(Event event)
+{
+    Player* owner = event.getOwner();
+    if (!owner)
+        return false;
+    GuildRpgInfo rpgInfo = botAI->guildRpgInfo;
+    std::string out = rpgInfo.ToString();
+    bot->Whisper(out.c_str(), LANG_UNIVERSAL, owner);
+    return true;
+}
+
 uint8 GuildRpgBaseAction::RollRandomActivity(std::vector<uint32> weights)
 {
     uint32 totalRatio = 0;
@@ -52,7 +63,7 @@ bool GuildRpgBaseAction::ChooseRandomActivity()
 
 bool GuildRpgBaseAction::isUseful()
 {
-    Guild* guild = GetGuild();
+    Guild* guild = bot->GetGuild();
     if (!guild)
         return false;
 

@@ -312,7 +312,7 @@ private:
     static Action* pet(PlayerbotAI* botAI) { return new PetAction(botAI); }
     static Action* pet_attack(PlayerbotAI* botAI) { return new PetAction(botAI, "attack"); }
     static Action* roll_action(PlayerbotAI* botAI) { return new RollAction(botAI); }
-    statis Action* guildrpg_status(PlayerbotAI* botAI) { return new TellGuildRpgStatusAction(botAI); }
+    static Action* guildrpg_status(PlayerbotAI* botAI) { return new TellGuildRpgStatusAction(botAI); }
 };
 
 #endif
