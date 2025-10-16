@@ -28,6 +28,7 @@
 #include "GossipHelloAction.h"
 #include "GuildBankAction.h"
 #include "GuildManagementActions.h"
+#include "GuildRpgBaseAction.h"
 #include "HelpAction.h"
 #include "HireAction.h"
 #include "InviteToGroupAction.h"
@@ -195,6 +196,7 @@ public:
 		creators["glyphs"] = &ChatActionContext::glyphs; // Added for custom Glyphs
 		creators["glyph equip"] = &ChatActionContext::glyph_equip; // Added for custom Glyphs
         creators["roll"] = &ChatActionContext::roll_action;
+        creators["guildrpg status"] = &ChatActionContext::guildrpg_status;
     }
 
 private:
@@ -305,6 +307,7 @@ private:
 	static Action* glyphs(PlayerbotAI* botAI) { return new TellGlyphsAction(botAI); } // Added for custom Glyphs
 	static Action* glyph_equip(PlayerbotAI* ai) { return new EquipGlyphsAction(ai); } // Added for custom Glyphs
     static Action* roll_action(PlayerbotAI* botAI) { return new RollAction(botAI); }
+    statis Action* guildrpg_status(PlayerbotAI* botAI) { return new TellGuildRpgStatusAction(botAI); }
 };
 
 #endif

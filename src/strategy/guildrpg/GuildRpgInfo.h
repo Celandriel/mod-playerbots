@@ -71,6 +71,7 @@ struct GuildRpgInfo
     void SetGuildRpgActivity(PlayerbotAI* botAI, uint8_t activity);
     void ResetGuildActivity();
     std::string GetActivityName() const;
+    std::string ToString() const;
     void SetGuildRpgPhase(GuildRpgPhase newPhase) { phase = newPhase; }
 };
 

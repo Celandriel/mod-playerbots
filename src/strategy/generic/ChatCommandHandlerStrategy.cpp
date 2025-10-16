@@ -106,6 +106,7 @@ void ChatCommandHandlerStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     triggers.push_back(new TriggerNode("glyphs", NextAction::array(0, new NextAction("glyphs", relevance), nullptr))); // Added for custom Glyphs
     triggers.push_back(new TriggerNode("glyph equip", NextAction::array(0, new NextAction("glyph equip", relevance), nullptr))); // Added for custom Glyphs
     triggers.push_back(new TriggerNode("roll", NextAction::array(0, new NextAction("roll", relevance), nullptr)));
+    triggers.push_back(new TriggerNode("guildrpg status", NextAction::array(0, new NextAction("guildrpg status", relevance), nullptr)));
 }
 
 ChatCommandHandlerStrategy::ChatCommandHandlerStrategy(PlayerbotAI* botAI) : PassTroughStrategy(botAI)
@@ -188,4 +189,5 @@ ChatCommandHandlerStrategy::ChatCommandHandlerStrategy(PlayerbotAI* botAI) : Pas
     supported.push_back("pet");
     supported.push_back("glyphs"); // Added for custom Glyphs
     supported.push_back("glyph equip"); // Added for custom Glyphs
+    supported.push_back("guildrpg status");
 }

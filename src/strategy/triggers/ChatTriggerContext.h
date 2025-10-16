@@ -137,6 +137,7 @@ public:
         creators["glyphs"] = &ChatTriggerContext::glyphs; // Added for custom Glyphs
         creators["glyph equip"] = &ChatTriggerContext::glyph_equip; // Added for custom Glyphs
         creators["roll"] = &ChatTriggerContext::roll_action;
+        creators["guildrpg status"] = &ChatTriggerContext::guildrpg_status;
     }
 
 private:
@@ -253,6 +254,7 @@ private:
     static Trigger* glyphs(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "glyphs"); } // Added for custom Glyphs
     static Trigger* glyph_equip(PlayerbotAI* ai) { return new ChatCommandTrigger(ai, "glyph equip"); } // Added for custom Glyphs
     static Trigger* roll_action(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "roll"); }
+    static Trigger* guildrpg_status(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "guildrpg status"); }
 };
 
 #endif

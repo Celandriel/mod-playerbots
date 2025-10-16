@@ -33,6 +33,15 @@ void GuildRpgInfo::ResetGuildActivity()
     phase = GuildRpgPhase::IDLE;
 }
 
+std::string GuildRpgInfo::ToString() const
+{
+    std::stringstream out;
+    out << "Status  ";
+    out << "Guild Type: " << static_cast<int>(type) << ", " << "Selected Activity: " << GetActivityName() << ", "
+        << "Phase " << phase;
+    return out.str();
+}
+
 std::string GuildRpgInfo::GetActivityName() const
 {
     auto typeIt = Activities.find(type);

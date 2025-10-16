@@ -807,6 +807,7 @@ bool PlayerbotAI::IsAllowedCommand(std::string const text)
         unsecuredCommands.insert("leave");
         unsecuredCommands.insert("lfg");
         unsecuredCommands.insert("rpg status");
+        unsecuredCommands.insert("guildrpg status");
     }
 
     for (std::set<std::string>::iterator i = unsecuredCommands.begin(); i != unsecuredCommands.end(); ++i)
