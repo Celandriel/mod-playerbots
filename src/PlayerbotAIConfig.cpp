@@ -219,13 +219,13 @@ bool PlayerbotAIConfig::Initialize()
 
     //////////////////////////// Guild RPG
     enableGuildRpgStrategy = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableGuildRPG", true);
-    guildRpgProbability = sConfigMgr->GetOption<float>("AiPlayerbot.GuildRPGProbability", 10);   
+    guildRpgProbability = sConfigMgr->GetOption<float>("AiPlayerbot.GuildRpgProbability", 10);   
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10"), GuildTypeRatios);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildSize", "4,3,2,2,2"), GuildSize);
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVPSpecRatio", "0,33,33,33"), GuildPvpSpecRatio);
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPVESpecRatio", "12,22,34,32"), GuildPveSpecRatio);
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVPWeights", "20,20,20,20,20"), GuildRpgPvpWeights);
-    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPVEWeights", "33,33,33"), GuildRpgPveWeights);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPvpSpecRatio", "0,33,33,33"), GuildPvpSpecRatio);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPveSpecRatio", "12,22,34,32"), GuildPveSpecRatio);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPvpWeights", "20,20,20,20,20"), GuildRpgPvpWeights);
+    LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgPveWeights", "33,33,33"), GuildRpgPveWeights);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgProfWeights", "20,20,20,20,20"), GuildRpgProfWeights);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildRpgRoleplayWeights", "33,33,33"), GuildRpRpgWeights);
 

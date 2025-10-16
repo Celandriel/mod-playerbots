@@ -8,7 +8,7 @@
 class TellGuildRpgStatusAction : public Action
 {
 public:
-    TellGuildRpgStatusAction(PlayerbotAI* botAI) : Action(botAI, "guild rpg status") {}
+    TellGuildRpgStatusAction(PlayerbotAI* botAI) : Action(botAI, "guildrpg status") {}
     bool Execute(Event event) override;
 };
 
