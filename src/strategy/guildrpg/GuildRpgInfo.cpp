@@ -33,12 +33,40 @@ void GuildRpgInfo::ResetGuildActivity()
     phase = GuildRpgPhase::IDLE;
 }
 
+std::string GuildRpgInfo::GetGuildTypeName(GuildType type)
+{
+    switch (type)
+    {
+        case GuildType::NONE:        return "NONE";
+        case GuildType::PVP:         return "PVP";
+        case GuildType::PVE:         return "PVE";
+        case GuildType::PROFESSION:  return "PROFESSION";
+        case GuildType::ROLEPLAY:    return "ROLEPLAY";
+        default:                     return "UNKNOWN_TYPE";
+    }
+}
+
+std::string GuildRpgInfo::GetPhaseName(GuildRpgPhase phase)
+{
+    switch (phase)
+    {
+        case GuildRpgPhase::IDLE:        return "IDLE";
+        case GuildRpgPhase::SELECTION:   return "SELECTION";
+        case GuildRpgPhase::GROUPING:    return "GROUPING";
+        case GuildRpgPhase::PREPARATION: return "PREPARATION";
+        case GuildRpgPhase::EXECUTING:   return "EXECUTING";
+        case GuildRpgPhase::COMPLETED:   return "COMPLETED";
+        default:                         return "UNKNOWN_PHASE";
+    }
+}
+
 std::string GuildRpgInfo::ToString() const
 {
     std::stringstream out;
     out << "Status  ";
-    out << "Guild Type: " << static_cast<int>(type) << ", " << "Selected Activity: " << GetActivityName() << ", "
-        << "Phase " << phase;
+    out << "Guild Type: " << GetGuildTypeName(type) << ", " 
+        << "Selected Activity: " << GetActivityName() << ", "
+        << "Phase " << GetPhaseName(phase); 
     return out.str();
 }
 
@@ -53,6 +81,7 @@ std::string GuildRpgInfo::GetActivityName() const
     }
     return "IDLE";
 }
+
 /*
 // GuildTaskInfo implementation
 void GuildTaskInfo::ChangePhase(GuildTaskPhase newPhase, GuildRpgStatistic* stats)

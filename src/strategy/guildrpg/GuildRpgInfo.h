@@ -73,6 +73,8 @@ struct GuildRpgInfo
     std::string GetActivityName() const;
     std::string ToString() const;
     void SetGuildRpgPhase(GuildRpgPhase newPhase) { phase = newPhase; }
+    static std::string GetGuildTypeName(GuildType type);
+    static std::string GetPhaseName(GuildRpgPhase phase);
 };
 
 #endif

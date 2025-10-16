@@ -307,7 +307,7 @@ private:
 	static Action* glyphs(PlayerbotAI* botAI) { return new TellGlyphsAction(botAI); } // Added for custom Glyphs
 	static Action* glyph_equip(PlayerbotAI* ai) { return new EquipGlyphsAction(ai); } // Added for custom Glyphs
     static Action* roll_action(PlayerbotAI* botAI) { return new RollAction(botAI); }
-    statis Action* guildrpg_status(PlayerbotAI* botAI) { return new TellGuildRpgStatusAction(botAI); }
+    static Action* guildrpg_status(PlayerbotAI* botAI) { return new TellGuildRpgStatusAction(botAI); }
 };
 
 #endif
