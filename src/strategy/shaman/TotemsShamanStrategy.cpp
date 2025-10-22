@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license, you may redistribute it
- * and/or modify it under version 2 of the License, or (at your option), any later version.
+ * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU AGPL v3 license, you may redistribute it
+ * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
 #include "TotemsShamanStrategy.h"
@@ -160,11 +160,11 @@ void WindfuryTotemStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     GenericShamanStrategy::InitTriggers(triggers);
     // If the bot hasn't learned Windfury Totem yet, set Grounding Totem instead.
     Player* bot = botAI->GetBot();
-    if (bot->HasSpell(8512)) 
+    if (bot->HasSpell(8512))
     {
         triggers.push_back(new TriggerNode("set windfury totem", NextAction::array(0, new NextAction("set windfury totem", 60.0f), nullptr)));
     }
-    else if (bot->HasSpell(8177)) 
+    else if (bot->HasSpell(8177))
     {
         triggers.push_back(new TriggerNode("set grounding totem", NextAction::array(0, new NextAction("set grounding totem", 60.0f), nullptr)));
     }

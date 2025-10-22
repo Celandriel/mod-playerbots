@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license, you may redistribute it
- * and/or modify it under version 2 of the License, or (at your option), any later version.
+ * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU AGPL v3 license, you may redistribute it
+ * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
 #ifndef _PLAYERBOT_SHAMANTRIGGERS_H
@@ -38,6 +38,7 @@ const uint32 SPELL_WINDFURY_TOTEM_RANK_1 = 8512;
 const uint32 SPELL_NATURE_RESISTANCE_TOTEM_RANK_1 = 10595;
 const uint32 SPELL_TOTEM_OF_WRATH_RANK_1 = 30706;
 const uint32 SPELL_TOTEMIC_RECALL = 36936;
+const uint32 SPELL_CALL_OF_THE_ELEMENTS = 66842;
 
 class MainHandWeaponNoImbueTrigger : public BuffTrigger
 {
@@ -358,17 +359,22 @@ public:
 class SetTotemTrigger : public Trigger
 {
 public:
-    SetTotemTrigger(PlayerbotAI* ai, std::string const spellName, const uint32 requiredSpellId,
-                    const uint32 totemSpellIds[], int actionButtonId)
-        : Trigger(ai, "set " + spellName),
-          requiredSpellId(requiredSpellId), 
-          totemSpellIds(totemSpellIds),
-          actionButtonId(actionButtonId) {}
+    // Template constructor: infers N (size of the id array) at compile time
+    template <size_t N>
+    SetTotemTrigger(PlayerbotAI* ai, std::string const& spellName, uint32 requiredSpellId,
+                    const uint32 (&ids)[N], int actionButtonId)
+        : Trigger(ai, "set " + spellName)
+        , requiredSpellId(requiredSpellId)
+        , totemSpellIds(ids)
+        , totemSpellIdsCount(N)
+        , actionButtonId(actionButtonId)
+    {}
     bool IsActive() override;
 
 private:
     uint32 requiredSpellId;
     uint32 const* totemSpellIds;
+	size_t totemSpellIdsCount;
     int actionButtonId;
 };
 

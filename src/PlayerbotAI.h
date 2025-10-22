@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license, you may redistribute it
- * and/or modify it under version 2 of the License, or (at your option), any later version.
+ * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU AGPL v3 license, you may redistribute it
+ * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
 #ifndef _PLAYERBOT_PLAYERbotAI_H
@@ -279,7 +279,7 @@ enum BotRoles : uint8
 
 enum HUNTER_TABS
 {
-    HUNTER_TAB_BEASTMASTER,
+    HUNTER_TAB_BEASTMASTERY,
     HUNTER_TAB_MARKSMANSHIP,
     HUNTER_TAB_SURVIVAL,
 };
@@ -288,12 +288,12 @@ enum ROGUE_TABS
 {
     ROGUE_TAB_ASSASSINATION,
     ROGUE_TAB_COMBAT,
-    ROGUE_TAB_SUBTLETY
+    ROGUE_TAB_SUBTLETY,
 };
 
 enum PRIEST_TABS
 {
-    PRIEST_TAB_DISIPLINE,
+    PRIEST_TAB_DISCIPLINE,
     PRIEST_TAB_HOLY,
     PRIEST_TAB_SHADOW,
 };
@@ -335,7 +335,7 @@ enum PALADIN_TABS
 
 enum WARLOCK_TABS
 {
-    WARLOCK_TAB_AFFLICATION,
+    WARLOCK_TAB_AFFLICTION,
     WARLOCK_TAB_DEMONOLOGY,
     WARLOCK_TAB_DESTRUCTION,
 };
@@ -438,6 +438,7 @@ public:
     void ResetStrategies(bool load = false);
     void ReInitCurrentEngine();
     void Reset(bool full = false);
+    void LeaveOrDisbandGroup();
     static bool IsTank(Player* player, bool bySpec = false);
     static bool IsHeal(Player* player, bool bySpec = false);
     static bool IsDps(Player* player, bool bySpec = false);
@@ -577,7 +578,7 @@ public:
     bool IsSafe(Player* player);
     bool IsSafe(WorldObject* obj);
     ChatChannelSource GetChatChannelSource(Player* bot, uint32 type, std::string channelName);
-    
+
     bool CheckLocationDistanceByLevel(Player* player, const WorldLocation &loc, bool fromStartUp = false);
 
     bool HasCheat(BotCheatMask mask)
@@ -624,6 +625,7 @@ public:
     NewRpgInfo rpgInfo;
     NewRpgStatistic rpgStatistic;
     std::unordered_set<uint32> lowPriorityQuest;
+    time_t bgReleaseAttemptTime = 0;
 
     // Schedules a callback to run once after <delayMs> milliseconds.
     void AddTimedEvent(std::function<void()> callback, uint32 delayMs);

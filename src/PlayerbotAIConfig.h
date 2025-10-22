@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license, you may redistribute it
- * and/or modify it under version 2 of the License, or (at your option), any later version.
+ * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU AGPL v3 license, you may redistribute it
+ * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
 #ifndef _PLAYERBOT_PLAYERbotAICONFIG_H
@@ -55,8 +55,6 @@ enum NewRpgStatus : int
     // Initial status
     RPG_IDLE = 7,
     RPG_STATUS_END = 8
-    /*RPG_AH_BUY
-    RPG_AH_SELL */
 };
 
 #define MAX_SPECNO 20
@@ -140,6 +138,12 @@ public:
     uint32 minRandomBotsPriceChangeInterval, maxRandomBotsPriceChangeInterval;
     uint32 disabledWithoutRealPlayerLoginDelay, disabledWithoutRealPlayerLogoutDelay;
     bool randomBotJoinLfg;
+
+    // Buff system
+    // Min group size to use Greater buffs (Paladin, Mage, Druid). Default: 3
+    int32 minBotsForGreaterBuff;
+    // Cooldown (seconds) between reagent-missing RP warnings, per bot & per buff. Default: 30
+    int32 rpWarningCooldown;
 
     // chat
     bool randomBotTalk;
@@ -263,9 +267,9 @@ public:
     uint32 randomBotAccountCount;
     bool randomBotRandomPassword;
     bool deleteRandomBotAccounts;
+    uint32 randomBotGuildCount, randomBotGuildSizeMax;
     bool enableGuildRpgStrategy;
     float guildRpgProbability;
-    uint32 randomBotGuildCount;
     bool deleteRandomBotGuilds;
     std::vector<uint32> randomBotGuilds;
     std::vector<uint32> GuildTypeRatios, GuildSize, GuildPveSpecRatio, GuildPvpSpecRatio, GuildRpgPvpWeights, GuildRpgPveWeights, GuildRpgProfWeights, GuildRpRpgWeights;
@@ -390,6 +394,25 @@ public:
     int32 addClassCommand;
     int32 addClassAccountPoolSize;
     int32 maintenanceCommand;
+    bool altMaintenanceAttunementQs,
+            altMaintenanceBags,
+            altMaintenanceAmmo,
+            altMaintenanceFood,
+            altMaintenanceReagents,
+            altMaintenanceConsumables,
+            altMaintenancePotions,
+            altMaintenanceTalentTree,
+            altMaintenancePet,
+            altMaintenancePetTalents,
+            altMaintenanceClassSpells,
+            altMaintenanceAvailableSpells,
+            altMaintenanceSkills,
+            altMaintenanceReputation,
+            altMaintenanceSpecialSpells,
+            altMaintenanceMounts,
+            altMaintenanceGlyphs,
+            altMaintenanceKeyring,
+            altMaintenanceGemsEnchants;
     int32 autoGearCommand, autoGearCommandAltBots, autoGearQualityLimit, autoGearScoreLimit;
 
     uint32 useGroundMountAtMinLevel;

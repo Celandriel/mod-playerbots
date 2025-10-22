@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license, you may redistribute it
- * and/or modify it under version 2 of the License, or (at your option), any later version.
+ * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU AGPL v3 license, you may redistribute it
+ * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
 #include "PlayerbotMgr.h"
@@ -228,6 +228,12 @@ void PlayerbotHolder::HandleBotPackets(WorldSession* session)
     {
         OpcodeClient opcode = static_cast<OpcodeClient>(packet->GetOpcode());
         ClientOpcodeHandler const* opHandle = opcodeTable[opcode];
+        if (!opHandle)
+        {
+            LOG_ERROR("playerbots", "Unhandled opcode {} queued for bot session {}. Packet dropped.", static_cast<uint32>(opcode), session->GetAccountId());
+            delete packet;
+            continue;
+        }
         opHandle->Call(session, *packet);
         delete packet;
     }
@@ -489,7 +495,7 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
     }
 
     Player* master = botAI->GetMaster();
-	if (master)
+    if (master)
     {
         ObjectGuid masterGuid = master->GetGUID();
         if (master->GetGroup() && !master->GetGroup()->IsLeader(masterGuid))
@@ -513,7 +519,7 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
                 }
             }
 
-			// Don't disband alt groups when master goes away
+            // Don't disband alt groups when master goes away
             // Controlled by config
             if (sPlayerbotAIConfig->KeepAltsInGroup())
             {
@@ -528,7 +534,7 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
 
         if (!groupValid)
         {
-            bot->RemoveFromGroup();
+            botAI->LeaveOrDisbandGroup();
         }
     }
 
@@ -1163,18 +1169,18 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         int8 gender = -1; // -1 = gender will be random
         if (genderArg)
         {
-        	std::string g = genderArg;
-        	std::transform(g.begin(), g.end(), g.begin(), ::tolower);
-        
-        	if (g == "male" || g == "0")
-        		gender = GENDER_MALE; // 0
-        	else if (g == "female" || g == "1")
-        		gender = GENDER_FEMALE; // 1
-        	else
-        	{
-        		messages.push_back("Unknown gender : " + g + " (male/female/0/1)");
-        		return messages;
-        	}
+            std::string g = genderArg;
+            std::transform(g.begin(), g.end(), g.begin(), ::tolower);
+
+            if (g == "male" || g == "0")
+                gender = GENDER_MALE; // 0
+            else if (g == "female" || g == "1")
+                gender = GENDER_FEMALE; // 1
+            else
+            {
+                messages.push_back("Unknown gender : " + g + " (male/female/0/1)");
+                return messages;
+            }
         } //end
 
         if (claz == 6 && master->GetLevel() < sWorld->getIntConfig(CONFIG_START_HEROIC_PLAYER_LEVEL))
@@ -1188,7 +1194,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         {
             // If the user requested a specific gender, skip any character that doesn't match.
             if (gender != -1 && GetOfflinePlayerGender(guid) != gender)
-                continue;			
+                continue;
             if (botLoading.find(guid) != botLoading.end())
                 continue;
             if (ObjectAccessor::FindConnectedPlayer(guid))
