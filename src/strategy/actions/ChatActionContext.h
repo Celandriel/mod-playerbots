@@ -83,7 +83,7 @@
 #include "TameAction.h"
 #include "TellGlyphsAction.h"
 #include "EquipGlyphsAction.h"
-#include "PetAction.h"
+#include "PetsAction.h"
 
 class ChatActionContext : public NamedObjectContext<Action>
 {
@@ -309,8 +309,8 @@ private:
     static Action* tame(PlayerbotAI* botAI) { return new TameAction(botAI); }
     static Action* glyphs(PlayerbotAI* botAI) { return new TellGlyphsAction(botAI); } // Added for custom Glyphs
     static Action* glyph_equip(PlayerbotAI* ai) { return new EquipGlyphsAction(ai); } // Added for custom Glyphs
-    static Action* pet(PlayerbotAI* botAI) { return new PetAction(botAI); }
-    static Action* pet_attack(PlayerbotAI* botAI) { return new PetAction(botAI, "attack"); }
+    static Action* pet(PlayerbotAI* botAI) { return new PetsAction(botAI); }
+    static Action* pet_attack(PlayerbotAI* botAI) { return new PetsAction(botAI, "attack"); }
     static Action* roll_action(PlayerbotAI* botAI) { return new RollAction(botAI); }
     static Action* guildrpg_status(PlayerbotAI* botAI) { return new TellGuildRpgStatusAction(botAI); }
 };
