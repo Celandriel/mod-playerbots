@@ -118,7 +118,7 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
     }
 
     // Check if composition is available
-    if (!groupMgr->IsCompositionAvailable(botAI->GetTargetGroupComposition()))
+    if (!groupMgr->IsCompositionAvailable())
     {
         LOG_INFO("playerbots", "Bot {}: Required group composition not available", bot->GetName().c_str());
         return false;

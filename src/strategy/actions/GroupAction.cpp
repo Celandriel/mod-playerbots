@@ -9,10 +9,6 @@
 bool CreateGroupAction::Execute(Event event)
 {
     PlayerbotGroupMgr& groupMgr = *botAI->GetGroupMgr();
-    TargetGroupComposition comp = botAI->GetTargetGroupComposition();
-
-    // Set composition for the manager
-    groupMgr.SetTargetComposition(comp);
 
     // If the group is incomplete, try to create/fill it
     if (!groupMgr.CheckGroupComposition())
@@ -20,7 +16,6 @@ bool CreateGroupAction::Execute(Event event)
         groupMgr.CreateGroup();
         return false; // still building
     }
-
     // Group is ready
     return true;
 }
@@ -46,10 +41,7 @@ bool CreateGroupAction::isUseful()
 
 bool CreateGroupAction::isPossible()
 {
-    TargetGroupComposition comp = botAI->GetTargetGroupComposition();
-    if (!ValidateTargetComposition(comp))
-        return false;
-    return botAI->GetGroupMgr()->IsCompositionAvailable(comp);
+    return botAI->GetGroupMgr()->IsCompositionAvailable();
 }
 
 bool DisbandGroupAction::Execute(Event event)
@@ -59,27 +51,4 @@ bool DisbandGroupAction::Execute(Event event)
     if (!botAI->GetBot()->GetGroup())
         return false;
     return botAI->GetGroupMgr()->DisbandGroup();
-}
-
-bool CreateGroupAction::ValidateTargetComposition(const TargetGroupComposition& comp)
-{
-    if (comp.groupSize == 0)
-        return false;
-
-    // Validate role requirements don't exceed group size
-    uint32 minRequired = comp.tanks + comp.minHealers + comp.minDps;
-    if (minRequired > comp.groupSize)
-        return false;
-
-    // Validate max roles
-    if (comp.maxHealers < comp.minHealers)
-        return false;
-    if (comp.maxDps < comp.minDps)
-        return false;
-
-    //Check level limits.
-    if (comp.lowerLevelLimit > comp.upperLevelLimit)
-        return false;
-
-    return true;
 }

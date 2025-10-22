@@ -21,6 +21,7 @@
 #include "NewRpgStrategy.h"
 #include "PlayerbotAIBase.h"
 #include "PlayerbotAIConfig.h"
+#include "PlayerbotGroupMgr.h"
 #include "PlayerbotSecurity.h"
 #include "PlayerbotTextMgr.h"
 #include "SpellAuras.h"
@@ -36,7 +37,6 @@ class Item;
 class ObjectGuid;
 class Player;
 class PlayerbotMgr;
-class PlayerbotGroupMgr;
 class PlayerbotGuildMgr;
 class Spell;
 class SpellInfo;
@@ -347,18 +347,6 @@ enum WARRIOR_TABS
     WARRIOR_TAB_PROTECTION,
 };
 
-struct TargetGroupComposition
-{
-    uint8_t groupSize;
-    uint8_t tanks;
-    uint8_t minHealers;
-    uint8_t maxHealers;
-    uint8_t minDps;
-    uint8_t maxDps;
-    uint8_t lowerLevelLimit;
-    uint8_t upperLevelLimit;
-};
-
 enum BotAvailabilityStatus : uint8
 {
     BOT_STATUS_OFFLINE = 0,
@@ -633,13 +621,14 @@ public:
     // Guild type functionality
     GuildType getGuildType() const { return guildType; }
     void setGuildType(GuildType type) { guildType = type; }
-    const TargetGroupComposition& GetTargetGroupComposition() const { return m_targetComposition; }
-    void SetTargetGroupComposition(const TargetGroupComposition& comp) { m_targetComposition = comp; }
     GuildRpgInfo guildRpgInfo;
     const BotAvailabilityStatus GetAvailabilityStatus() const { return availabilityStatus; }
 
     // Group functionality
-    PlayerbotGroupMgr* GetGroupMgr() const { return m_groupMgr; }
+    PlayerbotGroupMgr* GetGroupMgr() { return _groupMgr; }
+    bool SetTargetGroupComposition(const TargetGroupComposition& composition) { _groupMgr->SetTargetComposition(composition);}
+    void ResetGroupMgr() { _groupMgr->Reset(); }
+
 
 private:
     static void _fillGearScoreData(Player* player, Item* item, std::vector<uint32>* gearScore, uint32& twoHandScore,
@@ -650,7 +639,7 @@ private:
     void HandleCommands();
     void HandleCommand(uint32 type, const std::string& text, Player& fromPlayer, const uint32 lang = LANG_UNIVERSAL);
     bool _isBotInitializing = false;
-    PlayerbotGroupMgr* m_groupMgr;
+    PlayerbotGroupMgr* _groupMgr;
 
 protected:
     Player* bot;
@@ -678,7 +667,6 @@ protected:
     Position jumpDestination = Position();
     uint32 nextTransportCheck = 0;
     GuildType guildType;
-    TargetGroupComposition m_targetComposition {};
     BotAvailabilityStatus availabilityStatus = BOT_STATUS_OFFLINE;
 };
 

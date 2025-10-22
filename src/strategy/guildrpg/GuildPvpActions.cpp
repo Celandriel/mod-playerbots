@@ -132,7 +132,12 @@ bool GuildPvpActions::HandleSelection(Event event)
         }
         botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(battleground);
         TargetGroupComposition groupComp = CreatePvpGroupComposition(battleground, botLevel);
-        botAI->SetTargetGroupComposition(groupComp);
+        if (!botAI->SetTargetGroupComposition(groupComp))
+        {
+            LOG_ERROR("playerbots", "Bot {} could not set target group composition for battleground {}, reseting task", bot->GetName().c_str(), battleground);
+            botAI->guildRpgInfo.ResetGuildActivity();
+            return false;
+        }
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::GROUPING);
         return true;
     }

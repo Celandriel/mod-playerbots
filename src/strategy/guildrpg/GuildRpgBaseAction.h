@@ -32,7 +32,7 @@ public:
 
 protected:
     Guild* GetGuild() const;
-    
+
 };
 
 class GuildRpgActivityUpdateAction : public GuildRpgBaseAction

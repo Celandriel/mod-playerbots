@@ -4,7 +4,6 @@
 #include "Action.h"
 #include "PlayerbotAI.h"
 
-class PlayerbotGroupMgr;
 
 class CreateGroupAction : public Action
 {
@@ -15,8 +14,6 @@ public:
     bool isUseful() override;
     bool isPossible() override;
 
-private:
-    bool ValidateTargetComposition(const TargetGroupComposition& comp);
 };
 
 class DisbandGroupAction : public Action
