@@ -39,8 +39,8 @@ public:
 
 private:
     PlayerbotGuildMgr();
-    std::vector<uint32> guildTypeRatios;
-    std::vector<uint32> guildNumPlayers;
+    std::vector<uint32> _guildTypeRatios;
+    std::vector<uint32> _guildNumPlayers;
 
     struct GuildCache
     {

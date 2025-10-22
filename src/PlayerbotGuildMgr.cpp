@@ -9,7 +9,7 @@
 PlayerbotGuildMgr::PlayerbotGuildMgr()
 {
     // Initialize guild type ratios and player counts
-    guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
+    _guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
     std::vector<uint32> guildSizes = sPlayerbotAIConfig->GuildSize; 
     if (guildSizes.size()!= 4)
     {
@@ -21,22 +21,22 @@ PlayerbotGuildMgr::PlayerbotGuildMgr()
     {
         if (selection >=0 && selection <= 5)
         {
-            guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[selection]));
+            _guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[selection]));
         }
         else
         {
             LOG_ERROR("playerbots", "Invalid GuildSize set, defaulting to SOLO");
-            guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[0]));
+            _guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[0]));
         }
     }
     if(sPlayerbotAIConfig->GuildTypeRatios.size() == 5)
     {
-        guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
+        _guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
     }
     else
     {
         LOG_ERROR("playerbots", "Guild type ratios not defined correctly. Using default values.");
-        guildTypeRatios = {40, 20, 20, 10}; // Default values
+        _guildTypeRatios = {40, 20, 20, 10}; // Default values
     }
 
 }
@@ -65,7 +65,7 @@ void PlayerbotGuildMgr::Init()
         uint32 guildId = fields[3].Get<uint32>();
         uint8 faction = fields[4].Get<uint8>();
 
-        if (type == 0 || type > guildTypeRatios.size())
+        if (type == 0 || type > _guildTypeRatios.size())
         {
             LOG_WARN("playerbots", "Invalid guild type [{}] for guild [{}]", type, name);
             type = 0;
@@ -97,9 +97,9 @@ void PlayerbotGuildMgr::Init()
         else
             entry.memberCount = 0; // No guild ID means no members
 
-        if (type > 0 && static_cast<size_t>(type) <= guildNumPlayers.size())
+        if (type > 0 && static_cast<size_t>(type) <= _guildNumPlayers.size())
         {
-            entry.maxMembers = guildNumPlayers[type - 1];
+            entry.maxMembers = _guildNumPlayers[type - 1];
         }
         else
         {
@@ -113,13 +113,13 @@ void PlayerbotGuildMgr::Init()
 
 int8 PlayerbotGuildMgr::DetermineGuildType()
 {
-    if (guildTypeRatios.empty())
+    if (_guildTypeRatios.empty())
     {
         LOG_ERROR("playerbots", "Guild type names not defined");
         return 1;
     }
 
-    const size_t nTypes = guildTypeRatios.size();
+    const size_t nTypes = _guildTypeRatios.size();
 
     // Validate that config ratios vector length matches expected:
     if (sPlayerbotAIConfig->GuildTypeRatios.size() < nTypes)
@@ -265,7 +265,7 @@ void PlayerbotGuildMgr::AssignToGuild(Player* player)
         GuildCache& entry = guildCache[chosenName];
         entry.guildID = newGuild->GetId();
         entry.memberCount = 1;
-        entry.maxMembers = guildNumPlayers[entry.type - 1];
+        entry.maxMembers = _guildNumPlayers[entry.type - 1];
         entry.status = 1;
         entry.faction = player->GetTeamId();
         entry.dirty = true;
@@ -423,7 +423,7 @@ class BotGuildCacheWorldScript : public WorldScript
 {
     public:
 
-        BotGuildCacheWorldScript() : WorldScript("BotGuildCacheWorldScript"), m_validateTimer(0), m_timer(0){}
+        BotGuildCacheWorldScript() : WorldScript("BotGuildCacheWorldScript"), _validateTimer(0), _timer(0){}
 
         void OnStartup() override
         {
@@ -438,25 +438,34 @@ class BotGuildCacheWorldScript : public WorldScript
         {
             if (!sPlayerbotAIConfig->enableGuildRpgStrategy)
                 return;
-            m_timer += diff;
-            m_validateTimer += diff;
-            if (m_timer >= m_saveInterval)
+            _timer += diff;
+            _validateTimer += diff;
+            if (_timer >= _saveInterval)
             {
-                m_timer = 0;
+                _timer = 0;
                 sPlayerbotGuildMgr->SaveDirtyGuilds();
                 LOG_INFO("playerbots", "Bot guild cache saved");
             }
-            if (m_validateTimer >= m_saveInterval * 4) // Validate every hour
+            if (_validateTimer >= _saveInterval * 4) // Validate every hour
             {
-                m_validateTimer = 0;
+                _validateTimer = 0;
                 sPlayerbotGuildMgr->ValidateGuildCache();
                 LOG_INFO("playerbots", "Bot guild cache validated");
             }
         }
+
+        void OnShutdown() override
+        {
+            if (sPlayerbotAIConfig->enableGuildRpgStrategy)
+            {
+                sPlayerbotGuildMgr->SaveDirtyGuilds();
+                LOG_INFO("playerbots", "Bot guild cache saved on shutdown");
+            }
+        }
     private:
-        uint32 m_saveInterval = 900000; // 15 minutes
-        uint32 m_validateTimer;
-        uint32 m_timer;
+        uint32 _saveInterval = 900000; // 15 minutes
+        uint32 _validateTimer;
+        uint32 _timer;
 
 };
 
