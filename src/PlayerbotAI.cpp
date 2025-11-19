@@ -116,7 +116,7 @@ PlayerbotAI::PlayerbotAI()
       currentState(BOT_STATE_NON_COMBAT),
       chatHelper(this),
       chatFilter(this),
-      security(nullptr)
+      security(nullptr),
       _groupMgr(new PlayerbotGroupMgr(this)),
       guildType(GuildType::NONE)
 {
@@ -136,7 +136,7 @@ PlayerbotAI::PlayerbotAI(Player* bot)
       master(nullptr),
       chatHelper(this),
       chatFilter(this),
-      security(bot)  // reorder args - whipowill
+      security(bot),  // reorder args - whipowill
       _groupMgr(new PlayerbotGroupMgr(this)),
       guildType(GuildType::NONE)
 {
@@ -389,7 +389,6 @@ void PlayerbotAI::UpdateAIGroupAndMaster()
         return;
 
     Group* group = bot->GetGroup();
-
     bool IsRandomBot = sRandomPlayerbotMgr->IsRandomBot(bot);
 
     // If bot is not in group verify that for is RandomBot before clearing  master and resetting.
@@ -413,7 +412,13 @@ void PlayerbotAI::UpdateAIGroupAndMaster()
     if (master)
         masterBotAI = GET_PLAYERBOT_AI(master);
 
-    if (!master || (masterBotAI && !masterBotAI->IsRealPlayer()))
+    Player* groupLeader = GetGroupMaster();
+    bool isBotLeader = GET_PLAYERBOT_AI(groupLeader);
+
+    bool hasRealPlayerMaster = master && (masterBotAI && !masterBotAI->IsRealPlayer());
+    bool enableBotMaster = sPlayerbotAIConfig->enableGuildRpgStrategy && isBotLeader && groupLeader == master;
+
+    if (!master || (!hasRealPlayerMaster && !enableBotMaster))
     {
         Player* newMaster = FindNewMaster();
         if (newMaster)
@@ -4101,9 +4106,10 @@ Player* PlayerbotAI::FindNewMaster()
 
     Player* groupLeader = GetGroupMaster();
     PlayerbotAI* leaderBotAI = GET_PLAYERBOT_AI(groupLeader);
-    if (!leaderBotAI || leaderBotAI->IsRealPlayer())
+    if (!leaderBotAI || leaderBotAI->IsRealPlayer() || sPlayerbotAIConfig->enableGuildRpgStrategy)
         return groupLeader;
 
+    bool allowBotLeader = sPlayerbotAIConfig->enableGuildRpgStrategy;
     // Find the real player in group
     for (GroupReference* gref = group->GetFirstMember(); gref; gref = gref->next())
     {
