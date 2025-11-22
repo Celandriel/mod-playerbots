@@ -11,6 +11,7 @@
 #include "GuildMgr.h"
 #include "PlayerbotFactory.h"
 #include "Playerbots.h"
+#include "PlayerbotGuildMgr.h"
 #include "ScriptMgr.h"
 #include "SharedDefines.h"
 #include "SocialMgr.h"
@@ -884,50 +885,8 @@ void RandomPlayerbotFactory::CreateRandomGuilds()
 
         LOG_DEBUG("playerbots", "Creating guild name='{}' leader='{}'...", guildName.c_str(), player->GetName().c_str());
 
-        Guild* guild = new Guild();
-        if (!guild->Create(player, guildName))
-        {
-            LOG_ERROR("playerbots", "Error creating guild [ {} ] with leader [ {} ]", guildName.c_str(),
-                    player->GetName().c_str());
-            delete guild;
+        if (!sPlayerbotGuildMgr->CreateGuild(player, guildName))
             continue;
-        }
-
-        sGuildMgr->AddGuild(guild);
-
-        LOG_DEBUG("playerbots", "Guild created: id={} name='{}'", guild->GetId(), guildName.c_str());
-
-        // create random emblem
-        uint32 st, cl, br, bc, bg;
-        bg = urand(0, 51);
-        bc = urand(0, 17);
-        cl = urand(0, 17);
-        br = urand(0, 7);
-        st = urand(0, 180);
-
-        LOG_DEBUG("playerbots",
-                 "[TABARD] new guild id={} random -> style={}, color={}, borderStyle={}, borderColor={}, bgColor={}",
-                 guild->GetId(), st, cl, br, bc, bg);
-
-        // populate guild table with a random tabard design
-        CharacterDatabase.Execute(
-            "UPDATE guild SET EmblemStyle={}, EmblemColor={}, BorderStyle={}, BorderColor={}, BackgroundColor={} "
-            "WHERE guildid={}",
-            st, cl, br, bc, bg, guild->GetId());
-        LOG_DEBUG("playerbots", "[TABARD] UPDATE done for guild id={}", guild->GetId());
-
-        // Immediate reading for log
-        if (QueryResult qr = CharacterDatabase.Query(
-                "SELECT EmblemStyle,EmblemColor,BorderStyle,BorderColor,BackgroundColor FROM guild WHERE guildid={}",
-                guild->GetId()))
-        {
-            Field* f = qr->Fetch();
-            LOG_DEBUG("playerbots",
-                     "[TABARD] DB check guild id={} => style={}, color={}, borderStyle={}, borderColor={}, bgColor={}",
-                     guild->GetId(), f[0].Get<uint8>(), f[1].Get<uint8>(), f[2].Get<uint8>(), f[3].Get<uint8>(), f[4].Get<uint8>());
-        }
-
-        sPlayerbotAIConfig->randomBotGuilds.push_back(guild->GetId());
         // The guild is only counted if it is actually created
         ++guildNumber;
         ++createdThisRun;

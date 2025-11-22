@@ -367,9 +367,9 @@ void PlayerbotHolder::LogoutPlayerBot(ObjectGuid guid)
 
         // Peiru: Allow bots to always instant logout to see if this resolves logout crashes
         logout = true;
-        
+
         uint32 guildId = bot->GetGuildId();
-        if(guildId) 
+        if(guildId)
         {
             sPlayerbotGuildMgr->SetBotAvailability(
                 guildId,
@@ -487,11 +487,6 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
         // Log a warning here to indicate that the botAI is null
         LOG_DEBUG("mod-playerbots", "PlayerbotAI is null for bot with GUID: {}", bot->GetGUID().GetRawValue());
         return;
-    }
-    
-    if (!bot->GetGuildId()) // No guild assigned
-    {
-        sPlayerbotGuildMgr->AssignToGuild(bot);
     }
 
     Player* master = botAI->GetMaster();
@@ -687,6 +682,8 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
     uint32 guildID = bot->GetGuildId();
     if(guildID)
     {
+        uint32 guildType = sPlayerbotGuildMgr->GetGuildTypeById(guildID);
+        botAI->SetGuildType(guildType);
         if (group)
         {
             if (botAI->HasRealPlayerMaster())

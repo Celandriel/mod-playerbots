@@ -117,8 +117,7 @@ PlayerbotAI::PlayerbotAI()
       chatHelper(this),
       chatFilter(this),
       security(nullptr),
-      _groupMgr(new PlayerbotGroupMgr(this)),
-      guildType(GuildType::NONE)
+      _groupMgr(new PlayerbotGroupMgr(this))
 {
     for (uint8 i = 0; i < BOT_STATE_MAX; i++)
         engines[i] = nullptr;
@@ -137,8 +136,7 @@ PlayerbotAI::PlayerbotAI(Player* bot)
       chatHelper(this),
       chatFilter(this),
       security(bot),  // reorder args - whipowill
-      _groupMgr(new PlayerbotGroupMgr(this)),
-      guildType(GuildType::NONE)
+      _groupMgr(new PlayerbotGroupMgr(this))
 {
     if (!bot->isTaxiCheater() && HasCheat((BotCheatMask::taxi)))
         bot->SetTaxiCheater(true);
@@ -6615,4 +6613,13 @@ void PlayerbotAI::EvaluateHealerDpsStrategy()
         ChangeStrategy("-healer dps", BOT_STATE_COMBAT);
     else
         ChangeStrategy("+healer dps", BOT_STATE_COMBAT);
+}
+
+void PlayerbotAI::SetGuildType(uint32 type)
+{
+    if (type <= 4)
+    {
+        guildType = static_cast<GuildType>(type);
+        guildRpgInfo.SetGuildType(guildType);
+    }
 }

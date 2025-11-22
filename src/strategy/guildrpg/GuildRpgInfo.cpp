@@ -5,7 +5,7 @@
 
 void GuildRpgInfo::SetGuildRpgActivity(PlayerbotAI* botAI, uint8 activity)
 {
-    GuildType guildType = botAI->getGuildType();
+    GuildType guildType = botAI->GetGuildType();
 
     auto typeIt = Activities.find(guildType);
     if (typeIt == Activities.end())
@@ -21,7 +21,7 @@ void GuildRpgInfo::SetGuildRpgActivity(PlayerbotAI* botAI, uint8 activity)
         this->activityNumber = activity;
         LOG_INFO("playerbots", "Setting guild RPG objective to {}", actIt->second);
     }
-    else 
+    else
     {
         LOG_ERROR("playerbots", "Invalid guild RPG objective: {} for GuildType: {}", activity, static_cast<int>(guildType));
     }
@@ -64,9 +64,9 @@ std::string GuildRpgInfo::ToString() const
 {
     std::stringstream out;
     out << "Status  ";
-    out << "Guild Type: " << GetGuildTypeName(type) << ", " 
+    out << "Guild Type: " << GetGuildTypeName(type) << ", "
         << "Selected Activity: " << GetActivityName() << ", "
-        << "Phase " << GetPhaseName(phase); 
+        << "Phase " << GetPhaseName(phase);
     return out.str();
 }
 

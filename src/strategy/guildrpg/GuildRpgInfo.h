@@ -75,6 +75,7 @@ struct GuildRpgInfo
     void SetGuildRpgPhase(GuildRpgPhase newPhase) { phase = newPhase; }
     static std::string GetGuildTypeName(GuildType type);
     static std::string GetPhaseName(GuildRpgPhase phase);
+    void SetGuildType(GuildType newType) { type = newType; }
 };
 
 #endif

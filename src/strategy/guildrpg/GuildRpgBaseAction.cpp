@@ -18,9 +18,9 @@ bool TellGuildRpgStatusAction::Execute(Event event)
 uint8 GuildRpgBaseAction::RollRandomActivity(std::vector<uint32> weights)
 {
     uint32 totalRatio = 0;
-    for (float ratio : weights) 
+    for (float ratio : weights)
         totalRatio += ratio;
-    
+
     if (totalRatio == 0)
         return 0;
 
@@ -34,14 +34,14 @@ uint8 GuildRpgBaseAction::RollRandomActivity(std::vector<uint32> weights)
             activity = i;
             break;
         }
-    }    
+    }
     return activity;
 }
 
 bool GuildRpgBaseAction::ChooseRandomActivity()
 {
     std::vector<uint32> weights;
-    GuildType guildType = botAI->getGuildType();
+    GuildType guildType = botAI->GetGuildType();
     switch (guildType)
     {
         case GuildType::PVP:
@@ -67,7 +67,7 @@ bool GuildRpgBaseAction::isUseful()
     if (!guild)
         return false;
 
-    if (botAI->getGuildType() == GuildType::NONE)
+    if (botAI->GetGuildType() == GuildType::NONE)
         return false;
 
     if (bot->GetGroup() && bot->GetGroup()->GetLeaderGUID() != bot->GetGUID())

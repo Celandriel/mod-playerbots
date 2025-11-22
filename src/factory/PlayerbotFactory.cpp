@@ -30,6 +30,7 @@
 #include "PlayerbotAI.h"
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotDbStore.h"
+#include "PlayerbotGuildMgr.h"
 #include "Playerbots.h"
 #include "QuestDef.h"
 #include "RandomItemMgr.h"
@@ -3965,40 +3966,64 @@ void PlayerbotFactory::InitInventoryEquip()
 void PlayerbotFactory::InitGuild()
 {
     if (bot->GetGuildId())
+    {
+        if (!bot->HasItemCount(5976, 1) && bot->GetLevel() > 9)
+            StoreItem(5976, 1);
         return;
+    }
+    if (sPlayerbotAIConfig->enableGuildRpgStrategy)
+    {
+        std::string guildName = sPlayerbotGuildMgr->AssignToGuild(bot);
+        if (guildName.empty())
+            return;
 
+        Guild* guild = sGuildMgr->GetGuildByName(guildName);
+        if (!guild)
+        {
+            if (!sPlayerbotGuildMgr->CreateGuild(bot, guildName))
+                LOG_ERROR("playerbots","Failed to create guild {} for bot {}", guildName, bot->GetName());
+            return;
+        }
+        else
+        {
+            if (guild->AddMember(bot->GetGUID()))
+            {
+                LOG_DEBUG("playerbots","Bot {} joined guild {}.", bot->GetName(), guildName);
+                sPlayerbotGuildMgr->OnGuildUpdate(guild);
+            }
+            else
+                LOG_ERROR("playerbots","Bot {} failed to join guild {}.", bot->GetName(), guildName);
+        }
+    }
     // bot->SaveToDB(false, false);
-
-    // add guild tabard
-    if (bot->GetGuildId() && !bot->HasItemCount(5976, 1))
-        StoreItem(5976, 1);
-
-    if (sPlayerbotAIConfig->randomBotGuilds.empty())
-        RandomPlayerbotFactory::CreateRandomGuilds();
-
-    std::vector<uint32> guilds;
-    for (std::vector<uint32>::iterator i = sPlayerbotAIConfig->randomBotGuilds.begin();
-         i != sPlayerbotAIConfig->randomBotGuilds.end(); ++i)
-        guilds.push_back(*i);
-
-    if (guilds.empty())
+    else
     {
-        LOG_ERROR("playerbots", "No random guilds available");
-        return;
+        if (sPlayerbotAIConfig->randomBotGuilds.empty())
+            RandomPlayerbotFactory::CreateRandomGuilds();
+
+        std::vector<uint32> guilds;
+        for (std::vector<uint32>::iterator i = sPlayerbotAIConfig->randomBotGuilds.begin();
+            i != sPlayerbotAIConfig->randomBotGuilds.end(); ++i)
+            guilds.push_back(*i);
+
+        if (guilds.empty())
+        {
+            LOG_ERROR("playerbots", "No random guilds available");
+            return;
+        }
+
+        int index = urand(0, guilds.size() - 1);
+        uint32 guildId = guilds[index];
+        Guild* guild = sGuildMgr->GetGuildById(guildId);
+        if (!guild)
+        {
+            LOG_ERROR("playerbots", "Invalid guild {}", guildId);
+            return;
+        }
+
+        if (guild->GetMemberSize() < urand(10, sPlayerbotAIConfig->randomBotGuildSizeMax))
+            guild->AddMember(bot->GetGUID(), urand(GR_OFFICER, GR_INITIATE));
     }
-
-    int index = urand(0, guilds.size() - 1);
-    uint32 guildId = guilds[index];
-    Guild* guild = sGuildMgr->GetGuildById(guildId);
-    if (!guild)
-    {
-        LOG_ERROR("playerbots", "Invalid guild {}", guildId);
-        return;
-    }
-
-    if (guild->GetMemberSize() < urand(10, sPlayerbotAIConfig->randomBotGuildSizeMax))
-        guild->AddMember(bot->GetGUID(), urand(GR_OFFICER, GR_INITIATE));
-
     // add guild tabard
     if (bot->GetGuildId() && bot->GetLevel() > 9 && urand(0, 4) && !bot->HasItemCount(5976, 1))
         StoreItem(5976, 1);

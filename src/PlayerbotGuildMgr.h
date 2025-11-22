@@ -5,7 +5,7 @@
 #include "Player.h"
 #include "PlayerbotAI.h"
 
-constexpr std::array<GuilderType, 6> GuilderMap = 
+constexpr std::array<GuilderType, 6> GuilderMap =
 {
     GuilderType::SOLO,
     GuilderType::TINY,
@@ -28,10 +28,15 @@ public:
 
     void Init();
     int8 DetermineGuildType();
-    void AssignToGuild(Player* player);
+    std::string AssignToGuild(Player* player);
     void SaveDirtyGuilds();
+    void LoadGuildCache();
     void ValidateGuildCache();
     void ResetGuildCache();
+    bool CreateGuild(Player* player, std::string guildName);
+    void OnGuildUpdate  (Guild* guild);
+    uint32 GetGuildTypeByName(std::string guildName);
+    uint32 GetGuildTypeById(uint32 guildID);
 
     void SetBotAvailability(uint32 guildId, ObjectGuid guid, BotAvailabilityStatus status);
     std::vector<ObjectGuid> GetAvailableGuildMembers(uint32 guildId);
@@ -41,6 +46,8 @@ private:
     PlayerbotGuildMgr();
     std::vector<uint32> _guildTypeRatios;
     std::vector<uint32> _guildNumPlayers;
+    int const _nTypes = 4;
+    int _maxIndex;
 
     struct GuildCache
     {
@@ -52,7 +59,6 @@ private:
         uint32 memberCount = 0;
         uint8 faction = 0;
         bool dirty = false;
-        Guild* guildPtr = nullptr;
     };
     std::unordered_map<std::string, GuildCache> guildCache;
     std::unordered_map<uint32, std::unordered_map<ObjectGuid, BotAvailabilityStatus>> guildBotStates;
