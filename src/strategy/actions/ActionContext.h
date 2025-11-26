@@ -36,6 +36,10 @@
 #include "GuildCreateActions.h"
 #include "GuildManagementActions.h"
 #include "GuildRpgBaseAction.h"
+#include "GuildRpgPvpAction.h"
+#include "GuildRpgPveAction.h"
+#include "GuildRpgProfAction.h"
+#include "GuildRpgRoleplayAction.h"
 #include "ImbueAction.h"
 #include "InviteToGroupAction.h"
 #include "LeaveGroupAction.h"
@@ -67,6 +71,7 @@
 #include "XpGainAction.h"
 #include "NewRpgAction.h"
 #include "CancelChannelAction.h"
+
 
 class PlayerbotAI;
 
@@ -259,6 +264,12 @@ public:
         creators["new rpg do quest"] = &ActionContext::new_rpg_do_quest;
         creators["new rpg travel flight"] = &ActionContext::new_rpg_travel_flight;
 
+        //Guild RPG actions
+        creators["guild rpg status update"] = &ActionContext::guild_rpg_status_update;
+        creators["guild rpg pvp action"] = &ActionContext::guild_rpg_pvp_action;
+        creators["guild rpg pve action"] = &ActionContext::guild_rpg_pve_action;
+        creators["guild rpg prof action"] = &ActionContext::guild_rpg_prof_action;
+        creators["guild rpg roleplay action"] = &ActionContext::guild_rpg_roleplay_action;
         creators["create group"] = &ActionContext::create_group;
     }
 
@@ -449,6 +460,12 @@ private:
     static Action* new_rpg_do_quest(PlayerbotAI* ai) { return new NewRpgDoQuestAction(ai); }
     static Action* new_rpg_travel_flight(PlayerbotAI* ai) { return new NewRpgTravelFlightAction(ai); }
 
+    //Guild rpg actions
+    static Action* guild_rpg_status_update(PlayerbotAI* botAI) { return new GuildRpgStatusUpdateAction(botAI); }
+    static Action* guild_rpg_pvp_action(PlayerbotAI* botAI) { return new GuildRpgPvpAction(botAI); }
+    static Action* guild_rpg_pve_action(PlayerbotAI* botAI) { return new GuildRpgPveAction(botAI); }
+    static Action* guild_rpg_prof_action(PlayerbotAI* botAI) { return new GuildRpgProfAction(botAI); }
+    static Action* guild_rpg_roleplay_action(PlayerbotAI* botAI) { return new GuildRpgRoleplayAction(botAI); }
     static Action* create_group(PlayerbotAI* botAI) { return new CreateGroupAction(botAI); }
 };
 

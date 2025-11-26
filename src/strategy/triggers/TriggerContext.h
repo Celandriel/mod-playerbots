@@ -9,6 +9,7 @@
 #include "CureTriggers.h"
 #include "GenericTriggers.h"
 #include "GuildTriggers.h"
+#include "GuildRpgTriggers.h"
 #include "LfgTriggers.h"
 #include "LootTriggers.h"
 #include "NamedObjectContext.h"
@@ -227,6 +228,11 @@ public:
         creators["travel flight status"] = &TriggerContext::travel_flight_status;
         creators["can self resurrect"] = &TriggerContext::can_self_resurrect;
         creators["new pet"] = &TriggerContext::new_pet;
+
+        creators["guild rpg pvp task"] = &TriggerContext::guild_rpg_pvp_task;
+        creators["guild rpg pve task"] = &TriggerContext::guild_rpg_pve_task;
+        creators["guild rpg prof task"] = &TriggerContext::guild_rpg_prof_task;
+        creators["guild rpg roleplay task"] = &TriggerContext::guild_rpg_roleplay_task;
     }
 
 private:
@@ -426,6 +432,12 @@ private:
     static Trigger* travel_flight_status(PlayerbotAI* botAI) { return new NewRpgStatusTrigger(botAI, RPG_TRAVEL_FLIGHT); }
     static Trigger* can_self_resurrect(PlayerbotAI* ai) { return new SelfResurrectTrigger(ai); }
     static Trigger* new_pet(PlayerbotAI* ai) { return new NewPetTrigger(ai); }
+    static Trigger* guild_rpg_pvp_task(PlayerbotAI* botAI) { return new GuildRpgTaskTrigger(botAI, GuildType::PVP); }
+    static Trigger* guild_rpg_pve_task(PlayerbotAI* botAI) { return new GuildRpgTaskTrigger(botAI, GuildType::PVE); }
+    static Trigger* guild_rpg_prof_task(PlayerbotAI* botAI) { return new GuildRpgTaskTrigger(botAI, GuildType::PROFESSION); }
+    static Trigger* guild_rpg_roleplay_task(PlayerbotAI* botAI) { return new GuildRpgTaskTrigger(botAI, GuildType::ROLEPLAY); }
+
+
 };
 
 #endif

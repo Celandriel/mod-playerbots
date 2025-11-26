@@ -1,5 +1,5 @@
-#ifndef _PLAYERBOT_GUILDPVPACTIONS_H
-#define _PLAYERBOT_GUILDPVPACTIONS_H
+#ifndef _PLAYERBOT_GUILDRPGPVPACTIONS_H
+#define _PLAYERBOT_GUILDRPGPVPACTIONS_H
 
 #include "GuildRpgBaseAction.h"
 #include "GuildRpgInfo.h"
@@ -26,11 +26,11 @@ World PVP actions
     Zangarmarsh
     Wintergrasp
 */
-class GuildPvpActions : public GuildRpgBaseAction
+class GuildRpgPvpAction : public GuildRpgBaseAction
 {
 public:
-    GuildPvpActions(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild pvp rpg") {}
-    
+    GuildRpgPvpAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild rpg pvp action") {}
+
     bool HandleSelection(Event event) override;
     bool HandlePreparation(Event event) override;
     bool HandleExecution(Event event) override;

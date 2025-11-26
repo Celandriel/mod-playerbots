@@ -15,13 +15,13 @@ public:
 class GuildRpgBaseAction : public Action
 {
 public:
-    GuildRpgBaseAction(PlayerbotAI* botAI, const std::string& name);
+    GuildRpgBaseAction(PlayerbotAI* botAI, const std::string& name) : Action(botAI, name) {}
     bool Execute(Event event) override;
     bool isUseful() override;
 
     void UpdatePhase(PlayerbotAI* botAI);
     bool isPhaseComplete();
-    uint8 RollRandomActivity(std::vector<uint32> weights);
+    GuildRpgActivity RollRandomActivity(std::vector<uint32> weights, ActivityList activities);
     bool ChooseRandomActivity();
 
     virtual bool HandleSelection(Event event);
@@ -35,10 +35,10 @@ protected:
 
 };
 
-class GuildRpgActivityUpdateAction : public GuildRpgBaseAction
+class GuildRpgStatusUpdateAction : public GuildRpgBaseAction
 {
 public:
-    GuildRpgActivityUpdateAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild rpg activity update") {}
+    GuildRpgStatusUpdateAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild rpg status update") {}
     bool Execute(Event event) override;
 };
 

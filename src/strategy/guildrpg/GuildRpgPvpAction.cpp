@@ -1,4 +1,4 @@
-#include "GuildPvpActions.h"
+#include "GuildRpgPvpAction.h"
 #include "PlayerbotAI.h"
 #include "PlayerbotGroupMgr.h"
 #include "BattleGroundJoinAction.h"
@@ -61,10 +61,10 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
 
     // Determine group size based on BG type
     switch (bgTypeId)
-    {   
+    {
         case BATTLEGROUND_WS:// Warsong Gulch
             composition.groupSize = 10; // 10v10 battlegrounds
-            break; 
+            break;
         case BATTLEGROUND_SA: // Strand of the Ancients
         case BATTLEGROUND_AB: // Arathi Basin
         case BATTLEGROUND_EY: // Eye of the Storm
@@ -83,7 +83,7 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
     composition.lowerLevelLimit = (botLevel > 5) ? botLevel - 5 : 1;
     composition.upperLevelLimit = botLevel + 5;
 
-    if (botLevel >= 80) 
+    if (botLevel >= 80)
     {
         composition.lowerLevelLimit = 80;
         composition.upperLevelLimit = 80;
@@ -93,7 +93,7 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
         composition.lowerLevelLimit = (botLevel / 10) * 10;    // e.g. 47 → 40
         composition.upperLevelLimit = composition.lowerLevelLimit + 9;              // e.g. 40 → 49
     }
-    
+
     // Set composition requirements based on BG type and group size
     if (composition.groupSize == 5)
     {
@@ -117,10 +117,10 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
     return composition;
 }
 
-bool GuildPvpActions::HandleSelection(Event event)
+bool GuildRpgPvpAction::HandleSelection(Event event)
 {
-    uint8_t activity = botAI->guildRpgInfo.activityNumber;
-    if (activity == 1)
+    GuildRpgActivity activity = botAI->guildRpgInfo.activity;
+    if (activity == GuildRpgActivity::QUEUE_FOR_BG)
     {
         uint8 botLevel = bot->GetLevel();
         BattlegroundQueueTypeId battleground = SelectBattlegroundForLevel(botLevel);
@@ -144,13 +144,13 @@ bool GuildPvpActions::HandleSelection(Event event)
     return false;
 }
 
-bool GuildPvpActions::HandlePreparation(Event event)
+bool GuildRpgPvpAction::HandlePreparation(Event event)
 {
-    uint8 activityNumber = botAI->guildRpgInfo.activityNumber;
-    if (activityNumber == 1)
+    GuildRpgActivity activity = botAI->guildRpgInfo.activity;
+    if (activity == GuildRpgActivity::QUEUE_FOR_BG)
     {
         //check if in queue
-        //If not queue as group 
+        //If not queue as group
         if (bot->InBattlegroundQueue())
         {
             return false;
@@ -167,10 +167,10 @@ bool GuildPvpActions::HandlePreparation(Event event)
 }
 
 
-bool GuildPvpActions::HandleExecution(Event event)
+bool GuildRpgPvpAction::HandleExecution(Event event)
 {
-    uint8 activity = botAI->guildRpgInfo.activityNumber;
-    if (activity == 1)
+    GuildRpgActivity activity = botAI->guildRpgInfo.activity;
+    if (activity == GuildRpgActivity::QUEUE_FOR_BG)
     {
         //check if in bg
         //If not in bg check if in queue
@@ -184,11 +184,11 @@ bool GuildPvpActions::HandleExecution(Event event)
     return false;
 }
 
-bool GuildPvpActions::HandleCompletion(Event event)
+bool GuildRpgPvpAction::HandleCompletion(Event event)
 {
     GuildRpgInfo guildRpgInfo = botAI->guildRpgInfo;
-    uint8 activity = guildRpgInfo.activityNumber;
-    if (activity == 1)
+    GuildRpgActivity activity = guildRpgInfo.activity;
+    if (activity == GuildRpgActivity::QUEUE_FOR_BG)
     {
         //Not in queue or bg, decide to queue again or abandon task
         bool queueAgain = urand(0, 1); // 50% chance to queue again
@@ -201,7 +201,7 @@ bool GuildPvpActions::HandleCompletion(Event event)
         else
         {
             LOG_INFO("playerbots", "Bot {} BG completed, disbanding", bot->GetName().c_str());
-            guildRpgInfo.SetGuildRpgActivity(botAI, 0);
+            guildRpgInfo.SetGuildRpgActivity(botAI, GuildRpgActivity::NONE);
             guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::IDLE);
             //botAI->DisbandGroup();
             return true;

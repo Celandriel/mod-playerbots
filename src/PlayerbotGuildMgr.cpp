@@ -240,7 +240,7 @@ std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
     if (!partiallyfilledguilds.empty())
     {
         size_t idx = static_cast<size_t>(urand(0, static_cast<int>(partiallyfilledguilds.size()) - 1));
-        return guildName = partiallyfilledguilds[idx]->name;
+        return (partiallyfilledguilds[idx]->name);
     }
     // No partial guilds: determine type and pick an available one
     uint8 guildType = DetermineGuildType();

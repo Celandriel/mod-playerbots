@@ -12,13 +12,14 @@ GuildRpgStrategy::GuildRpgStrategy(PlayerbotAI* botAI) : Strategy(botAI) {}
 NextAction** GuildRpgStrategy::getDefaultActions()
 {
     return NextAction::array(0,
-        new NextAction("guild queue for bg", 12.0f),
+        new NextAction("guild rpg status update", 12.0f),
         nullptr);
 }
 
 void GuildRpgStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
-    triggers.push_back(
-        new TriggerNode("no guild task", NextAction::array(0, new NextAction("guild rpg set objective", 1.0f), nullptr))
-    );
+    triggers.push_back(new TriggerNode("guild rpg pvp task", NextAction::array(0, new NextAction("guild rpg pvp action", 5.0f), nullptr)));
+    triggers.push_back(new TriggerNode("guild rpg pve task", NextAction::array(0, new NextAction("guild rpg pve action", 5.0f), nullptr)));
+    triggers.push_back(new TriggerNode("guild rpg prof task", NextAction::array(0, new NextAction("guild rpg prof action", 5.0f), nullptr)));
+    triggers.push_back(new TriggerNode("guild rpg roleplay task", NextAction::array(0, new NextAction("guild rpg roleplay action", 5.0f), nullptr)));
 }

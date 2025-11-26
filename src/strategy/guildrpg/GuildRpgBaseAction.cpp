@@ -15,27 +15,27 @@ bool TellGuildRpgStatusAction::Execute(Event event)
     return true;
 }
 
-uint8 GuildRpgBaseAction::RollRandomActivity(std::vector<uint32> weights)
+GuildRpgActivity GuildRpgBaseAction::RollRandomActivity(std::vector<uint32> weights, ActivityList activities)
 {
-    uint32 totalRatio = 0;
-    for (float ratio : weights)
-        totalRatio += ratio;
+    uint32 totalWeights = 0;
+    for (uint weight : weights)
+        totalWeights += weight;
 
-    if (totalRatio == 0)
-        return 0;
+    if (totalWeights == 0)
+        return GuildRpgActivity::NONE;
 
-    uint32 roll = urand(1, totalRatio);
+    uint32 roll = urand(1, totalWeights);
     uint32 accumulate = 0;
-    uint8 activity;
-    for (uint8 i = 0; i < weights.size(); ++i) {
+
+    for (uint8 i = 0; i < weights.size(); ++i)
+    {
         accumulate += weights[i];
         if (roll <= accumulate)
         {
-            activity = i;
-            break;
+            return activities[i];
         }
     }
-    return activity;
+    return GuildRpgActivity::NONE;
 }
 
 bool GuildRpgBaseAction::ChooseRandomActivity()
@@ -56,7 +56,12 @@ bool GuildRpgBaseAction::ChooseRandomActivity()
         default:
             return false;
     }
-    uint8 objective = RollRandomActivity(weights);
+    auto it = ActivitiesByGuildType.find(guildType);
+    if (it == ActivitiesByGuildType.end())
+        return false;
+
+    const ActivityList& activities = it->second;
+    GuildRpgActivity objective = RollRandomActivity(weights, activities);
     botAI->guildRpgInfo.SetGuildRpgActivity(botAI, objective);
     return true;
 }
@@ -120,7 +125,7 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
     // Check if composition is available
     if (!groupMgr->IsCompositionAvailable())
     {
-        LOG_INFO("playerbots", "Bot {}: Required group composition not available", bot->GetName().c_str());
+        LOG_ERROR("playerbots", "Bot {}: Required group composition not available", bot->GetName().c_str());
         return false;
     }
 
@@ -171,14 +176,14 @@ bool GuildRpgBaseAction::HandleCompletion(Event event)
 
 
 
-bool GuildRpgActivityUpdateAction::Execute(Event event)
+bool GuildRpgStatusUpdateAction::Execute(Event event)
 {
     //random float 0-1 and check against guildrpgprobability
     float roll = (float)rand() / RAND_MAX;
     if (roll < sPlayerbotAIConfig->guildRpgProbability)
     {
         ChooseRandomActivity();
-        LOG_INFO("playerbots", "Bot {} selected new guild RPG activity: {}", botAI->GetBot()->GetName().c_str(), botAI->guildRpgInfo.activityNumber);
+        LOG_INFO("playerbots", "Bot {} selected new guild RPG activity: {}", botAI->GetBot()->GetName().c_str(), botAI->guildRpgInfo.GetActivityName());
         return true;
     }
 }
