@@ -174,16 +174,11 @@ bool GuildRpgBaseAction::HandleCompletion(Event event)
     return false;
 }
 
-
-
 bool GuildRpgStatusUpdateAction::Execute(Event event)
 {
-    //random float 0-1 and check against guildrpgprobability
-    float roll = (float)rand() / RAND_MAX;
+    uint32 roll = urand(0, 100);
     if (roll < sPlayerbotAIConfig->guildRpgProbability)
-    {
-        ChooseRandomActivity();
-        LOG_INFO("playerbots", "Bot {} selected new guild RPG activity: {}", botAI->GetBot()->GetName().c_str(), botAI->guildRpgInfo.GetActivityName());
-        return true;
-    }
+        return ChooseRandomActivity();
+
+    return false;
 }

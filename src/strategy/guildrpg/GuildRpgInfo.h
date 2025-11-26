@@ -102,14 +102,11 @@ struct GuildRpgInfo
     void SetGuildRpgActivity(PlayerbotAI* botAI, GuildRpgActivity activity);
     void ResetGuildActivity();
 
-    std::string GetActivityName() const {};
-    std::string ToString() const;
-
-
     static std::string GetGuildTypeName(GuildType type);
     static std::string GetPhaseName(GuildRpgPhase phase);
-    std::string GetActivityName();
-    std::string GetActivityName(GuildRpgActivity activity);
+    std::string ToString() const;
+    std::string GetActivityName() const;
+    std::string GetActivityName(GuildRpgActivity activity) const;
 
 
     void SetGuildRpgPhase(GuildRpgPhase newPhase) { phase = newPhase; }

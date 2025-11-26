@@ -269,7 +269,7 @@ public:
     bool deleteRandomBotAccounts;
     uint32 randomBotGuildCount, randomBotGuildSizeMax;
     bool enableGuildRpgStrategy;
-    float guildRpgProbability;
+    uint32 guildRpgProbability;
     bool deleteRandomBotGuilds;
     std::vector<uint32> randomBotGuilds;
     std::vector<uint32> GuildTypeRatios, GuildSize, GuildPveSpecRatio, GuildPvpSpecRatio, GuildRpgPvpWeights, GuildRpgPveWeights, GuildRpgProfWeights, GuildRpRpgWeights;

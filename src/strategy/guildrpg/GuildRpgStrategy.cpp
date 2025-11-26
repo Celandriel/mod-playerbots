@@ -23,3 +23,7 @@ void GuildRpgStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode("guild rpg prof task", NextAction::array(0, new NextAction("guild rpg prof action", 5.0f), nullptr)));
     triggers.push_back(new TriggerNode("guild rpg roleplay task", NextAction::array(0, new NextAction("guild rpg roleplay action", 5.0f), nullptr)));
 }
+
+void GuildRpgStrategy::InitMultipliers(std::vector<Multiplier*>& multipliers)
+{
+}

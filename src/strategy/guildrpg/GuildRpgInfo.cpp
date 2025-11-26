@@ -42,11 +42,11 @@ std::string GuildRpgInfo::GetPhaseName(GuildRpgPhase phase)
     }
 }
 
-std::string GuildRpgInfo::GetActivityName()
+std::string GuildRpgInfo::GetActivityName() const
 {
     return GetActivityName(activity);
 }
-std::string GuildRpgInfo::GetActivityName(GuildRpgActivity activity)
+std::string GuildRpgInfo::GetActivityName(GuildRpgActivity activity) const
 {
     switch (activity)
     {

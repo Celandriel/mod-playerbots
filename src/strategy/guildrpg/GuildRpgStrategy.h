@@ -19,6 +19,7 @@ public:
     std::string const getName() override { return "guild rpg"; }
     NextAction** getDefaultActions() override;
     void InitTriggers(std::vector<TriggerNode*>& triggers) override;
+    void InitMultipliers(std::vector<Multiplier*>& multipliers) override;
 };
 
 #endif
