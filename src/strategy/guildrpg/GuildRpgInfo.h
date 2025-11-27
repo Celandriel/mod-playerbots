@@ -52,7 +52,7 @@ enum class GuildRpgActivity : uint8_t
     FISHING,
 
     // ROLEPLAY
-    INNS_MEETUP,
+    INN_MEETUP,
     EMOTE_EVENT
 };
 using ActivityList = std::vector<GuildRpgActivity>;
@@ -62,7 +62,6 @@ static const std::map<GuildType, ActivityList> ActivitiesByGuildType =
     { GuildType::NONE,       { GuildRpgActivity::NONE } },
 
     { GuildType::PVP, {
-        GuildRpgActivity::NONE,
         GuildRpgActivity::QUEUE_FOR_BG,
         GuildRpgActivity::PATROL_AREA,
         GuildRpgActivity::ATTACK_CITY,
@@ -71,14 +70,12 @@ static const std::map<GuildType, ActivityList> ActivitiesByGuildType =
     }},
 
     { GuildType::PVE, {
-        GuildRpgActivity::NONE,
         GuildRpgActivity::RUN_DUNGEON,
         GuildRpgActivity::RUN_RAID,
         GuildRpgActivity::WORLD_EVENT,
     }},
 
     { GuildType::PROFESSION, {
-        GuildRpgActivity::NONE,
         GuildRpgActivity::GATHER_NODES,
         GuildRpgActivity::FARM_MOBS,
         GuildRpgActivity::MASS_CRAFT,
@@ -86,8 +83,7 @@ static const std::map<GuildType, ActivityList> ActivitiesByGuildType =
     }},
 
     { GuildType::ROLEPLAY, {
-        GuildRpgActivity::NONE,
-        GuildRpgActivity::INNS_MEETUP,
+        GuildRpgActivity::INN_MEETUP,
         GuildRpgActivity::EMOTE_EVENT,
     }}
 };

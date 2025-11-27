@@ -62,6 +62,7 @@ bool GuildRpgBaseAction::ChooseRandomActivity()
 
     const ActivityList& activities = it->second;
     GuildRpgActivity objective = RollRandomActivity(weights, activities);
+    LOG_ERROR("playerbots","Bot {} has guild type {} and has selected activity {}", bot->GetName(), guildType, objective);
     botAI->guildRpgInfo.SetGuildRpgActivity(botAI, objective);
     return true;
 }
@@ -87,24 +88,19 @@ bool GuildRpgBaseAction::Execute(Event event)
     switch (rpgInfo.phase)
     {
         case GuildRpgPhase::IDLE:
-            HandleGrouping(event);
-            break;
+            return HandleSelection(event);
         case GuildRpgPhase::GROUPING:
-            HandleGrouping(event);
-            break;
+            return HandleGrouping(event);
         case GuildRpgPhase::PREPARATION:
-            HandlePreparation(event);
-            break;
+            return HandlePreparation(event);
         case GuildRpgPhase::EXECUTING:
-            HandleExecution(event);
-            break;
+            return HandleExecution(event);
         case GuildRpgPhase::COMPLETED:
-            HandleCompletion(event);
-            break;
+            return HandleCompletion(event);
         default:
             break;
     }
-    return true;
+    return false;
 }
 
 bool GuildRpgBaseAction::HandleSelection(Event event)
@@ -118,42 +114,42 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
     PlayerbotGroupMgr* groupMgr = botAI->GetGroupMgr();
     if (!groupMgr)
     {
-        LOG_ERROR("playerbots", "Bot {} has no group manager available", bot->GetName().c_str());
+        LOG_ERROR("playerbots", "Bot {} has no group manager available", bot->GetName());
         return false;
     }
 
     // Check if composition is available
     if (!groupMgr->IsCompositionAvailable())
     {
-        LOG_ERROR("playerbots", "Bot {}: Required group composition not available", bot->GetName().c_str());
+        LOG_ERROR("playerbots", "Bot {}: Required group composition not available", bot->GetName());
         return false;
     }
 
     // Create the group
     if (!groupMgr->CreateGroup())
     {
-        LOG_ERROR("playerbots", "Bot {}: Failed to create group", bot->GetName().c_str());
+        LOG_ERROR("playerbots", "Bot {}: Failed to create group", bot->GetName());
         return false;
     }
 
-    LOG_INFO("playerbots", "Bot {} created group for PVP activity", bot->GetName().c_str());
+    LOG_INFO("playerbots", "Bot {} created group for PVP activity", bot->GetName());
 
     // Wait for group formation to complete
     if (groupMgr->WaitingforResponse())
     {
-        LOG_INFO("playerbots", "Bot {} waiting for group invites to be accepted", bot->GetName().c_str());
+        LOG_INFO("playerbots", "Bot {} waiting for group invites to be accepted", bot->GetName());
         return true; // Return true to continue waiting
     }
 
     // Check if group is complete
     if (!groupMgr->CheckGroupComposition())
     {
-        LOG_DEBUG("playerbots", "Bot {}: Group composition not yet complete for PVP activity", bot->GetName().c_str());
+        LOG_DEBUG("playerbots", "Bot {}: Group composition not yet complete for PVP activity", bot->GetName());
         return true; // Continue waiting for complete group
     }
 
     // Group is ready. Transition to PREPARATION phase.
-    LOG_INFO("playerbots", "Bot {} group is ready for PVP activity. Updating task phase to PREPARATION.", bot->GetName().c_str());
+    LOG_INFO("playerbots", "Bot {} group is ready for PVP activity. Updating task phase to PREPARATION.", bot->GetName());
     botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
 
     return true;
@@ -176,9 +172,13 @@ bool GuildRpgBaseAction::HandleCompletion(Event event)
 
 bool GuildRpgStatusUpdateAction::Execute(Event event)
 {
-    uint32 roll = urand(0, 100);
-    if (roll < sPlayerbotAIConfig->guildRpgProbability)
-        return ChooseRandomActivity();
-
+    if (bot->GetLevel() < 10)
+        return false;
+    if (botAI->guildRpgInfo.GetActivityName()=="NONE")
+    {
+        uint32 roll = urand(0, 100);
+        if (roll < sPlayerbotAIConfig->guildRpgProbability)
+            return ChooseRandomActivity();
+    }
     return false;
 }

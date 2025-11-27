@@ -627,7 +627,7 @@ public:
 
     // Group functionality
     PlayerbotGroupMgr* GetGroupMgr() { return _groupMgr; }
-    bool SetTargetGroupComposition(const TargetGroupComposition& composition) { _groupMgr->SetTargetComposition(composition);}
+    bool SetTargetGroupComposition(const TargetGroupComposition& composition) { return _groupMgr->SetTargetComposition(composition);}
     void ResetGroupMgr() { _groupMgr->Reset(); }
 
 
@@ -640,7 +640,7 @@ private:
     void HandleCommands();
     void HandleCommand(uint32 type, const std::string& text, Player& fromPlayer, const uint32 lang = LANG_UNIVERSAL);
     bool _isBotInitializing = false;
-    PlayerbotGroupMgr* _groupMgr;
+    PlayerbotGroupMgr* _groupMgr = new PlayerbotGroupMgr(this);
 
 protected:
     Player* bot;

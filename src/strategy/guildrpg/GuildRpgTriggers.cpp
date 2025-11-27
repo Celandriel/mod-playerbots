@@ -4,7 +4,7 @@
 
 bool GuildRpgTaskTrigger::IsActive()
 {
-    GuildRpgInfo guildRpgInfo= botAI->guildRpgInfo;
-    return (!(guildRpgInfo.phase == GuildRpgPhase::IDLE) &&
+    GuildRpgInfo guildRpgInfo = botAI->guildRpgInfo;
+    return (!(guildRpgInfo.activity == GuildRpgActivity::NONE) &&
             guildRpgInfo.type == type);
 }

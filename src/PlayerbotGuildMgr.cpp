@@ -118,14 +118,14 @@ bool PlayerbotGuildMgr::CreateGuild(Player* player, std::string guildName)
     Guild* guild = new Guild();
     if (!guild->Create(player, guildName))
     {
-        LOG_ERROR("playerbots", "Error creating guild [ {} ] with leader [ {} ]", guildName.c_str(),
-            player->GetName().c_str());
+        LOG_ERROR("playerbots", "Error creating guild [ {} ] with leader [ {} ]", guildName,
+            player->GetName());
         delete guild;
         return false;
     }
     sGuildMgr->AddGuild(guild);
 
-    LOG_DEBUG("playerbots", "Guild created: id={} name='{}'", guild->GetId(), guildName.c_str());
+    LOG_DEBUG("playerbots", "Guild created: id={} name='{}'", guild->GetId(), guildName);
 
     // create random emblem
     uint32 st, cl, br, bc, bg;

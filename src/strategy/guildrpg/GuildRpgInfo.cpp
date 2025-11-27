@@ -67,7 +67,7 @@ std::string GuildRpgInfo::GetActivityName(GuildRpgActivity activity) const
         case GuildRpgActivity::MASS_CRAFT:        return "MASS_CRAFT";
         case GuildRpgActivity::FISHING:           return "FISHING";
 
-        case GuildRpgActivity::INNS_MEETUP:       return "INNS_MEETUP";
+        case GuildRpgActivity::INN_MEETUP:       return "INN_MEETUP";
         case GuildRpgActivity::EMOTE_EVENT:       return "EMOTE_EVENT";
         default: return "NONE";
     }

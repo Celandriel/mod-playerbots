@@ -268,7 +268,7 @@ bool PlayerbotGroupMgr::SetTargetComposition(const TargetGroupComposition& compo
     if (!IsValidComposition(composition))
         return false;
 
-        _targetComposition = composition;
+    _targetComposition = composition;
     if (_targetComposition.lowerLevelLimit == 0 && _targetComposition.upperLevelLimit == 0)
         levelrangeset = false;
     else
