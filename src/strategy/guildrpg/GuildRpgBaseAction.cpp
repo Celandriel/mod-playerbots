@@ -122,6 +122,7 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
     if (!groupMgr->IsCompositionAvailable())
     {
         LOG_ERROR("playerbots", "Bot {}: Required group composition not available", bot->GetName());
+        botAI->guildRpgInfo.ResetGuildActivity();
         return false;
     }
 

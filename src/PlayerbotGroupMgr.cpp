@@ -368,10 +368,12 @@ bool PlayerbotGroupMgr::WaitingforResponse()
 
 bool PlayerbotGroupMgr::IsCompositionAvailable()
 {
-
     Player* bot = _botAI->GetBot();
     if (!bot->GetGuild())
+    {
+        LOG_ERROR("playerbots", "Bot {} has no guild", bot->GetName());
         return false;
+    }
 
     _guild = bot->GetGuild();
 
@@ -381,9 +383,14 @@ bool PlayerbotGroupMgr::IsCompositionAvailable()
     std::vector<GuildMember> availableMembers = FindAvailableGuildMembers();
 
     // Check if there are enough members for the group size (excluding the leader)
-    if (availableMembers.size() < (_targetComposition.groupSize > 0 ? _targetComposition.groupSize - 1 : 0))
-        return false;
-
+    if (!_targetComposition.allowPartial)
+    {
+        if (availableMembers.size() < (_targetComposition.groupSize > 0 ? _targetComposition.groupSize - 1 : 0))
+        {
+            LOG_ERROR("playerbots","Requested number of bots is not available for group.");
+            return false;
+        }
+    }
     std::map<BotRoles, int> roleCounts;
     roleCounts[BOT_ROLE_TANK] = 0;
     roleCounts[BOT_ROLE_HEALER] = 0;
@@ -406,14 +413,15 @@ bool PlayerbotGroupMgr::IsCompositionAvailable()
         healersNeeded--;
     else if (botRole == BOT_ROLE_DPS && dpsNeeded > 0)
         dpsNeeded--;
-
-    if (roleCounts[BOT_ROLE_TANK] < tanksNeeded)
-        return false;
-    if (roleCounts[BOT_ROLE_HEALER] < healersNeeded)
-        return false;
-    if (roleCounts[BOT_ROLE_DPS] < dpsNeeded)
-        return false;
-
+    LOG_ERROR("playerbots","Bot {} in guild {} has found {} tanks, {} dps, {} healers in their guild", bot->GetName(), _guild->GetName(), roleCounts[BOT_ROLE_TANK], roleCounts[BOT_ROLE_DPS], roleCounts[BOT_ROLE_HEALER]);
+    {
+        if (roleCounts[BOT_ROLE_TANK] < tanksNeeded)
+            return false;
+        if (roleCounts[BOT_ROLE_HEALER] < healersNeeded)
+            return false;
+        if (roleCounts[BOT_ROLE_DPS] < dpsNeeded)
+            return false;
+    }
     return true;
 }
 

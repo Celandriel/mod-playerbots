@@ -113,7 +113,7 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
         composition.minDps = 5;
         composition.maxDps = 6;
     }
-
+    composition.allowPartial = true;
     return composition;
 }
 
@@ -126,7 +126,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
         BattlegroundQueueTypeId battleground = SelectBattlegroundForLevel(botLevel);
         if (battleground == BATTLEGROUND_QUEUE_NONE)
         {
-           // LOG_ERROR("playerbots", "Bot {} could not find suitable battleground for level {} resetting task", name, botLevel);
+            LOG_ERROR("playerbots", "Bot {} could not find suitable battleground for level {} resetting task", name, botLevel);
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
@@ -138,6 +138,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
+        LOG_ERROR("playerbots", "[GUILD RPG] Bot {} has selected Battleground {}", bot->GetName(), battleground);
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::GROUPING);
         return true;
     }

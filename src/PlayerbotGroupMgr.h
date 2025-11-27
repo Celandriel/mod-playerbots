@@ -4,7 +4,7 @@
 #include "Group.h"
 #include "Guild.h"
 #include "Action.h"
- 
+
 enum BotRoles : uint8;
 
 struct GuildMember
@@ -16,14 +16,15 @@ struct GuildMember
 
 struct TargetGroupComposition
 {
-    uint8_t groupSize;
-    uint8_t tanks;
-    uint8_t minHealers;
-    uint8_t maxHealers;
-    uint8_t minDps;
-    uint8_t maxDps;
-    uint8_t lowerLevelLimit;
-    uint8_t upperLevelLimit;
+    uint8_t groupSize = 0;
+    uint8_t tanks = 0;
+    uint8_t minHealers = 0;
+    uint8_t maxHealers = 0;
+    uint8_t minDps = 0;
+    uint8_t maxDps = 0;
+    uint8_t lowerLevelLimit = 0;
+    uint8_t upperLevelLimit = 0;
+    bool allowPartial = false;
 };
 
 class PlayerbotGroupMgr
@@ -60,7 +61,7 @@ private:
 
     bool IsLevelWithinRange(uint8 level);
     BotRoles GetBotRole(ObjectGuid guid);
-    void UpdateComposition(); 
+    void UpdateComposition();
     bool CanInviteMore(BotRoles role);
     std::vector<ObjectGuid> GetGuildMembers(uint32 guildId);
 };
