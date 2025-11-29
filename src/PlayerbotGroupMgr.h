@@ -1,9 +1,9 @@
 #ifndef _PLAYERBOT_GROUPMGR_H
 #define _PLAYERBOT_GROUPMGR_H
 
-#include "Group.h"
-#include "Guild.h"
+
 #include "Action.h"
+#include "Guild.h"
 
 enum BotRoles : uint8;
 
@@ -34,7 +34,7 @@ public:
     void Reset();
 
     bool CreateGroup();
-    std::vector<GuildMember> FindAvailableGuildMembers();
+    std::vector<GuildMember> FindAvailableGuildMembers(Guild* guild);
     bool InviteBot(ObjectGuid guid);
     bool RemoveBot(ObjectGuid guid);
     bool DisbandGroup();
@@ -46,7 +46,6 @@ public:
     bool SetTargetComposition(const TargetGroupComposition& composition);
     bool IsValidComposition(const TargetGroupComposition& composition);
 
-    Group* GetGroup() const { return _group; }
     const std::map<BotRoles, int>& GetComposition() const { return _roleComposition; }
     const TargetGroupComposition& GetTargetComposition() const { return _targetComposition; }
 
@@ -54,9 +53,7 @@ private:
     TargetGroupComposition _targetComposition = {};
     PlayerbotAI* _botAI;
     std::map<BotRoles, int> _roleComposition;
-    Group* _group;
-    Guild* _guild;
-    uint8_t totalMembers;
+    uint8_t totalMembers = 0;
     bool levelrangeset = false;
 
     bool IsLevelWithinRange(uint8 level);

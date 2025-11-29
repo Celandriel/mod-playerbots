@@ -4,13 +4,14 @@
 #include "Group.h"
 #include "GroupMgr.h"
 #include "Guild.h"
+#include "InviteToGroupAction.h"
 #include "Player.h"
 #include "PlayerbotAI.h"
 #include "PlayerbotGuildMgr.h"
 #include "Playerbots.h"
 
 PlayerbotGroupMgr::PlayerbotGroupMgr(PlayerbotAI* botAI)
-    : _botAI(botAI), _group(nullptr), _guild(nullptr), totalMembers(0)
+    : _botAI(botAI)
 {
     _roleComposition[BOT_ROLE_TANK] = 0;
     _roleComposition[BOT_ROLE_HEALER] = 0;
@@ -19,10 +20,6 @@ PlayerbotGroupMgr::PlayerbotGroupMgr(PlayerbotAI* botAI)
 
 void PlayerbotGroupMgr::Reset()
 {
-    if (_group)
-        _group = nullptr;
-    if (_guild)
-        _guild = nullptr;
     totalMembers = 0;
     levelrangeset = false;
     _targetComposition = {};
@@ -40,45 +37,37 @@ bool PlayerbotGroupMgr::CreateGroup()
         return false;
 
     ObjectGuid leaderGuid = leader->GetGUID();
-    _guild = leader->GetGuild();
-    if (!_guild)
+    Guild* guild = leader->GetGuild();
+    if (guild)
         return false;
 
-    std::vector<GuildMember> availableMembers = FindAvailableGuildMembers();
+    std::vector<GuildMember> availableMembers = FindAvailableGuildMembers(guild);
     if (availableMembers.empty())
         return false;
 
-    if (!_group)
-    {
-        _group = new Group();
-        if (!_group->Create(leader))
-        {
-            delete _group;
-            _group = nullptr;
-            return false;
-        }
-        sGroupMgr->AddGroup(_group);
-        BotRoles leaderRole = GetBotRole(leaderGuid);
-        _roleComposition[leaderRole] = 1;
-    }
+    InviteToGroupAction InviteToGroupAction(_botAI);
+    BotRoles leaderRole = GetBotRole(leaderGuid);
+    _roleComposition[leaderRole] = 1;
 
     UpdateComposition();
     // Shuffle the available members to randomize selection
     std::random_device rd;
     std::default_random_engine rng(rd());
     std::shuffle(availableMembers.begin(), availableMembers.end(), rng);
+    Player* bot = _botAI->GetBot();
 
     for (auto& member : availableMembers)
     {
         if (totalMembers >= _targetComposition.groupSize)
             break;
 
-        if (totalMembers > 1 && _targetComposition.groupSize > 5 && !_group->isRaidGroup())
-            _group->ConvertToRaid();
-
         if (CanInviteMore(member.role))
         {
-            if (InviteBot(member.guid))
+            Player* player = ObjectAccessor::FindPlayer(member.guid);
+            if (!player)
+                continue;
+
+            if (InviteToGroupAction.Invite(leader, player))
             {
                 _roleComposition[member.role]++;
                 totalMembers++;
@@ -88,12 +77,12 @@ bool PlayerbotGroupMgr::CreateGroup()
     return true;
 }
 
-std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers()
+std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers(Guild* guild)
 {
     std::vector<GuildMember> availableMembers;
-    if (!_guild)
+    if (!guild)
         return availableMembers;
-    std::vector<ObjectGuid> guildMembers = GetGuildMembers(_guild->GetId());
+    std::vector<ObjectGuid> guildMembers = GetGuildMembers(guild->GetId());
 
     for (const auto& memberGuid : guildMembers)
     {
@@ -116,57 +105,40 @@ std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers()
     return availableMembers;
 }
 
-bool PlayerbotGroupMgr::InviteBot(ObjectGuid guid)
-{
-    Player* bot = ObjectAccessor::FindPlayer(guid);
-    if (!bot)
-        return false;
-
-    if (bot->GetGroup())
-        return false;
-
-    if (!_group)
-    {
-        return false;
-    }
-    return _group->AddInvite(bot);
-}
-
 bool PlayerbotGroupMgr::RemoveBot(ObjectGuid guid)
 {
     Player* bot = ObjectAccessor::FindPlayer(guid);
     if (!bot)
         return false;
 
-    if (!_group)
+    Group* group = bot->GetGroup();
+    if (!group)
         return false;
 
-    if (guid == _group->GetLeaderGUID())
+    if (guid == group->GetLeaderGUID())
     {
         DisbandGroup();
         return true;
     }
-    _group->RemoveMember(guid);
+
+    WorldPacket* packet = new WorldPacket(CMSG_GROUP_UNINVITE_GUID, 8);
+    *packet << guid;
+    bot->GetSession()->QueuePacket(packet);
     UpdateComposition();
 
-    if (_group->GetMembersCount() == 0)
-    {
-        sGroupMgr->RemoveGroup(_group);
-        delete _group;
-        _group = nullptr;
-    }
     return true;
 }
 
 bool PlayerbotGroupMgr::DisbandGroup()
 {
-    if (!_group)
+    Player* bot = _botAI->GetBot();
+    if (!bot)
+        return false;
+    Group* group = bot->GetGroup();
+    if (!group)
         return false;
 
-    _group->Disband();
-    sGroupMgr->RemoveGroup(_group);
-    delete _group;
-    _group = nullptr;
+    _botAI->LeaveOrDisbandGroup();
     return true;
 }
 
@@ -211,12 +183,16 @@ void PlayerbotGroupMgr::UpdateComposition()
     for (auto& pair : _roleComposition)
         pair.second = 0;
 
-    if (!_group)
+    Player* bot = _botAI->GetBot();
+    if (!bot)
+        return;
+    Group* group = bot->GetGroup();
+    if (!group)
         return;
 
-    totalMembers = _group->GetMembersCount();
+    totalMembers = group->GetMembersCount();
 
-    Group::MemberSlotList const& members = _group->GetMemberSlots();
+    Group::MemberSlotList const& members = group->GetMemberSlots();
     for (Group::MemberSlot const& slot : members)
     {
         Player* member = ObjectAccessor::FindPlayer(slot.guid);
@@ -236,6 +212,13 @@ std::vector<ObjectGuid> PlayerbotGroupMgr::GetGuildMembers(uint32 guildId)
 // Figure out if the group is complete
 bool PlayerbotGroupMgr::CheckGroupComposition()
 {
+    Player* bot = _botAI->GetBot();
+    if (!bot)
+        return false;
+    Group* group = bot->GetGroup();
+    if (!group)
+        return false;
+
     UpdateComposition();
     if (totalMembers != _targetComposition.groupSize)
         return false;
@@ -250,7 +233,7 @@ bool PlayerbotGroupMgr::CheckGroupComposition()
     if (levelrangeset)
     {
         uint8_t playerlevel = 0;
-        for (auto& member : _group->GetMemberSlots())
+        for (auto& member : group->GetMemberSlots())
         {
             Player* player = ObjectAccessor::FindPlayer(member.guid);
             if (!player)
@@ -291,7 +274,11 @@ bool PlayerbotGroupMgr::IsLevelWithinRange(uint8 level)
 
 void PlayerbotGroupMgr::CleanGroup()
 {
-    if (!_group)
+    Player* bot = _botAI->GetBot();
+    if (!bot)
+        return;
+    Group* group = bot->GetGroup();
+    if (!group)
         return;
 
     if (_targetComposition.groupSize == 0)
@@ -302,7 +289,7 @@ void PlayerbotGroupMgr::CleanGroup()
     _roleComposition[BOT_ROLE_HEALER] = 0;
     _roleComposition[BOT_ROLE_DPS] = 0;
 
-    for (auto& member : _group->GetMemberSlots())
+    for (auto& member : group->GetMemberSlots())
     {
         if (levelrangeset)
         {
@@ -359,28 +346,31 @@ void PlayerbotGroupMgr::CleanGroup()
 }
 bool PlayerbotGroupMgr::WaitingforResponse()
 {
-    if (!_group || _group->GetInviteeCount() != 0)
-    {
+    Player* bot = _botAI->GetBot();
+    if (!bot)
+        return false;
+    Group* group = bot->GetGroup();
+    if (!group || group->GetInviteeCount() != 0)
         return true;
-    }
+
     return false;
 }
 
 bool PlayerbotGroupMgr::IsCompositionAvailable()
 {
     Player* bot = _botAI->GetBot();
-    if (!bot->GetGuild())
+    if (!bot)
+        return false;
+    Guild* guild = bot->GetGuild();
+    if (!guild)
     {
         LOG_ERROR("playerbots", "Bot {} has no guild", bot->GetName());
         return false;
     }
-
-    _guild = bot->GetGuild();
-
     if (!IsValidComposition(_targetComposition))
         return false;
 
-    std::vector<GuildMember> availableMembers = FindAvailableGuildMembers();
+    std::vector<GuildMember> availableMembers = FindAvailableGuildMembers(guild);
 
     // Check if there are enough members for the group size (excluding the leader)
     if (!_targetComposition.allowPartial)
@@ -413,7 +403,7 @@ bool PlayerbotGroupMgr::IsCompositionAvailable()
         healersNeeded--;
     else if (botRole == BOT_ROLE_DPS && dpsNeeded > 0)
         dpsNeeded--;
-    LOG_ERROR("playerbots","Bot {} in guild {} has found {} tanks, {} dps, {} healers in their guild", bot->GetName(), _guild->GetName(), roleCounts[BOT_ROLE_TANK], roleCounts[BOT_ROLE_DPS], roleCounts[BOT_ROLE_HEALER]);
+    LOG_ERROR("playerbots","Bot {} in guild {} has found {} tanks, {} dps, {} healers in their guild", bot->GetName(), guild->GetName(), roleCounts[BOT_ROLE_TANK], roleCounts[BOT_ROLE_DPS], roleCounts[BOT_ROLE_HEALER]);
     {
         if (roleCounts[BOT_ROLE_TANK] < tanksNeeded)
             return false;
