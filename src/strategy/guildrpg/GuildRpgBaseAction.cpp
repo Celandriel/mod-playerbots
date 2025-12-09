@@ -3,6 +3,7 @@
 #include "Guild.h"
 #include "Group.h"
 #include "PlayerbotGroupMgr.h"
+#include "Playerbots.h"
 
 bool TellGuildRpgStatusAction::Execute(Event event)
 {
@@ -77,7 +78,9 @@ bool GuildRpgBaseAction::isUseful()
         return false;
 
     if (bot->GetGroup() && bot->GetGroup()->GetLeaderGUID() != bot->GetGUID())
-            return false;
+    {
+        return false;
+    }
     return true;
 }
 
@@ -103,6 +106,29 @@ bool GuildRpgBaseAction::Execute(Event event)
     return false;
 }
 
+void GuildRpgBaseAction::SyncGuildRpgStatus()
+{
+    Group* group = bot->GetGroup();
+    if (!group)
+        return;
+
+    GuildRpgInfo rpgInfo = botAI->guildRpgInfo;
+    GuildRpgPhase phase = rpgInfo.phase;
+    GuildRpgActivity activity = rpgInfo.activity;
+
+    for (GroupReference* gref = group->GetFirstMember(); gref; gref = gref->next())
+    {
+        Player* member = gref->GetSource();
+        PlayerbotAI* memberBotAI = GET_PLAYERBOT_AI(member);
+        if (!memberBotAI)
+            continue;
+        GuildRpgInfo& memberRpgInfo = memberBotAI->guildRpgInfo;
+        memberRpgInfo.phase = phase;
+        memberRpgInfo.activity = activity;
+    }
+    return;
+}
+
 bool GuildRpgBaseAction::HandleSelection(Event event)
 {
     return false;
@@ -111,29 +137,36 @@ bool GuildRpgBaseAction::HandleSelection(Event event)
 bool GuildRpgBaseAction::HandleGrouping(Event event)
 {
     Player* bot = botAI->GetBot();
+    if (!bot)
+        return false;
+
     PlayerbotGroupMgr* groupMgr = botAI->GetGroupMgr();
     if (!groupMgr)
     {
         LOG_ERROR("playerbots", "Bot {} has no group manager available", bot->GetName());
         return false;
     }
-
-    // Check if composition is available
-    if (!groupMgr->IsCompositionAvailable())
+    Group* group = bot->GetGroup();
+    if (!group)
     {
-        LOG_ERROR("playerbots", "Bot {}: Required group composition not available", bot->GetName());
-        botAI->guildRpgInfo.ResetGuildActivity();
-        return false;
+        // Check if composition is available
+        if (!groupMgr->IsCompositionAvailable())
+        {
+            LOG_ERROR("playerbots", "Bot {}: Required group composition not available", bot->GetName());
+            botAI->guildRpgInfo.ResetGuildActivity();
+            return false;
+        }
+
+        // Create the group
+        if (!groupMgr->CreateGroup())
+        {
+            LOG_ERROR("playerbots", "Bot {}: Failed to create group", bot->GetName());
+            return false;
+        }
+        LOG_INFO("playerbots", "Bot {} created group for activity", bot->GetName());
+        return true;
     }
 
-    // Create the group
-    if (!groupMgr->CreateGroup())
-    {
-        LOG_ERROR("playerbots", "Bot {}: Failed to create group", bot->GetName());
-        return false;
-    }
-
-    LOG_INFO("playerbots", "Bot {} created group for PVP activity", bot->GetName());
 
     // Wait for group formation to complete
     if (groupMgr->WaitingforResponse())
@@ -146,12 +179,21 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
     if (!groupMgr->CheckGroupComposition())
     {
         LOG_DEBUG("playerbots", "Bot {}: Group composition not yet complete for PVP activity", bot->GetName());
+        if (!groupMgr->CreateGroup())
+        {
+            LOG_ERROR("playerbots", "Bot {}: Failed to send re-invites to complete group. Reset activity.", bot->GetName());
+            botAI->guildRpgInfo.ResetGuildActivity();
+            groupMgr->DisbandGroup();
+            groupMgr->Reset();
+            return false;
+        }
         return true; // Continue waiting for complete group
     }
 
     // Group is ready. Transition to PREPARATION phase.
-    LOG_INFO("playerbots", "Bot {} group is ready for PVP activity. Updating task phase to PREPARATION.", bot->GetName());
+    LOG_INFO("playerbots", "Bot {} group is ready for activity. Updating task phase to PREPARATION.", bot->GetName());
     botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
+    SyncGuildRpgStatus();
 
     return true;
 }

@@ -11,44 +11,44 @@
 #include "Value.h"
 
 
-BattlegroundQueueTypeId SelectBattlegroundForLevel(uint8 botLevel)
+BattlegroundTypeId  SelectBattlegroundForLevel(uint8 botLevel)
 {
     // Available battlegrounds for different level ranges
-    std::vector<BattlegroundQueueTypeId> possibleBGs;
+    std::vector<BattlegroundTypeId > possibleBGs;
 
     if (botLevel >= 10 && botLevel <= 19)
     {
         // Level 10-19: Warsong Gulch, Arathi Basin
-        possibleBGs = { BATTLEGROUND_QUEUE_WS, BATTLEGROUND_QUEUE_AB };
+        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB };
     }
     else if (botLevel >= 20 && botLevel <= 29)
     {
         // Level 20-29: Warsong Gulch, Arathi Basin, Alterac Valley
-        possibleBGs = { BATTLEGROUND_QUEUE_WS, BATTLEGROUND_QUEUE_AB, BATTLEGROUND_QUEUE_AV };
+        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV };
     }
     else if (botLevel >= 30 && botLevel <= 39)
     {
         // Level 30-39: All classic BGs
-        possibleBGs = { BATTLEGROUND_QUEUE_WS, BATTLEGROUND_QUEUE_AB, BATTLEGROUND_QUEUE_AV, BATTLEGROUND_QUEUE_EY };
+        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV, BATTLEGROUND_EY };
     }
     else if (botLevel >= 40 && botLevel <= 49)
     {
         // Level 40-49: All classic + Strand of the Ancients
-        possibleBGs = { BATTLEGROUND_QUEUE_WS, BATTLEGROUND_QUEUE_AB, BATTLEGROUND_QUEUE_AV, BATTLEGROUND_QUEUE_EY, BATTLEGROUND_QUEUE_SA };
+        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV, BATTLEGROUND_EY, BATTLEGROUND_SA };
     }
     else if (botLevel >= 50 && botLevel <= 59)
     {
         // Level 50-59: All BGs except Isle of Conquest
-        possibleBGs = { BATTLEGROUND_QUEUE_WS, BATTLEGROUND_QUEUE_AB, BATTLEGROUND_QUEUE_AV, BATTLEGROUND_QUEUE_EY, BATTLEGROUND_QUEUE_SA };
+        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV, BATTLEGROUND_EY, BATTLEGROUND_SA };
     }
     else if (botLevel >= 60)
     {
         // Level 60+: All BGs
-        possibleBGs = { BATTLEGROUND_QUEUE_WS, BATTLEGROUND_QUEUE_AB, BATTLEGROUND_QUEUE_AV, BATTLEGROUND_QUEUE_EY, BATTLEGROUND_QUEUE_SA, BATTLEGROUND_QUEUE_IC };
+        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV, BATTLEGROUND_EY, BATTLEGROUND_SA, BATTLEGROUND_IC };
     }
 
     if (possibleBGs.empty())
-        return BATTLEGROUND_QUEUE_NONE;
+        return BATTLEGROUND_TYPE_NONE;
 
     // Randomly select from available BGs
     return possibleBGs[urand(0, possibleBGs.size() - 1)];
@@ -95,16 +95,7 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
     }
 
     // Set composition requirements based on BG type and group size
-    if (composition.groupSize == 5)
-    {
-        // 5-man BG composition
-        composition.tanks = 1;
-        composition.minHealers = 1;
-        composition.maxHealers = 2;
-        composition.minDps = 2;
-        composition.maxDps = 3;
-    }
-    else if (composition.groupSize == 10)
+    if (composition.groupSize == 10)
     {
         // 10-man BG composition
         composition.tanks = 2;
@@ -113,26 +104,46 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
         composition.minDps = 5;
         composition.maxDps = 6;
     }
+    else if (composition.groupSize == 15)
+    {
+        // 15-man BG composition
+        composition.tanks = 3;
+        composition.minHealers = 3;
+        composition.maxHealers = 4;
+        composition.minDps = 7;
+        composition.maxDps = 9;
+    }
+    else if (composition.groupSize == 40)
+    {
+        // 40-man BG composition
+        composition.tanks = 5;
+        composition.minHealers = 8;
+        composition.maxHealers = 10;
+        composition.minDps = 25;
+        composition.maxDps = 27;
+    }
+
     composition.allowPartial = true;
     return composition;
 }
 
 bool GuildRpgPvpAction::HandleSelection(Event event)
 {
-    GuildRpgActivity activity = botAI->guildRpgInfo.activity;//stop 1
+    GuildRpgActivity activity = botAI->guildRpgInfo.activity;
     if (activity == GuildRpgActivity::QUEUE_FOR_BG)
-    {//stop 2
+    {
         uint8 botLevel = bot->GetLevel();
-        BattlegroundQueueTypeId battleground = SelectBattlegroundForLevel(botLevel);
-        if (battleground == BATTLEGROUND_QUEUE_NONE)
+        BattlegroundTypeId  battleground = SelectBattlegroundForLevel(botLevel);
+        if (battleground == BATTLEGROUND_TYPE_NONE)
         {
             LOG_ERROR("playerbots", "Bot {} could not find suitable battleground for level {} resetting task", name, botLevel);
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
-        botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(battleground); //stop 2
-        TargetGroupComposition groupComp = CreatePvpGroupComposition(battleground, botLevel); //stop 3
-        if (!botAI->SetTargetGroupComposition(groupComp)) //stop 4
+        botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(battleground);
+        TargetGroupComposition groupComp = CreatePvpGroupComposition(battleground, botLevel);
+
+        if (!botAI->SetTargetGroupComposition(groupComp))
         {
             LOG_ERROR("playerbots", "Bot {} could not set target group composition for battleground {}, resetting task", bot->GetName(), battleground);
             botAI->guildRpgInfo.ResetGuildActivity();
@@ -140,6 +151,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
         }
         LOG_ERROR("playerbots", "[GUILD RPG] Bot {} has selected Battleground {}", bot->GetName(), battleground);
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::GROUPING);
+        SyncGuildRpgStatus();
         return true;
     }
     return false;
@@ -159,6 +171,7 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
         if (bot->InBattleground())
         {
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
+            SyncGuildRpgStatus();
             return false;
         }
         BGJoinAction bgJoinAction(botAI);
@@ -180,6 +193,7 @@ bool GuildRpgPvpAction::HandleExecution(Event event)
             return true;
         }
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
+        SyncGuildRpgStatus();
         return true;
     }
     return false;
@@ -197,6 +211,7 @@ bool GuildRpgPvpAction::HandleCompletion(Event event)
         {
             LOG_INFO("playerbots", "Bot {} BG completed, queuing again", bot->GetName());
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
+            SyncGuildRpgStatus();
             return true;
         }
         else
@@ -204,7 +219,7 @@ bool GuildRpgPvpAction::HandleCompletion(Event event)
             LOG_INFO("playerbots", "Bot {} BG completed, disbanding", bot->GetName());
             guildRpgInfo.SetGuildRpgActivity(botAI, GuildRpgActivity::NONE);
             guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::IDLE);
-            //botAI->DisbandGroup();
+            botAI->LeaveOrDisbandGroup();
             return true;
         }
     }

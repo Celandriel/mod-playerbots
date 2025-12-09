@@ -35,38 +35,34 @@ bool PlayerbotGroupMgr::CreateGroup()
     Player* leader = _botAI->GetBot();
     if (!leader)
         return false;
-
     ObjectGuid leaderGuid = leader->GetGUID();
     Guild* guild = leader->GetGuild();
-    if (guild)
+    if (!guild)
         return false;
-
+    LOG_ERROR("playerbots","Preliminary checks passed");
     std::vector<GuildMember> availableMembers = FindAvailableGuildMembers(guild);
     if (availableMembers.empty())
         return false;
-
+    LOG_ERROR("playerbots","Found available members");
     InviteToGroupAction InviteToGroupAction(_botAI);
     BotRoles leaderRole = GetBotRole(leaderGuid);
     _roleComposition[leaderRole] = 1;
+    totalMembers = 1;
 
-    UpdateComposition();
     // Shuffle the available members to randomize selection
     std::random_device rd;
     std::default_random_engine rng(rd());
     std::shuffle(availableMembers.begin(), availableMembers.end(), rng);
-    Player* bot = _botAI->GetBot();
 
     for (auto& member : availableMembers)
     {
         if (totalMembers >= _targetComposition.groupSize)
             break;
-
         if (CanInviteMore(member.role))
         {
             Player* player = ObjectAccessor::FindPlayer(member.guid);
             if (!player)
                 continue;
-
             if (InviteToGroupAction.Invite(leader, player))
             {
                 _roleComposition[member.role]++;
@@ -220,6 +216,8 @@ bool PlayerbotGroupMgr::CheckGroupComposition()
         return false;
 
     UpdateComposition();
+    if (_targetComposition.allowPartial && totalMembers > 1)
+        return true;
     if (totalMembers != _targetComposition.groupSize)
         return false;
     if (_roleComposition[BOT_ROLE_TANK] != _targetComposition.tanks)
@@ -250,7 +248,6 @@ bool PlayerbotGroupMgr::SetTargetComposition(const TargetGroupComposition& compo
 {
     if (!IsValidComposition(composition))
         return false;
-
     _targetComposition = composition;
     if (_targetComposition.lowerLevelLimit == 0 && _targetComposition.upperLevelLimit == 0)
         levelrangeset = false;
@@ -387,9 +384,7 @@ bool PlayerbotGroupMgr::IsCompositionAvailable()
     roleCounts[BOT_ROLE_DPS] = 0;
 
     for (const auto& member : availableMembers)
-    {
         roleCounts[member.role]++;
-    }
 
     // Account for the leader's role
     BotRoles botRole = GetBotRole(bot->GetGUID());
@@ -403,7 +398,7 @@ bool PlayerbotGroupMgr::IsCompositionAvailable()
         healersNeeded--;
     else if (botRole == BOT_ROLE_DPS && dpsNeeded > 0)
         dpsNeeded--;
-    LOG_ERROR("playerbots","Bot {} in guild {} has found {} tanks, {} dps, {} healers in their guild", bot->GetName(), guild->GetName(), roleCounts[BOT_ROLE_TANK], roleCounts[BOT_ROLE_DPS], roleCounts[BOT_ROLE_HEALER]);
+    if (!_targetComposition.allowPartial)
     {
         if (roleCounts[BOT_ROLE_TANK] < tanksNeeded)
             return false;

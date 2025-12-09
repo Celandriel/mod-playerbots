@@ -23,6 +23,7 @@ public:
     bool isPhaseComplete();
     GuildRpgActivity RollRandomActivity(std::vector<uint32> weights, ActivityList activities);
     bool ChooseRandomActivity();
+    void SyncGuildRpgStatus();
 
     virtual bool HandleSelection(Event event);
     virtual bool HandleGrouping(Event event);
