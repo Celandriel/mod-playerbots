@@ -19,7 +19,7 @@ void PlayerbotGuildMgr::Init()
     if (sPlayerbotAIConfig->deleteRandomBotGuilds)
         DeleteBotGuilds();
 
-        LoadGuildNames();
+    LoadGuildNames();
     ValidateGuildCache();
 }
 
@@ -118,7 +118,7 @@ std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
 
     std::shuffle(guildNames.begin(), guildNames.end(), g);
 
-    for (const auto& name : guildNames)
+    for (auto& name : guildNames)
     {
         bool match = false;
         for (auto& keyValue : _guildCache)
@@ -195,7 +195,7 @@ void PlayerbotGuildMgr::ValidateGuildCache()
         Field* fields = result->Fetch();
         uint32 guildId = fields[0].Get<uint32>();
         std::string guildName = fields[1].Get<std::string>();
-        guildNames.push_back(guildName);
+        dbGuilds[guildId] = guildName;
     } while (result->NextRow());
 
     for (auto it = dbGuilds.begin(); it != dbGuilds.end(); it++)

@@ -49,7 +49,6 @@ private:
     {
         std::string name;
         uint8 status;
-        uint8 size;
         uint32 maxMembers = 0;
         uint32 memberCount = 0;
         uint8 faction = 0;
