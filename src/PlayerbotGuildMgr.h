@@ -43,7 +43,7 @@ private:
     int _maxIndex;
     int _randomBotGuildCount;
     int _randomBotGuildSizeMax;
-    std::vector<std::string> guildNames;
+    std::unordered_map<std::string, bool> _guildNames;
 
     struct GuildCache
     {
@@ -55,8 +55,8 @@ private:
         bool hasRealPlayer = false;
     };
     std::unordered_map<uint32 , GuildCache> _guildCache;
+    std::vector<std::string> _shuffled_guild_keys;
 };
-
 
 void PlayerBotsGuildValidationScript();
 

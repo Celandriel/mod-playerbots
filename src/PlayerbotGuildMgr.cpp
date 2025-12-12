@@ -55,7 +55,7 @@ bool PlayerbotGuildMgr::SetGuildEmblem(uint32 guildId)
     if (!guild)
         return false;
 
-     // create random emblem
+    // create random emblem
     uint32 st, cl, br, bc, bg;
     bg = urand(0, 51);
     bc = urand(0, 17);
@@ -87,7 +87,6 @@ bool PlayerbotGuildMgr::SetGuildEmblem(uint32 guildId)
     return true;
 }
 
-
 std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
 {
     if (!player)
@@ -111,27 +110,16 @@ std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
         size_t idx = static_cast<size_t>(urand(0, static_cast<int>(partiallyfilledguilds.size()) - 1));
         return (partiallyfilledguilds[idx]->name);
     }
-    // No partial guilds: determine type and pick an available one
-    std::random_device rd;
-    std::mt19937 g(rd());
 
-
-    std::shuffle(guildNames.begin(), guildNames.end(), g);
-
-    for (auto& name : guildNames)
+    for (auto key : _shuffled_guild_keys)
     {
-        bool match = false;
-        for (auto& keyValue : _guildCache)
+        if (_guildNames[key])
         {
-            if (keyValue.second.name == name)
-                match = true;
-        }
-        if (!match)
-        {
-            LOG_INFO("playerbots","Assigning player [{}] to guild [{}]", player->GetName(), name);
-            return name;
+            LOG_INFO("playerbots","Assigning player [{}] to guild [{}]", player->GetName(), key);
+            return key;
         }
     }
+    LOG_ERROR("playerbots","No available guild names left.");
     return "";
 }
 
@@ -143,9 +131,17 @@ void PlayerbotGuildMgr::OnGuildUpdate(Guild* guild)
 
     GuildCache& entry = it->second;
     entry.memberCount++;
-
     if (entry.memberCount >= entry.maxMembers)
         entry.status = 2; // Full
+    std::string guildName = guild->GetName();
+    for (auto it : _guildNames)
+    {
+        if (it.first == guildName)
+        {
+            it.second = false;
+            break;
+        }
+    }
 }
 
 void PlayerbotGuildMgr::ResetGuildCache()
@@ -174,9 +170,17 @@ void PlayerbotGuildMgr::LoadGuildNames()
     do
     {
         Field* fields = result->Fetch();
-        guildNames.push_back(fields[1].Get<std::string>());
+        _guildNames[fields[1].Get<std::string>()] = true;
     } while (result->NextRow());
-    LOG_INFO("playerbots", "Loaded {} guild entries from playerbots_guild_names table.", guildNames.size());
+
+    for (const auto& pair : _guildNames)
+        _shuffled_guild_keys.push_back(pair.first);
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    std::shuffle(_shuffled_guild_keys.begin(), _shuffled_guild_keys.end(), g);
+    LOG_INFO("playerbots", "Loaded {} guild entries from playerbots_guild_names table.", _guildNames.size());
 }
 
 void PlayerbotGuildMgr::ValidateGuildCache()
@@ -223,6 +227,14 @@ void PlayerbotGuildMgr::ValidateGuildCache()
             cache.status = 2; // full
 
         _guildCache.insert_or_assign(guildId, cache);
+        for (auto it : _guildNames)
+        {
+            if (it.first == cache.name)
+            {
+                it.second = false;
+                break;
+            }
+        }
     }
 }
 

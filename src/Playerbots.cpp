@@ -486,4 +486,3 @@ void AddPlayerbotsScripts()
     AddSC_playerbots_commandscript();
     PlayerBotsGuildValidationScript();
 }
-
