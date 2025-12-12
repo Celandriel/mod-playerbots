@@ -173,7 +173,7 @@ void PlayerbotGuildMgr::LoadGuildNames()
         _guildNames[fields[1].Get<std::string>()] = true;
     } while (result->NextRow());
 
-    for (const auto& pair : _guildNames)
+    for (auto& pair : _guildNames)
         _shuffled_guild_keys.push_back(pair.first);
 
     std::random_device rd;
