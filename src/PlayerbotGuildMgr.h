@@ -29,14 +29,15 @@ public:
     void Init();
     int8 DetermineGuildType();
     std::string AssignToGuild(Player* player);
-    void SaveDirtyGuilds();
-    void LoadGuildCache();
     void ValidateGuildCache();
     void ResetGuildCache();
-    bool CreateGuild(Player* player, std::string guildName);
     void OnGuildUpdate  (Guild* guild);
     uint32 GetGuildTypeByName(std::string guildName);
     uint32 GetGuildTypeById(uint32 guildID);
+    bool SetGuildEmblem(uint32 guildId);
+    void DeleteBotGuilds();
+    bool IsRealGuild(uint32 guildId);
+    bool IsRealGuild(Player* bot);
 
     void SetBotAvailability(uint32 guildId, ObjectGuid guid, BotAvailabilityStatus status);
     std::vector<ObjectGuid> GetAvailableGuildMembers(uint32 guildId);
@@ -44,6 +45,10 @@ public:
 
 private:
     PlayerbotGuildMgr();
+    int _maxIndex;
+    int _randomBotGuildCount;
+    int _randomBotGuildSizeMax;
+    std::unordered_map<std::string, bool> _guildNames;
     std::vector<uint32> _guildTypeRatios;
     std::vector<uint32> _guildNumPlayers;
     int const _nTypes = 4;
@@ -52,18 +57,18 @@ private:
     struct GuildCache
     {
         std::string name;
-        uint8 type;
+        uint8 type = 0;
         uint8 status;
-        uint32 guildID = 0;
         uint32 maxMembers = 0;
         uint32 memberCount = 0;
         uint8 faction = 0;
-        bool dirty = false;
+        bool hasRealPlayer = false;
     };
-    std::unordered_map<std::string, GuildCache> guildCache;
-    std::unordered_map<uint32, std::unordered_map<ObjectGuid, BotAvailabilityStatus>> guildBotStates;
-};
+    std::unordered_map<uint32 , GuildCache> _guildCache;
+//TOBO    std::unordered_map<uint32, std::unordered_map<ObjectGuid, BotAvailabilityStatus>> guildBotStates;
+    std::vector<std::string> _shuffled_guild_keys;
 
+};
 
 void PlayerBotsGuildValidationScript();
 

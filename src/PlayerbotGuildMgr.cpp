@@ -1,4 +1,5 @@
 #include "PlayerbotGuildMgr.h"
+#include "Player.h"
 #include "PlayerbotAIConfig.h"
 #include "DatabaseEnv.h"
 #include "Guild.h"
@@ -8,109 +9,50 @@
 
 PlayerbotGuildMgr::PlayerbotGuildMgr()
 {
-    // Initialize guild type ratios and player counts
-    _guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
-    _maxIndex = static_cast<uint32>(std::distance(_guildTypeRatios.begin(), std::max_element(
-        _guildTypeRatios.begin(),
-        _guildTypeRatios.end()))) + 1;
-    std::vector<uint32> guildSizes = sPlayerbotAIConfig->GuildSize;
-    if (guildSizes.size()!= _nTypes)
-    {
-        LOG_ERROR("playerbots", "Config Error: GuildSize must have 4 numbers separated by commas.");
-        guildSizes = {4,3,2,2};
-    }
-
-    for (int selection : guildSizes)
-    {
-        if (selection >=0 && selection <= 5)
-        {
-            _guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[selection]));
-        }
-        else
-        {
-            LOG_ERROR("playerbots", "Invalid GuildSize set, defaulting to SOLO");
-            _guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[0]));
-        }
-    }
-    if(sPlayerbotAIConfig->GuildTypeRatios.size() == _nTypes)
+    _randomBotGuildCount = sPlayerbotAIConfig->randomBotGuildCount;
+    _randomBotGuildSizeMax = sPlayerbotAIConfig->randomBotGuildSizeMax;
+    if (sPlayerbotAIConfig->enableGuildRpg)
     {
         _guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
-    }
-    else
-    {
-        LOG_ERROR("playerbots", "Guild type ratios not defined correctly. Using default values.");
-        _guildTypeRatios = {40, 20, 20, 10}; // Default values
+        _maxIndex = static_cast<uint32>(std::distance(_guildTypeRatios.begin(), std::max_element(
+            _guildTypeRatios.begin(),
+            _guildTypeRatios.end()))) + 1;
+        std::vector<uint32> guildSizes = sPlayerbotAIConfig->GuildSize;
+        if (guildSizes.size()!= _nTypes)
+        {
+            LOG_ERROR("playerbots", "Config Error: GuildSize must have 4 numbers separated by commas.");
+            guildSizes = {4,3,2,2};
+        }
+
+        for (int selection : guildSizes)
+        {
+            if (selection >=0 && selection <= 5)
+                _guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[selection]));
+
+            else
+            {
+                LOG_ERROR("playerbots", "Invalid GuildSize set, defaulting to SOLO");
+                _guildNumPlayers.push_back(static_cast<uint32>(GuilderMap[0]));
+            }
+        }
+        if(sPlayerbotAIConfig->GuildTypeRatios.size() == _nTypes)
+            _guildTypeRatios = sPlayerbotAIConfig->GuildTypeRatios;
+
+        else
+        {
+            LOG_ERROR("playerbots", "Guild type ratios not defined correctly. Using default values.");
+            _guildTypeRatios = {40, 20, 20, 10}; // Default values
+        }
     }
 }
 
 void PlayerbotGuildMgr::Init()
 {
-    guildCache.clear();
-    LOG_INFO("playerbots", "Loading guilds from database");
-    QueryResult result = CharacterDatabase.Query("SELECT name, guild_type, status, guildID, faction FROM playerbots_guild_names");
-    if(!result)
-    {
-        LOG_ERROR("playerbots", "No guild names found in database");
-        return;
-    }
-    do
-    {
-        Field* fields = result->Fetch();
-        if (!fields)
-        {
-            LOG_WARN("playerbots", "Error fetching guild name fields");
-            continue;
-        }
-        std::string name = fields[0].Get<std::string>();
-        uint8 type = fields[1].Get<uint8>();
-        uint8 status = fields[2].Get<uint8>();
-        uint32 guildId = fields[3].Get<uint32>();
-        uint8 faction = fields[4].Get<uint8>();
+    if (sPlayerbotAIConfig->deleteRandomBotGuilds)
+        DeleteBotGuilds();
 
-        if (type == 0 || type > _guildTypeRatios.size())
-        {
-            LOG_WARN("playerbots", "Invalid guild type [{}] for guild [{}]", type, name);
-            type = 0;
-        }
-        if (status > 2)
-        {
-            LOG_WARN("playerbots", "Invalid guild status [{}] for guild [{}]", status, name);
-            status = 0; // Default to 0 if invalid
-        }
-        GuildCache& entry = guildCache[name];
-        entry.name = name;
-        entry.status = status;
-        entry.type = type;
-        entry.guildID = guildId;
-        entry.faction = faction;
-
-        if (entry.guildID != 0)
-        {
-            if (Guild* guild = sGuildMgr->GetGuildById(entry.guildID))
-            {
-                entry.memberCount = guild->GetMemberCount();
-            }
-            else
-            {
-                LOG_ERROR("playerbots", "Guild ID [{}] for guild [{}] not found in cache", entry.guildID, name);
-                entry.memberCount = 0; // Reset if guild not found
-            }
-        }
-        else
-            entry.memberCount = 0; // No guild ID means no members
-
-        if (type > 0 && static_cast<size_t>(type) <= _guildNumPlayers.size())
-        {
-            entry.maxMembers = _guildNumPlayers[type - 1];
-        }
-        else
-        {
-            LOG_WARN("playerbots", "Guild type [{}] for guild [{}] has no max members defined", type, name);
-            entry.maxMembers = 0; // Default to 0 if no max members defined
-        }
-
-        entry.dirty = false;
-        } while (result->NextRow());
+    LoadGuildNames();
+    ValidateGuildCache();
 }
 
 bool PlayerbotGuildMgr::CreateGuild(Player* player, std::string guildName)
@@ -126,6 +68,27 @@ bool PlayerbotGuildMgr::CreateGuild(Player* player, std::string guildName)
     sGuildMgr->AddGuild(guild);
 
     LOG_DEBUG("playerbots", "Guild created: id={} name='{}'", guild->GetId(), guildName);
+    SetGuildEmblem(guild->GetId());
+
+    GuildCache entry;
+    entry.name = guildName;
+    entry.memberCount = 1;
+    entry.status = 1;
+    entry.type = GetGuildTypeByName(guildName); //TODO: Fix this cause it probably dont work.
+    entry.faction = player->GetTeamId();
+    if (!sPlayerbotAIConfig->enableGuildRpg)
+        entry.maxMembers = _randomBotGuildSizeMax;
+    else
+        entry.maxMembers = _guildNumPlayers[entry.type - 1];
+    _guildCache[guild->GetId()] = entry;
+    return true;
+}
+
+bool PlayerbotGuildMgr::SetGuildEmblem(uint32 guildId)
+{
+    Guild* guild = sGuildMgr->GetGuildById(guildId);
+    if (!guild)
+        return false;
 
     // create random emblem
     uint32 st, cl, br, bc, bg;
@@ -156,27 +119,13 @@ bool PlayerbotGuildMgr::CreateGuild(Player* player, std::string guildName)
             "[TABARD] DB check guild id={} => style={}, color={}, borderStyle={}, borderColor={}, bgColor={}",
             guild->GetId(), f[0].Get<uint8>(), f[1].Get<uint8>(), f[2].Get<uint8>(), f[3].Get<uint8>(), f[4].Get<uint8>());
     }
-
-    GuildCache entry;
-    entry.name = guildName;
-    entry.guildID = guild->GetId();
-    entry.memberCount = 1;
-    entry.status = 1;
-    entry.type = GetGuildTypeByName(guild->GetName());
-    entry.maxMembers = _guildNumPlayers[entry.type - 1];
-    entry.faction = player->GetTeamId();
-    entry.dirty = true;
-
-    guildCache[guildName] = entry;
-
-    sPlayerbotAIConfig->randomBotGuilds.push_back(guild->GetId());
     return true;
 }
 
 int8 PlayerbotGuildMgr::DetermineGuildType()
 {
     // If no guilds loaded, find max ratio:
-    if (guildCache.empty())
+    if (_guildCache.empty())
     {
         LOG_INFO("playerbots", "No guilds loaded in cache; defaulting to max");
         return _maxIndex;
@@ -184,7 +133,7 @@ int8 PlayerbotGuildMgr::DetermineGuildType()
 
     std::vector<int> currentGuildCounts(_nTypes, 0);
     int totalGuilds = 0;
-    for (const auto& keyValue : guildCache)
+    for (const auto& keyValue : _guildCache)
     {
         const GuildCache& gc = keyValue.second;
         if (gc.status > 0 && gc.type > 0 && static_cast<size_t>(gc.type) <= _nTypes) // validate index
@@ -221,16 +170,14 @@ int8 PlayerbotGuildMgr::DetermineGuildType()
 
 std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
 {
-    if (!player || !sPlayerbotAIConfig->enableGuildRpgStrategy)
+    if (!player)
         return "";
 
-    LOG_DEBUG("playerbots", "Assigning player [{}] to a guild", player->GetName());
-
-    int playerFaction = player->GetTeamId();
+    uint8_t playerFaction = player->GetTeamId();
     std::vector<GuildCache*> partiallyfilledguilds;
-    partiallyfilledguilds.reserve(guildCache.size());
+    partiallyfilledguilds.reserve(_guildCache.size());
 
-    for (auto& keyValue : guildCache)
+    for (auto& keyValue : _guildCache)
     {
         GuildCache& cached = keyValue.second;
         if (cached.status == 1 && cached.faction == playerFaction)
@@ -243,28 +190,49 @@ std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
         return (partiallyfilledguilds[idx]->name);
     }
     // No partial guilds: determine type and pick an available one
-    uint8 guildType = DetermineGuildType();
-    std::vector<GuildCache*> availableGuilds;
-    for (auto& keyValue : guildCache)
-    {
-        GuildCache& cached = keyValue.second;
-        if (cached.status == 0 && cached.type == guildType)
+    size_t count = std::count_if(
+        _guildCache.begin(), _guildCache.end(),
+        [](const std::pair<const uint32, GuildCache>& pair)
         {
-            availableGuilds.push_back(&cached);
+            return !pair.second.hasRealPlayer;
         }
-    }
+        );
 
-    if (availableGuilds.empty())
+    if (count < _randomBotGuildCount)
     {
-        LOG_ERROR("playerbots", "No available guilds of required type");
-        return "";
-    }
+        if (sPlayerbotAIConfig->enableGuildRpgStrategy)
+        {
+            uint8 guildType = DetermineGuildType();
+            std::vector<GuildCache*> availableGuilds;
+            for (auto& keyValue : guildCache)//TODO: this is not the right variable for this anymore.
+            {
+                GuildCache& cached = keyValue.second;
+                if (cached.status == 0 && cached.type == guildType)
+                    availableGuilds.push_back(&cached);
+            }
 
-    // choose an available guild
-    size_t chosenIdx = static_cast<size_t>(urand(0, static_cast<int>(availableGuilds.size()) - 1));
-    GuildCache* chosenCache = availableGuilds[chosenIdx];
-    LOG_ERROR("playerbots","Assigning player [{}] to guild [{}]", player->GetName(), chosenCache->name);
-    return chosenCache->name;
+            if (availableGuilds.empty())
+            {
+                LOG_ERROR("playerbots", "No available guilds of required type");
+                return "";
+            }
+        // choose an available guild
+        size_t chosenIdx = static_cast<size_t>(urand(0, static_cast<int>(availableGuilds.size()) - 1));
+        GuildCache* chosenCache = availableGuilds[chosenIdx];
+        LOG_ERROR("playerbots","Assigning player [{}] to guild [{}]", player->GetName(), chosenCache->name);
+        return chosenCache->name;
+        }
+        for (auto& key : _shuffled_guild_keys)
+        {
+            if (_guildNames[key])
+            {
+                LOG_INFO("playerbots","Assigning player [{}] to guild [{}]", player->GetName(), key);
+                return key;
+            }
+        }
+        LOG_ERROR("playerbots","No available guild names left.");
+    }
+    return "";
 }
 
 uint32 PlayerbotGuildMgr::GetGuildTypeByName(std::string guildName)
@@ -301,167 +269,116 @@ void PlayerbotGuildMgr::OnGuildUpdate(Guild* guild)
 
     GuildCache& entry = it->second;
     entry.memberCount++;
-    entry.dirty = true;
-
-    if (entry.memberCount >= entry.maxMembers)
+        entry.status = 1;
+    else if (entry.memberCount >= entry.maxMembers)
         entry.status = 2; // Full
+    std::string guildName = guild->GetName();
+    for (auto& it : _guildNames)
+    {
+        if (it.first == guildName)
+        {
+            it.second = false;
+            break;
+        }
+    }
 }
 
 void PlayerbotGuildMgr::ResetGuildCache()
 {
     for (auto it = guildCache.begin(); it != guildCache.end();)
-        {
-            GuildCache& cached = it->second;
-            cached.guildID = 0;
-            cached.memberCount = 0;
-            cached.faction = 2;
-            cached.status = 0;
-            cached.dirty = true;
-        }
+    {
+        GuildCache& cached = it->second;
+        cached.guildID = 0;
+        cached.memberCount = 0;
+        cached.faction = 2;
+        cached.status = 0;
+        cached.dirty = true;
+    }
 }
 
-void PlayerbotGuildMgr::LoadGuildCache()
+void PlayerbotGuildMgr::LoadGuildNames()
 {
-    LOG_INFO("playerbots", "Loading guild cache from playerbots_guild_names...");
+    LOG_INFO("playerbots", "Loading guild names from playerbots_guild_names...");
 
-    QueryResult result = CharacterDatabase.Query("SELECT name_id, name, guild_type, status, guildID, faction FROM playerbots_guild_names"
-    );
+    QueryResult result = CharacterDatabase.Query("SELECT name_id, name FROM playerbots_guild_names"); //TODO: Add Type to table.
 
     if (!result)
     {
-        LOG_INFO("playerbots", "No entries found in playerbots_guild_names. Initial cache is empty.");
+        LOG_ERROR("playerbots", "No entries found in playerbots_guild_names. List is empty.");
         return;
     }
 
     do
     {
         Field* fields = result->Fetch();
-        std::string name = fields[1].Get<std::string>();
-        GuildCache& entry = guildCache[name];
-
-        entry.name = name;
-        entry.type = fields[2].Get<uint8>();
-        entry.status = fields[3].Get<uint8>();
-        entry.guildID = fields[4].Get<uint32>();
-        entry.faction = fields[5].Get<uint8>();
-
-        // Initialize other runtime fields
-        entry.memberCount = 0; // Will be validated in the next step
-        entry.maxMembers = _guildNumPlayers[entry.type - 1];
-        entry.dirty = false; // Start clean
-
-        // Use the guild name as the key for the map
-        guildCache[entry.name] = entry;
-
+        _guildNames[fields[1].Get<std::string>()] = true;
     } while (result->NextRow());
 
-    LOG_INFO("playerbots", "Loaded {} guild cache entries from custom table.", guildCache.size());
+    for (auto& pair : _guildNames)
+        _shuffled_guild_keys.push_back(pair.first);//TODO Change variable to account for type as well.
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    std::shuffle(_shuffled_guild_keys.begin(), _shuffled_guild_keys.end(), g);
+    LOG_INFO("playerbots", "Loaded {} guild entries from playerbots_guild_names table.", _guildNames.size());
 }
 
 void PlayerbotGuildMgr::ValidateGuildCache()
 {
-    bool saveRequired = false;
-    QueryResult result = CharacterDatabase.Query("SELECT g.guildid, g.name, COUNT(gm.guid) AS memberCount "
-         "FROM guild g LEFT JOIN guild_member gm ON g.guildid = gm.guildid "
-         "GROUP BY g.guildid, g.name ORDER BY memberCount DESC;");
+    QueryResult result = CharacterDatabase.Query("SELECT guildid, name FROM guild");
     if (!result)
     {
         LOG_ERROR("playerbots", "No guilds found in database, resetting guild cache");
         ResetGuildCache();
         return;
     }
-    struct DbGuildInfo {
-        uint32 guildID;
-        uint32 memberCount;
-    };
-    std::unordered_map<std::string, DbGuildInfo> dbGuilds;
+
+    std::unordered_map<uint32, std::string> dbGuilds;
     do
     {
         Field* fields = result->Fetch();
         uint32 guildId = fields[0].Get<uint32>();
         std::string guildName = fields[1].Get<std::string>();
-        uint32 memberCount = fields[2].Get<uint32>();
-        dbGuilds[guildName] = {guildId, memberCount};
+        dbGuilds[guildId] = guildName;
     } while (result->NextRow());
 
-    for (auto it = guildCache.begin(); it != guildCache.end(); )
+    for (auto it = dbGuilds.begin(); it != dbGuilds.end(); it++)
     {
-        std::string guildName = it->first;
-        GuildCache& cached = it->second;
-        bool cacheUpdated = false;
+        uint32 guildId = it->first;
+        GuildCache cache;
+        cache.name = it->second;
+        cache.maxMembers = _randomBotGuildSizeMax;
 
-        auto dbGuildIt = dbGuilds.find(guildName); // Matched Name
+        Guild* guild = sGuildMgr ->GetGuildById(guildId);
+        if (!guild)
+            continue;
 
-        if (dbGuildIt == dbGuilds.end())
-        {
-            if (cached.status != 0)
-            {
-                cached.status = 0;
-                cached.guildID = 0;
-                cached.memberCount = 0;
-                cached.faction = 2; // Neutral faction
-                cached.dirty = true;
-                LOG_INFO("playerbots", "Cached guild [{}] not found in DB, resetting status to 0", guildName);
-            }
-        }
+        cache.memberCount = guild->GetMemberCount();
+        ObjectGuid leaderGuid = guild->GetLeaderGUID();
+        CharacterCacheEntry const* leaderEntry = sCharacterCache->GetCharacterCacheByGuid(leaderGuid);
+        uint32 leaderAccount = leaderEntry->AccountId;
+        cache.hasRealPlayer = !(sPlayerbotAIConfig->IsInRandomAccountList(leaderAccount));
+        cache.faction = Player::TeamIdForRace(leaderEntry->Race);
+        if (cache.memberCount == 0)
+            cache.status = 0; // empty
+        else if (cache.memberCount < cache.maxMembers)
+            cache.status = 1; // partially filled
         else
+            cache.status = 2; // full
+
+        _guildCache.insert_or_assign(guildId, cache);
+        for (auto& it : _guildNames)
         {
-            DbGuildInfo& guildInfo = dbGuildIt->second;
-            if (cached.guildID != guildInfo.guildID)
+            if (it.first == cache.name)
             {
-                cached.guildID = guildInfo.guildID;
-                cached.dirty = true;
-                cacheUpdated = true;
+                it.second = false;
+                break;
             }
-
-            if (cached.memberCount != guildInfo.memberCount)
-            {
-                cached.memberCount = guildInfo.memberCount;
-                cached.dirty = true;
-                cacheUpdated = true;
-            }
-
-            uint8 expectedStatus = 0;
-            if (guildInfo.memberCount == 0)
-                expectedStatus = 0; // empty
-            else if (guildInfo.memberCount < cached.maxMembers)
-                expectedStatus = 1; // partially filled
-            else
-                expectedStatus = 2; // full
-
-            if (cached.status != expectedStatus)
-            {
-                cached.status = expectedStatus;
-                cached.dirty = true;
-                cacheUpdated = true;
-            }
-        }
-
-        if (cacheUpdated)
-        {
-            saveRequired = true;
-        }
-        it++;
-    }
-    if (saveRequired)
-        SaveDirtyGuilds();
-}
-
-void PlayerbotGuildMgr::SaveDirtyGuilds()
-{
-    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-
-    for (auto& [name, cached] : guildCache)
-    {
-        if (cached.dirty)
-        {
-            trans->Append("UPDATE playerbots_guild_names SET status = {}, guildID = {}, faction = {} WHERE name = '{}'",
-                          cached.status, cached.guildID, cached.faction, name);
-            cached.dirty = false;
         }
     }
-    CharacterDatabase.CommitTransaction(trans);
 }
+
 
 void PlayerbotGuildMgr::SetBotAvailability(uint32 guildId, ObjectGuid guid, BotAvailabilityStatus status)
 {
@@ -495,57 +412,76 @@ std::vector<ObjectGuid> PlayerbotGuildMgr::GetAvailableGuildMembers(uint32 guild
     return availableMembers;
 }
 
+void PlayerbotGuildMgr::DeleteBotGuilds()
+{
+    LOG_INFO("playerbots", "Deleting random bot guilds...");
+    std::vector<uint32> randomBots;
+
+    PlayerbotsDatabasePreparedStatement* stmt = PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_SEL_RANDOM_BOTS_BOT);
+    stmt->SetData(0, "add");
+    if (PreparedQueryResult result = PlayerbotsDatabase.Query(stmt))
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            uint32 bot = fields[0].Get<uint32>();
+            randomBots.push_back(bot);
+        } while (result->NextRow());
+    }
+
+    for (std::vector<uint32>::iterator i = randomBots.begin(); i != randomBots.end(); ++i)
+    {
+        if (Guild* guild = sGuildMgr->GetGuildByLeader(ObjectGuid::Create<HighGuid::Player>(*i)))
+            guild->Disband();
+    }
+    LOG_INFO("playerbots", "Random bot guilds deleted");
+}
+
+bool PlayerbotGuildMgr::IsRealGuild(Player* bot)
+{
+    if (!bot)
+        return false;
+    uint32 guildId = bot->GetGuildId();
+    if (!guildId)
+        return false;
+
+    return IsRealGuild(guildId);
+}
+
+bool PlayerbotGuildMgr::IsRealGuild(uint32 guildId)
+{
+    if (!guildId)
+        return false;
+
+    auto it = _guildCache.find(guildId);
+    if (it == _guildCache.end())
+        return false;
+
+    return it->second.hasRealPlayer;
+}
 
 class BotGuildCacheWorldScript : public WorldScript
 {
     public:
 
-        BotGuildCacheWorldScript() : WorldScript("BotGuildCacheWorldScript"), _validateTimer(0), _timer(0){}
-
-        void OnStartup() override
-        {
-            if (sPlayerbotAIConfig->enableGuildRpgStrategy)
-            {
-                sPlayerbotGuildMgr->LoadGuildCache();
-                LOG_INFO("server.loading", "Bot guild cache initialized");
-                sPlayerbotGuildMgr->ValidateGuildCache();
-                LOG_INFO("server.loading", "Bot guild cache validated");
-            }
-        }
+        BotGuildCacheWorldScript() : WorldScript("BotGuildCacheWorldScript"), _validateTimer(0){}
 
         void OnUpdate(uint32 diff) override
         {
-            if (!sPlayerbotAIConfig->enableGuildRpgStrategy)
-                return;
-            _timer += diff;
             _validateTimer += diff;
-            if (_timer >= _saveInterval)
-            {
-                _timer = 0;
-                sPlayerbotGuildMgr->SaveDirtyGuilds();
-                LOG_INFO("playerbots", "Bot guild cache saved");
-            }
-            if (_validateTimer >= _saveInterval * 4) // Validate every hour
+
+            if (_validateTimer >= _validateInterval) // Validate every hour
             {
                 _validateTimer = 0;
                 sPlayerbotGuildMgr->ValidateGuildCache();
-                LOG_INFO("playerbots", "Bot guild cache validated");
+                LOG_INFO("playerbots", "Schedueled guild cache validation");
             }
+            return;
         }
 
-        void OnShutdown() override
-        {
-            if (sPlayerbotAIConfig->enableGuildRpgStrategy)
-            {
-                sPlayerbotGuildMgr->SaveDirtyGuilds();
-                LOG_INFO("playerbots", "Bot guild cache saved on shutdown");
-            }
-        }
     private:
-        uint32 _saveInterval = 900000; // 15 minutes
+        uint32 _validateInterval = HOUR*IN_MILLISECONDS;
         uint32 _validateTimer;
-        uint32 _timer;
-
 };
 
 void PlayerBotsGuildValidationScript()

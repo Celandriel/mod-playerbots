@@ -271,7 +271,6 @@ public:
     bool enableGuildRpgStrategy;
     uint32 guildRpgProbability;
     bool deleteRandomBotGuilds;
-    std::vector<uint32> randomBotGuilds;
     std::vector<uint32> GuildTypeRatios, GuildSize, GuildPveSpecRatio, GuildPvpSpecRatio, GuildRpgPvpWeights, GuildRpgPveWeights, GuildRpgProfWeights, GuildRpRpgWeights;
     std::vector<uint32> pvpProhibitedZoneIds;
     std::vector<uint32> pvpProhibitedAreaIds;

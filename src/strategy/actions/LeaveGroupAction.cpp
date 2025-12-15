@@ -109,7 +109,7 @@ bool LeaveFarAwayAction::isUseful()
     if (!bot->GetGroup())
         return false;
 
-    Player* groupLeader = botAI->GetGroupMaster();
+    Player* groupLeader = botAI->GetGroupLeader();
     Player* trueMaster = botAI->GetMaster();
     if (!groupLeader || (bot == groupLeader && !botAI->IsRealPlayer()))
         return false;
@@ -124,11 +124,12 @@ bool LeaveFarAwayAction::isUseful()
         return false;
 
     if (botAI->IsAlt() &&
-        (!groupLeaderBotAI || groupLeaderBotAI->IsRealPlayer()))  // Don't leave group when alt grouped with player master.
+        (!groupLeaderBotAI || groupLeaderBotAI->IsRealPlayer()))  //TODO Don't leave group when alt grouped with player master.
         return false;
 
     if (groupLeaderBotAI && !groupLeaderBotAI->IsRealPlayer() &&
       sPlayerbotAIConfig->enableGuildRpgStrategy)
+        (!groupLeaderBotAI || groupLeaderBotAI->IsRealPlayer()))  // Don't leave group when alt grouped with player groupLeader.
         return false;
 
     if (botAI->GetGrouperType() == GrouperType::SOLO)
@@ -141,6 +142,15 @@ bool LeaveFarAwayAction::isUseful()
 
     if (dCount > 4 && !botAI->HasRealPlayerMaster())
         return true;
+
+    if (bot->GetGuildId() == groupLeader->GetGuildId())
+    {
+        if (bot->GetLevel() > groupLeader->GetLevel() + 5)
+        {
+            if (AI_VALUE(bool, "should get money"))
+                return false;
+        }
+    }
 
     if (abs(int32(groupLeader->GetLevel() - bot->GetLevel())) > 4)
         return true;

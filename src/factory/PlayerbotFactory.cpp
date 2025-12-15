@@ -3971,64 +3971,28 @@ void PlayerbotFactory::InitGuild()
             StoreItem(5976, 1);
         return;
     }
-    if (sPlayerbotAIConfig->enableGuildRpgStrategy)
-    {
-        std::string guildName = sPlayerbotGuildMgr->AssignToGuild(bot);
-        if (guildName.empty())
-            return;
 
-        Guild* guild = sGuildMgr->GetGuildByName(guildName);
-        if (!guild)
-        {
-            if (!sPlayerbotGuildMgr->CreateGuild(bot, guildName))
-                LOG_ERROR("playerbots","Failed to create guild {} for bot {}", guildName, bot->GetName());
-            return;
-        }
-        else
-        {
-            if (guild->AddMember(bot->GetGUID()))
-            {
-                LOG_DEBUG("playerbots","Bot {} joined guild {}.", bot->GetName(), guildName);
-                sPlayerbotGuildMgr->OnGuildUpdate(guild);
-            }
-            else
-                LOG_ERROR("playerbots","Bot {} failed to join guild {}.", bot->GetName(), guildName);
-        }
+    std::string guildName = sPlayerbotGuildMgr->AssignToGuild(bot);
+    if (guildName.empty())
+        return;
+
+    Guild* guild = sGuildMgr->GetGuildByName(guildName);
+    if (!guild)
+    {
+        if (!sPlayerbotGuildMgr->CreateGuild(bot, guildName))
+            LOG_ERROR("playerbots","Failed to create guild {} for bot {}", guildName, bot->GetName());
+        return;
     }
-    // bot->SaveToDB(false, false);
     else
     {
-        if (sPlayerbotAIConfig->randomBotGuilds.empty())
-            RandomPlayerbotFactory::CreateRandomGuilds();
-
-        std::vector<uint32> guilds;
-        for (std::vector<uint32>::iterator i = sPlayerbotAIConfig->randomBotGuilds.begin();
-            i != sPlayerbotAIConfig->randomBotGuilds.end(); ++i)
-            guilds.push_back(*i);
-
-        if (guilds.empty())
-        {
-            LOG_ERROR("playerbots", "No random guilds available");
-            return;
-        }
-
-        int index = urand(0, guilds.size() - 1);
-        uint32 guildId = guilds[index];
-        Guild* guild = sGuildMgr->GetGuildById(guildId);
-        if (!guild)
-        {
-            LOG_ERROR("playerbots", "Invalid guild {}", guildId);
-            return;
-        }
-
-        if (guild->GetMemberSize() < urand(10, sPlayerbotAIConfig->randomBotGuildSizeMax))
-            guild->AddMember(bot->GetGUID(), urand(GR_OFFICER, GR_INITIATE));
+        if (guild->AddMember(bot->GetGUID(),urand(GR_OFFICER, GR_INITIATE)))
+            sPlayerbotGuildMgr->OnGuildUpdate(guild);
+        else
+            LOG_ERROR("playerbots","Bot {} failed to join guild {}.", bot->GetName(), guildName);
     }
     // add guild tabard
     if (bot->GetGuildId() && bot->GetLevel() > 9 && urand(0, 4) && !bot->HasItemCount(5976, 1))
         StoreItem(5976, 1);
-
-    // bot->SaveToDB(false, false);
 }
 
 void PlayerbotFactory::InitImmersive()
@@ -4124,6 +4088,7 @@ void PlayerbotFactory::InitImmersive()
 
 void PlayerbotFactory::InitArenaTeam()
 {
+
     if (!sPlayerbotAIConfig->IsInRandomAccountList(bot->GetSession()->GetAccountId()))
         return;
 
@@ -4210,10 +4175,34 @@ void PlayerbotFactory::InitArenaTeam()
 
             if (botcaptain && botcaptain->GetTeamId() == bot->GetTeamId())  // need?
             {
+                // Add bot to arena team
                 arenateam->AddMember(bot->GetGUID());
-                arenateam->SaveToDB();
+
+                // Only synchronize ratings once the team is full (avoid redundant work)
+                // The captain was added with incorrect ratings when the team was created,
+                // so we fix everyone's ratings once the roster is complete
+                if (arenateam->GetMembersSize() >= (uint32)arenateam->GetType())
+                {
+                    uint32 teamRating = arenateam->GetRating();
+
+                    // Use SetRatingForAll to align all members with team rating
+                    arenateam->SetRatingForAll(teamRating);
+
+                    // For bot-only teams, keep MMR synchronized with team rating
+                    // This ensures matchmaking reflects the artificial team strength (1000-2000 range)
+                    // instead of being influenced by the global CONFIG_ARENA_START_MATCHMAKER_RATING
+                    for (auto& member : arenateam->GetMembers())
+                    {
+                        // Set MMR to match personal rating (which already matches team rating)
+                        member.MatchMakerRating = member.PersonalRating;
+                        member.MaxMMR = std::max(member.MaxMMR, member.PersonalRating);
+                    }
+                    // Force save all member data to database
+                    arenateam->SaveToDB(true);
+                }
             }
         }
+
         arenateams.erase(arenateams.begin() + index);
     }
 

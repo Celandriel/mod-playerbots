@@ -674,10 +674,7 @@ bool PlayerbotAIConfig::Initialize()
         sRandomPlayerbotMgr->Init();
     }
 
-    if (enableGuildRpgStrategy)
-    {
-        sPlayerbotGuildMgr->Init();
-    }
+    sPlayerbotGuildMgr->Init();
     sRandomItemMgr->Init();
     sRandomItemMgr->InitAfterAhBot();
     sPlayerbotTextMgr->LoadBotTexts();
