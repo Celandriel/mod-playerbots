@@ -157,15 +157,6 @@ AiPlayerbot.AllowTrustedAccountBots = 1
 # Default: 0 (disabled)
 AiPlayerbot.RandomBotGuildNearby = 0
 
-# Number of guilds created by randombots
-AiPlayerbot.RandomBotGuildCount = 20
-
-# Maximum number of members in randombot guilds (minimum is hardcoded to 10)
-AiPlayerbot.RandomBotGuildSizeMax = 15
-
-# Delete all randombot guilds if set to 1
-AiPlayerbot.DeleteRandomBotGuilds = 0
-
 # Randombots will invite players to groups/raids/guilds
 AiPlayerbot.RandomBotInvitePlayer = 0
 
@@ -1059,6 +1050,15 @@ AiPlayerbot.ZoneBracket.4197 = 79,80
 # GUILD RPG STRATEGY (ALPHA DEMO)
 #
 #
+# Number of guilds created by randombots
+AiPlayerbot.RandomBotGuildCount = 20
+
+# Maximum number of members in randombot guilds (minimum is hardcoded to 10)
+AiPlayerbot.RandomBotGuildSizeMax = 15
+
+# Delete all randombot guilds if set to 1
+AiPlayerbot.DeleteRandomBotGuilds = 0
+
 # Set the percentage of guild types and the number of bots per guild.
 # Entries are in order by type PvP, PvE, Gathering/Crafter, Roleplaying"
 # Guild Sizes, 0= SOLO, 1 = TINY (30), 2 = SMALL (50), 3 = MEDIUM (70), 4 = LARGE (120), 5 = VERY LARGE (250)
