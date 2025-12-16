@@ -4,6 +4,7 @@
 #include "Guild.h"
 #include "Player.h"
 #include "PlayerbotAI.h"
+#include "GuildRpgInfo.h"
 
 constexpr std::array<GuilderType, 6> GuilderMap =
 {
@@ -27,13 +28,15 @@ public:
     }
 
     void Init();
-    int8 DetermineGuildType();
+    GuildType DetermineGuildType();
     std::string AssignToGuild(Player* player);
+    void LoadGuildNames();
     void ValidateGuildCache();
     void ResetGuildCache();
+    bool CreateGuild(Player* player, std::string guildName);
     void OnGuildUpdate  (Guild* guild);
-    uint32 GetGuildTypeByName(std::string guildName);
-    uint32 GetGuildTypeById(uint32 guildID);
+    GuildType GetGuildTypeByName(std::string guildName);
+    GuildType GetGuildTypeById(uint32 guildId);
     bool SetGuildEmblem(uint32 guildId);
     void DeleteBotGuilds();
     bool IsRealGuild(uint32 guildId);
@@ -45,19 +48,21 @@ public:
 
 private:
     PlayerbotGuildMgr();
-    int _maxIndex;
-    int _randomBotGuildCount;
-    int _randomBotGuildSizeMax;
-    std::unordered_map<std::string, bool> _guildNames;
+    GuildType _defaultGuildType;
+    struct GuildInfo
+    {
+        bool isAvailable;
+        GuildType type;
+    };
+    std::unordered_map<std::string, GuildInfo> _guildData;
     std::vector<uint32> _guildTypeRatios;
     std::vector<uint32> _guildNumPlayers;
-    int const _nTypes = 4;
-    int _maxIndex;
+    uint8_t const _nTypes = 4;
 
     struct GuildCache
     {
         std::string name;
-        uint8 type = 0;
+        GuildType type = GuildType::NONE;
         uint8 status;
         uint32 maxMembers = 0;
         uint32 memberCount = 0;
@@ -65,7 +70,8 @@ private:
         bool hasRealPlayer = false;
     };
     std::unordered_map<uint32 , GuildCache> _guildCache;
-//TOBO    std::unordered_map<uint32, std::unordered_map<ObjectGuid, BotAvailabilityStatus>> guildBotStates;
+//TODO
+    std::unordered_map<uint32, std::unordered_map<ObjectGuid, BotAvailabilityStatus>> guildBotStates;
     std::vector<std::string> _shuffled_guild_keys;
 
 };

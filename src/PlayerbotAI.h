@@ -619,8 +619,7 @@ public:
     void AddTimedEvent(std::function<void()> callback, uint32 delayMs);
 
     // Guild type functionality
-    GuildType GetGuildType() const { return guildType; }
-    void SetGuildType(uint32 type);
+    void SetGuildType(GuildType type){guildRpgInfo.SetGuildType(type);}
     GuildRpgInfo guildRpgInfo;
     const BotAvailabilityStatus GetAvailabilityStatus() const { return availabilityStatus; }
 
@@ -666,7 +665,6 @@ protected:
     BotCheatMask cheatMask = BotCheatMask::none;
     Position jumpDestination = Position();
     uint32 nextTransportCheck = 0;
-    GuildType guildType = GuildType::NONE;
     BotAvailabilityStatus availabilityStatus = BOT_STATUS_OFFLINE;
 };
 

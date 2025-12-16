@@ -409,7 +409,7 @@ void PlayerbotAI::UpdateAIGroupMaster()
     if (master)
         masterBotAI = GET_PLAYERBOT_AI(master);
 
-    Player* groupLeader = GetGroupMaster();
+    Player* groupLeader = GetGroupLeader();
     bool isBotLeader = GET_PLAYERBOT_AI(groupLeader);
 
     bool hasRealPlayerMaster = master && (masterBotAI && !masterBotAI->IsRealPlayer());
@@ -6600,13 +6600,4 @@ void PlayerbotAI::EvaluateHealerDpsStrategy()
         ChangeStrategy("-healer dps", BOT_STATE_COMBAT);
     else
         ChangeStrategy("+healer dps", BOT_STATE_COMBAT);
-}
-
-void PlayerbotAI::SetGuildType(uint32 type)
-{
-    if (type <= 4)
-    {
-        guildType = static_cast<GuildType>(type);
-        guildRpgInfo.SetGuildType(guildType);
-    }
 }

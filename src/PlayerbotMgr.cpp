@@ -690,7 +690,7 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
     uint32 guildID = bot->GetGuildId();
     if(guildID)
     {
-        uint32 guildType = sPlayerbotGuildMgr->GetGuildTypeById(guildID);
+        GuildType guildType = sPlayerbotGuildMgr->GetGuildTypeById(guildID);
         botAI->SetGuildType(guildType);
         if (group)
         {
