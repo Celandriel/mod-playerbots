@@ -28,7 +28,7 @@ public:
     }
 
     void Init();
-    GuildType DetermineGuildType();
+    GuildType DetermineGuildType(uint8 faction);
     std::string AssignToGuild(Player* player);
     void LoadGuildNames();
     void ValidateGuildCache();
@@ -41,6 +41,7 @@ public:
     void DeleteBotGuilds();
     bool IsRealGuild(uint32 guildId);
     bool IsRealGuild(Player* bot);
+
 
     void SetBotAvailability(uint32 guildId, ObjectGuid guid, BotAvailabilityStatus status);
     std::vector<ObjectGuid> GetAvailableGuildMembers(uint32 guildId);
@@ -58,6 +59,7 @@ private:
     std::vector<uint32> _guildTypeRatios;
     std::vector<uint32> _guildNumPlayers;
     uint8_t const _nTypes = 4;
+
 
     struct GuildCache
     {

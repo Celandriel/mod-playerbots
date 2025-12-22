@@ -63,20 +63,20 @@ bool PlayerbotGuildMgr::CreateGuild(Player* player, std::string guildName)
     }
     sGuildMgr->AddGuild(guild);
 
-    LOG_DEBUG("playerbots", "Guild created: id={} name='{}'", guild->GetId(), guildName);
     SetGuildEmblem(guild->GetId());
 
     GuildCache entry;
     entry.name = guildName;
     entry.memberCount = 1;
     entry.status = 1;
-    entry.type = GetGuildTypeByName(guildName);
+    entry.type = _guildData[guildName].type;;
     entry.faction = player->GetTeamId();
-    if (!sPlayerbotAIConfig->enableGuildRpgStrategy)
+    if (!sPlayerbotAIConfig->enableGuildRpgStrategy || entry.type == GuildType::NONE)
         entry.maxMembers = sPlayerbotAIConfig->randomBotGuildSizeMax;
     else
         entry.maxMembers = _guildNumPlayers[static_cast<uint8>(entry.type) - 1];
     _guildCache[guild->GetId()] = entry;
+
     return true;
 }
 
@@ -118,7 +118,7 @@ bool PlayerbotGuildMgr::SetGuildEmblem(uint32 guildId)
     return true;
 }
 
-GuildType PlayerbotGuildMgr::DetermineGuildType()
+GuildType PlayerbotGuildMgr::DetermineGuildType(uint8 faction)
 {
     // If no guilds loaded, find max ratio:
     if (_guildCache.empty())
@@ -134,7 +134,8 @@ GuildType PlayerbotGuildMgr::DetermineGuildType()
         const GuildCache& guildCache = keyValue.second;
         if (guildCache.status > 0 && guildCache.type != GuildType::NONE &&
             static_cast<size_t>(guildCache.type) <= _nTypes &&
-            guildCache.hasRealPlayer == false) // validate index
+            guildCache.hasRealPlayer == false &&
+            guildCache.faction == faction) // validate index
         {
             currentGuildCounts[guildCache.type]++;
             totalGuilds++;
@@ -206,7 +207,7 @@ std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
     {
         if (sPlayerbotAIConfig->enableGuildRpgStrategy)
         {
-            GuildType guildType = DetermineGuildType();
+            GuildType guildType = DetermineGuildType(playerFaction);
             for (auto& keyValue : _guildData)
             {
                 GuildInfo& info = keyValue.second;
@@ -288,7 +289,7 @@ void PlayerbotGuildMgr::LoadGuildNames()
 {
     LOG_INFO("playerbots", "Loading guild names from playerbots_guild_names...");
 
-    QueryResult result = CharacterDatabase.Query("SELECT name_id, name, type FROM playerbots_guild_names");
+    QueryResult result = CharacterDatabase.Query("SELECT name_id, name, guild_type FROM playerbots_guild_names");
 
     if (!result)
     {
