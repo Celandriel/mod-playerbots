@@ -410,10 +410,18 @@ void PlayerbotAI::UpdateAIGroupMaster()
         masterBotAI = GET_PLAYERBOT_AI(master);
 
     Player* groupLeader = GetGroupLeader();
-    bool isBotLeader = GET_PLAYERBOT_AI(groupLeader);
+    bool isGroupLeaderBot = GET_PLAYERBOT_AI(groupLeader);
 
-    bool hasRealPlayerMaster = master && (masterBotAI && !masterBotAI->IsRealPlayer());
-    bool enableBotMaster = sPlayerbotAIConfig->enableGuildRpgStrategy && isBotLeader && groupLeader == master;
+    bool hasRealPlayerMaster = master && (!masterBotAI || masterBotAI->IsRealPlayer());
+    bool enableBotMaster = sPlayerbotAIConfig->enableGuildRpgStrategy && isGroupLeaderBot && groupLeader == master;
+
+    if (bot == groupLeader && sPlayerbotAIConfig->enableGuildRpgStrategy)
+    {
+        if (master)
+            master = nullptr;
+
+        return;
+    }
 
     if (!master || (!hasRealPlayerMaster && !enableBotMaster))
     {
@@ -4109,10 +4117,10 @@ Player* PlayerbotAI::FindNewMaster()
 
     Player* groupLeader = GetGroupLeader();
     PlayerbotAI* leaderBotAI = GET_PLAYERBOT_AI(groupLeader);
+
     if (!leaderBotAI || leaderBotAI->IsRealPlayer() || sPlayerbotAIConfig->enableGuildRpgStrategy)
         return groupLeader;
 
-    bool allowBotLeader = sPlayerbotAIConfig->enableGuildRpgStrategy;
     // Find the real player in group
     for (GroupReference* gref = group->GetFirstMember(); gref; gref = gref->next())
     {

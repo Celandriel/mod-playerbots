@@ -34,7 +34,7 @@ enum class GuildRpgActivity : uint8_t
     NONE = 0,
 
     // PVP
-    QUEUE_FOR_BG,
+    BATTLEGROUND,
     PATROL_AREA,
     ATTACK_CITY,
     DEFEND_BASE,
@@ -62,7 +62,7 @@ static const std::map<GuildType, ActivityList> ActivitiesByGuildType =
     { GuildType::NONE,       { GuildRpgActivity::NONE } },
 
     { GuildType::PVP, {
-        GuildRpgActivity::QUEUE_FOR_BG,
+        GuildRpgActivity::BATTLEGROUND,
         GuildRpgActivity::PATROL_AREA,
         GuildRpgActivity::ATTACK_CITY,
         GuildRpgActivity::DEFEND_BASE,
@@ -87,7 +87,6 @@ static const std::map<GuildType, ActivityList> ActivitiesByGuildType =
         GuildRpgActivity::EMOTE_EVENT,
     }}
 };
-
 
 struct GuildRpgInfo
 {

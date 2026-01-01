@@ -641,9 +641,10 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
     }
 
     if (sPlayerbotAIConfig->autoSaveMana && PlayerbotAI::IsHeal(player, true))
-    {
         nonCombatEngine->addStrategy("save mana", false);
-    }
+
+    if (sPlayerbotAIConfig->enableGuildRpgStrategy)
+        nonCombatEngine->addStrategy("guild rpg", false);
 
     if ((sRandomPlayerbotMgr->IsRandomBot(player)) && !player->InBattleground())
     {
@@ -668,10 +669,6 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
             // nonCombatEngine->addStrategy("guild");
             nonCombatEngine->addStrategy("grind", false);
 
-            if (sPlayerbotAIConfig->enableGuildRpgStrategy)
-            {
-                nonCombatEngine->addStrategy("guild rpg", false);
-            }
             if (sPlayerbotAIConfig->enableNewRpgStrategy)
             {
                 nonCombatEngine->addStrategy("new rpg", false);

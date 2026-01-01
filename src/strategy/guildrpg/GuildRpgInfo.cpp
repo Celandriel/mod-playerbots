@@ -52,7 +52,7 @@ std::string GuildRpgInfo::GetActivityName(GuildRpgActivity activity) const
     {
         case GuildRpgActivity::NONE:              return "NONE";
 
-        case GuildRpgActivity::QUEUE_FOR_BG:      return "QUEUE_FOR_BG";
+        case GuildRpgActivity::BATTLEGROUND:      return "BATTLEGROUND";
         case GuildRpgActivity::PATROL_AREA:       return "PATROL_AREA";
         case GuildRpgActivity::ATTACK_CITY:       return "ATTACK_CITY";
         case GuildRpgActivity::DEFEND_BASE:       return "DEFEND_BASE";

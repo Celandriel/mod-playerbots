@@ -39,11 +39,10 @@ bool PlayerbotGroupMgr::CreateGroup()
     Guild* guild = leader->GetGuild();
     if (!guild)
         return false;
-    LOG_ERROR("playerbots","Preliminary checks passed");
     std::vector<GuildMember> availableMembers = FindAvailableGuildMembers(guild);
     if (availableMembers.empty())
         return false;
-    LOG_ERROR("playerbots","Found available members");
+
     InviteToGroupAction InviteToGroupAction(_botAI);
     BotRoles leaderRole = GetBotRole(leaderGuid);
     _roleComposition[leaderRole] = 1;

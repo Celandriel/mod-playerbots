@@ -130,13 +130,13 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
 bool GuildRpgPvpAction::HandleSelection(Event event)
 {
     GuildRpgActivity activity = botAI->guildRpgInfo.activity;
-    if (activity == GuildRpgActivity::QUEUE_FOR_BG)
+    if (activity == GuildRpgActivity::BATTLEGROUND)
     {
         uint8 botLevel = bot->GetLevel();
         BattlegroundTypeId  battleground = SelectBattlegroundForLevel(botLevel);
         if (battleground == BATTLEGROUND_TYPE_NONE)
         {
-            LOG_ERROR("playerbots", "Bot {} could not find suitable battleground for level {} resetting task", name, botLevel);
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find suitable battleground for level {} resetting task", name, botLevel);
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
@@ -145,7 +145,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
 
         if (!botAI->SetTargetGroupComposition(groupComp))
         {
-            LOG_ERROR("playerbots", "Bot {} could not set target group composition for battleground {}, resetting task", bot->GetName(), battleground);
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not set target group composition for battleground {}, resetting task", bot->GetName(), battleground);
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
@@ -160,20 +160,23 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
 bool GuildRpgPvpAction::HandlePreparation(Event event)
 {
     GuildRpgActivity activity = botAI->guildRpgInfo.activity;
-    if (activity == GuildRpgActivity::QUEUE_FOR_BG)
+
+    if (activity == GuildRpgActivity::BATTLEGROUND)
     {
-        //check if in queue
-        //If not queue as group
-        if (bot->InBattlegroundQueue())
-        {
-            return false;
-        }
         if (bot->InBattleground())
         {
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
             SyncGuildRpgStatus();
-            return false;
+            return true;
         }
+        //check if in queue
+        //If not queue as group
+
+        uint32 queueType = botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Get();
+        BattlegroundQueueTypeId queueTypeId = BattlegroundQueueTypeId(queueType);
+        if (bot->InBattlegroundQueueForBattlegroundQueueType(queueTypeId))
+            return false;
+        LOG_ERROR("playerbots", "[GUILD RPG] Bot {} is queuing for battleground", bot->GetName());
         BGJoinAction bgJoinAction(botAI);
         return bgJoinAction.Execute(event);
     }
@@ -184,14 +187,13 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
 bool GuildRpgPvpAction::HandleExecution(Event event)
 {
     GuildRpgActivity activity = botAI->guildRpgInfo.activity;
-    if (activity == GuildRpgActivity::QUEUE_FOR_BG)
+    if (activity == GuildRpgActivity::BATTLEGROUND)
     {
         //check if in bg
         //If not in bg check if in queue
         if (bot->InBattleground())
-        {
             return true;
-        }
+
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
         SyncGuildRpgStatus();
         return true;
@@ -203,22 +205,23 @@ bool GuildRpgPvpAction::HandleCompletion(Event event)
 {
     GuildRpgInfo guildRpgInfo = botAI->guildRpgInfo;
     GuildRpgActivity activity = guildRpgInfo.activity;
-    if (activity == GuildRpgActivity::QUEUE_FOR_BG)
+    if (activity == GuildRpgActivity::BATTLEGROUND)
     {
         //Not in queue or bg, decide to queue again or abandon task
         bool queueAgain = urand(0, 1); // 50% chance to queue again
         if (queueAgain)
         {
-            LOG_INFO("playerbots", "Bot {} BG completed, queuing again", bot->GetName());
+            LOG_INFO("playerbots", "[Guild RPG] Bot {} BG completed, queuing again", bot->GetName());
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
             SyncGuildRpgStatus();
             return true;
         }
         else
         {
-            LOG_INFO("playerbots", "Bot {} BG completed, disbanding", bot->GetName());
+            LOG_INFO("playerbots", "[Guild RPG] Bot {} BG completed, disbanding", bot->GetName());
             guildRpgInfo.SetGuildRpgActivity(botAI, GuildRpgActivity::NONE);
             guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::IDLE);
+            SyncGuildRpgStatus();
             botAI->LeaveOrDisbandGroup();
             return true;
         }
