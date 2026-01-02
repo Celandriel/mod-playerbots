@@ -161,6 +161,7 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
         if (!groupMgr->CreateGroup())
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {}: Failed to create group", bot->GetName());
+            botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
         LOG_DEBUG("playerbots", "[Guild RPG] Bot {} created group for activity", bot->GetName());

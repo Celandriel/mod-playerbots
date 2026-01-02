@@ -45,53 +45,5 @@ public:
     bool isUseful() override;
     bool Execute(Event event) override;
 };
-/*
-class AttackCityAction : public GuildRpgBaseAction
-{
-public:
-    AttackCityAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild attack city") {}
-    bool isUseful() override;
-    bool Execute(Event event) override;
-};
 
-class RaidHighProbabilityLocationAction : public GuildRpgBaseAction
-{
-public:
-    RaidHighProbabilityLocationAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild raid high prob location") {}
-    bool isUseful() override;
-    bool Execute(Event event) override;
-};
-
-class PatrolAreaAction : public GuildRpgBaseAction
-{
-public:
-    PatrolAreaAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild patrol area") {}
-    bool isUseful() override;
-    bool Execute(Event event) override;
-};
-
-class DefendBaseAction : public GuildRpgBaseAction
-{
-public:
-    DefendBaseAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild defend base") {}
-    bool isUseful() override;
-    bool Execute(Event event) override;
-};
-
-class WorldPvpAction : public GuildRpgBaseAction
-{
-public:
-    WorldPvpAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild world pvp") {}
-    bool isUseful() override;
-    bool Execute(Event event) override;
-};
-
-class BGPreparationAction : public GuildRpgBaseAction
-{
-public:
-    BGPreparationAction(PlayerbotAI* botAI) : GuildRpgBaseAction(botAI, "guild bg preparation") {}
-    bool isUseful() override;
-    bool Execute(Event event) override;
-};
-*/
 #endif
