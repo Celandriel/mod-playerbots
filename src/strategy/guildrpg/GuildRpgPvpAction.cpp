@@ -14,39 +14,22 @@
 BattlegroundTypeId  SelectBattlegroundForLevel(uint8 botLevel)
 {
     // Available battlegrounds for different level ranges
+    //TODO: Align this to core's available battlegrounds and requirements from DBC etc.
     std::vector<BattlegroundTypeId > possibleBGs;
 
-    if (botLevel >= 10 && botLevel <= 19)
+    if (botLevel >= 10)
+        possibleBGs.push_back(BATTLEGROUND_WS);
+    if (botLevel >= 20)
+        possibleBGs.push_back(BATTLEGROUND_AB);
+    if (botLevel >= 51)
+        possibleBGs.push_back(BATTLEGROUND_AV);
+    if (botLevel >= 61)
+        possibleBGs.push_back(BATTLEGROUND_EY);
+    if (botLevel >= 71)
     {
-        // Level 10-19: Warsong Gulch, Arathi Basin
-        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB };
+//        possibleBGs.push_back(BATTLEGROUND_SA);
+        possibleBGs.push_back(BATTLEGROUND_IC);
     }
-    else if (botLevel >= 20 && botLevel <= 29)
-    {
-        // Level 20-29: Warsong Gulch, Arathi Basin, Alterac Valley
-        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV };
-    }
-    else if (botLevel >= 30 && botLevel <= 39)
-    {
-        // Level 30-39: All classic BGs
-        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV, BATTLEGROUND_EY };
-    }
-    else if (botLevel >= 40 && botLevel <= 49)
-    {
-        // Level 40-49: All classic + Strand of the Ancients
-        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV, BATTLEGROUND_EY, BATTLEGROUND_SA };
-    }
-    else if (botLevel >= 50 && botLevel <= 59)
-    {
-        // Level 50-59: All BGs except Isle of Conquest
-        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV, BATTLEGROUND_EY, BATTLEGROUND_SA };
-    }
-    else if (botLevel >= 60)
-    {
-        // Level 60+: All BGs
-        possibleBGs = { BATTLEGROUND_WS, BATTLEGROUND_AB, BATTLEGROUND_AV, BATTLEGROUND_EY, BATTLEGROUND_SA, BATTLEGROUND_IC };
-    }
-
     if (possibleBGs.empty())
         return BATTLEGROUND_TYPE_NONE;
 
@@ -140,7 +123,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
-        botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(battleground);
+        botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(BattlegroundMgr::BGQueueTypeId(battleground, 0));
         TargetGroupComposition groupComp = CreatePvpGroupComposition(battleground, botLevel);
 
         if (!botAI->SetTargetGroupComposition(groupComp))
