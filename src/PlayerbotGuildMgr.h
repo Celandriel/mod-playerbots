@@ -28,6 +28,7 @@ public:
     }
 
     void Init();
+
     GuildType DetermineGuildType(uint8 faction);
     std::string AssignToGuild(Player* player);
     void LoadGuildNames();
@@ -37,6 +38,7 @@ public:
     void OnGuildUpdate  (Guild* guild);
     GuildType GetGuildTypeByName(std::string guildName);
     GuildType GetGuildTypeById(uint32 guildId);
+
     bool SetGuildEmblem(uint32 guildId);
     void DeleteBotGuilds();
     bool IsRealGuild(uint32 guildId);
@@ -60,7 +62,6 @@ private:
     std::vector<uint32> _guildNumPlayers;
     uint8_t const _nTypes = 4;
 
-
     struct GuildCache
     {
         std::string name;
@@ -72,9 +73,10 @@ private:
         bool hasRealPlayer = false;
     };
     std::unordered_map<uint32 , GuildCache> _guildCache;
-//TODO
+    //TODO
     std::unordered_map<uint32, std::unordered_map<ObjectGuid, BotAvailabilityStatus>> guildBotStates;
     std::vector<std::string> _shuffled_guild_keys;
+
 
 };
 

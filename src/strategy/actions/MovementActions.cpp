@@ -946,25 +946,7 @@ bool MovementAction::IsWaitingForLastMove(MovementPriority priority)
 
 bool MovementAction::IsMovingAllowed()
 {
-    // do not allow if not vehicle driver
-    if (botAI->IsInVehicle() && !botAI->IsInVehicle(true))
-        return false;
-
-    if (bot->isFrozen() || bot->IsPolymorphed() || (bot->isDead() && !bot->HasPlayerFlag(PLAYER_FLAGS_GHOST)) ||
-        bot->IsBeingTeleported() || bot->HasRootAura() || bot->HasSpiritOfRedemptionAura() || bot->HasConfuseAura() ||
-        bot->IsCharmed() || bot->HasStunAura() || bot->IsInFlight() || bot->HasUnitState(UNIT_STATE_LOST_CONTROL))
-        return false;
-
-    if (bot->GetMotionMaster()->GetMotionSlotType(MOTION_SLOT_CONTROLLED) != NULL_MOTION_TYPE)
-    {
-        return false;
-    }
-
-    // if (bot->HasUnitMovementFlag(MOVEMENTFLAG_FALLING))
-    // {
-    //     return false;
-    // }
-    return bot->GetMotionMaster()->GetCurrentMovementGeneratorType() != FLIGHT_MOTION_TYPE;
+    return botAI->CanMove();
 }
 
 bool MovementAction::Follow(Unit* target, float distance) { return Follow(target, distance, GetFollowAngle()); }
@@ -972,12 +954,10 @@ bool MovementAction::Follow(Unit* target, float distance) { return Follow(target
 void MovementAction::UpdateMovementState()
 {
     const bool isCurrentlyRestricted = // see if the bot is currently slowed, rooted, or otherwise unable to move
+        bot->HasUnitState(UNIT_STATE_LOST_CONTROL) ||
+        bot->IsRooted() ||
         bot->isFrozen() ||
-        bot->IsPolymorphed() ||
-        bot->HasRootAura() ||
-        bot->HasStunAura() ||
-        bot->HasConfuseAura() ||
-        bot->HasUnitState(UNIT_STATE_LOST_CONTROL);
+        bot->IsPolymorphed();
 
     // no update movement flags while movement is current restricted.
     if (!isCurrentlyRestricted && bot->IsAlive())

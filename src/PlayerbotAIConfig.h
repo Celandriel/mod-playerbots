@@ -145,6 +145,10 @@ public:
     // Cooldown (seconds) between reagent-missing RP warnings, per bot & per buff. Default: 30
     int32 rpWarningCooldown;
 
+    // Professions
+    bool enableFishingWithMaster;
+    float fishingDistanceFromMaster, fishingDistance, endFishingWithMaster;
+
     // chat
     bool randomBotTalk;
     bool randomBotEmote;
@@ -271,7 +275,9 @@ public:
     bool enableGuildRpgStrategy;
     uint32 guildRpgProbability;
     bool deleteRandomBotGuilds;
+
     std::vector<uint32> GuildTypeRatios, GuildSize, GuildPveSpecRatio, GuildPvpSpecRatio, GuildRpgPvpWeights, GuildRpgPveWeights, GuildRpgProfWeights, GuildRpRpgWeights;
+
     std::vector<uint32> pvpProhibitedZoneIds;
     std::vector<uint32> pvpProhibitedAreaIds;
     bool fastReactInBG;
