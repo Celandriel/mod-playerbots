@@ -93,6 +93,7 @@ struct GuildRpgInfo
     GuildType type = GuildType::NONE;
     GuildRpgActivity activity = GuildRpgActivity::NONE;
     GuildRpgPhase phase = GuildRpgPhase::IDLE;
+    std::string activityTarget = "";
 
     void SetGuildRpgActivity(PlayerbotAI* botAI, GuildRpgActivity activity);
     void ResetGuildActivity();
@@ -102,7 +103,6 @@ struct GuildRpgInfo
     std::string ToString() const;
     std::string GetActivityName() const;
     std::string GetActivityName(GuildRpgActivity activity) const;
-
 
     void SetGuildRpgPhase(GuildRpgPhase newPhase) { phase = newPhase; }
     void SetGuildType(GuildType newType) { type = newType; }

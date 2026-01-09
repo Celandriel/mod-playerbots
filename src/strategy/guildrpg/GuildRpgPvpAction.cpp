@@ -37,31 +37,14 @@ BattlegroundTypeId  SelectBattlegroundForLevel(uint8 botLevel)
     return possibleBGs[urand(0, possibleBGs.size() - 1)];
 }
 
-// Helper function to create PVP group composition based on battleground type
-TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel)
+// Helper function to create PVP group composition based on requested group size
+TargetGroupComposition CreatePvpGroupComposition(uint8 groupSize, uint8 botLevel)
 {
     TargetGroupComposition composition = {};
 
-    // Determine group size based on BG type
-    switch (bgTypeId)
-    {
-        case BATTLEGROUND_WS:// Warsong Gulch
-            composition.groupSize = 10; // 10v10 battlegrounds
-            break;
-        case BATTLEGROUND_SA: // Strand of the Ancients
-        case BATTLEGROUND_AB: // Arathi Basin
-        case BATTLEGROUND_EY: // Eye of the Storm
-            composition.groupSize = 15; // 15v15 battlegrounds
-            break;
-        case BATTLEGROUND_AV: // Alterac Valley
-        case BATTLEGROUND_IC: // Isle of Conquest
-            composition.groupSize = 40; // 40v40 battlegrounds
-            break;
-        default:
-            composition.groupSize = 5; // Default to 5
-            break;
-    }
-
+    if (groupSize == 0)
+        return composition;
+    composition.groupSize = groupSize;
     // Set level range based on bot bracket
     composition.lowerLevelLimit = (botLevel > 5) ? botLevel - 5 : 1;
     composition.upperLevelLimit = botLevel + 5;
@@ -113,9 +96,10 @@ TargetGroupComposition CreatePvpGroupComposition(uint32 bgTypeId, uint8 botLevel
 bool GuildRpgPvpAction::HandleSelection(Event event)
 {
     GuildRpgActivity activity = botAI->guildRpgInfo.activity;
+    uint8 botLevel = bot->GetLevel();
+    uint8 groupSize = 0;
     if (activity == GuildRpgActivity::BATTLEGROUND)
     {
-        uint8 botLevel = bot->GetLevel();
         BattlegroundTypeId  battleground = SelectBattlegroundForLevel(botLevel);
         if (battleground == BATTLEGROUND_TYPE_NONE)
         {
@@ -124,20 +108,34 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
             return false;
         }
         botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(BattlegroundMgr::BGQueueTypeId(battleground, 0));
-        TargetGroupComposition groupComp = CreatePvpGroupComposition(battleground, botLevel);
-
-        if (!botAI->SetTargetGroupComposition(groupComp))
-        {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not set target group composition for battleground {}, resetting task", bot->GetName(), battleground);
-            botAI->guildRpgInfo.ResetGuildActivity();
-            return false;
-        }
-        LOG_ERROR("playerbots", "[GUILD RPG] Bot {} has selected Battleground {}", bot->GetName(), battleground);
-        botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::GROUPING);
-        SyncGuildRpgStatus();
-        return true;
+        groupSize = BattlegroundMgr::GetBattlegroundTemplate(battleground)->maxPlayersPerTeam;
     }
-    return false;
+    else if (activity == GuildRpgActivity::WORLD_PVP)
+    {
+        if (botLevel <= 60 && botLevel > 54)
+        {
+            botAI->guildRpgInfo.activityTarget = "EPL";
+            groupSize = 40;
+        }
+        else
+        {
+            botAI->guildRpgInfo.ResetGuildActivity();
+            return false; // No world PVP area available for bot level
+        }
+    }
+    else
+        return false;
+
+    TargetGroupComposition groupComp = CreatePvpGroupComposition(groupSize, botLevel);
+    if (!botAI->SetTargetGroupComposition(groupComp))
+    {
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not set target group composition for battleground {}, resetting task", bot->GetName(), battleground);
+        botAI->guildRpgInfo.ResetGuildActivity();
+        return false;
+    }
+    botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::GROUPING);
+    SyncGuildRpgStatus();
+    return true;
 }
 
 bool GuildRpgPvpAction::HandlePreparation(Event event)
@@ -162,6 +160,22 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
         LOG_ERROR("playerbots", "[GUILD RPG] Bot {} is queuing for battleground", bot->GetName());
         BGJoinAction bgJoinAction(botAI);
         return bgJoinAction.Execute(event);
+    }
+    else if (activity == GuildRpgActivity::WORLD_PVP)
+    {
+        // Go to Lights Hope Chapel in EPL
+        WorldPosition targetPos;
+        if (botAI->guildRpgInfo.activityTarget == "EPL")
+        {
+            targetPos = WorldPosition(0, 2263.0f, -5286.0f, 82.0f, 0.0f);
+        }
+
+        botAI->rpgInfo.SetMoveFarTo(targetPos);
+        botAI->rpgInfo.Changeto
+            botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
+            SyncGuildRpgStatus();
+            return true;
+        }
     }
     return false;
 }
