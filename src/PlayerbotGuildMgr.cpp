@@ -67,7 +67,9 @@ bool PlayerbotGuildMgr::CreateGuild(Player* player, std::string guildName)
     sGuildMgr->AddGuild(guild);
 
     LOG_DEBUG("playerbots", "Guild created: id={} name='{}'", guild->GetId(), guildName);
-
+    SetGuildEmblem(guild->GetId());
+    GuildCache entry;
+    entry.name = guildName;
     entry.memberCount = 1;
     entry.status = 1;
     entry.type = _guildData[guildName].type;;
@@ -304,7 +306,7 @@ void PlayerbotGuildMgr::LoadGuildNames()
         _guildData[fields[1].Get<std::string>()].type = static_cast<GuildType>(fields[2].Get<int>());
     } while (result->NextRow());
 
-    for (auto& pair : _guildNames)
+    for (auto& pair : _guildData)
         _shuffled_guild_keys.push_back(pair.first);
 
     std::random_device rd;
@@ -330,7 +332,11 @@ void PlayerbotGuildMgr::ValidateGuildCache()
     {
         Field* fields = result->Fetch();
         uint32 guildId = fields[0].Get<uint32>();
+        std::string guildName = fields[1].Get<std::string>();
         dbGuilds[guildId] = guildName;
+    } while (result->NextRow());
+
+    for (auto it = dbGuilds.begin(); it != dbGuilds.end(); it++)
     {
         uint32 guildId = it->first;
         GuildCache cache;

@@ -108,7 +108,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
             return false;
         }
         botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(BattlegroundMgr::BGQueueTypeId(battleground, 0));
-        groupSize = BattlegroundMgr::GetBattlegroundTemplate(battleground)->maxPlayersPerTeam;
+        groupSize = sBattlegroundMgr->GetBattlegroundTemplate(battleground)->GetMaxPlayersPerTeam();
     }
     else if (activity == GuildRpgActivity::WORLD_PVP)
     {
@@ -129,7 +129,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
     TargetGroupComposition groupComp = CreatePvpGroupComposition(groupSize, botLevel);
     if (!botAI->SetTargetGroupComposition(groupComp))
     {
-        LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not set target group composition for battleground {}, resetting task", bot->GetName(), battleground);
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not set target group composition for activity {} resetting task", bot->GetName(), static_cast<int>(activity));
         botAI->guildRpgInfo.ResetGuildActivity();
         return false;
     }
@@ -171,11 +171,10 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
         }
 
         botAI->rpgInfo.SetMoveFarTo(targetPos);
-        botAI->rpgInfo.Changeto
-            botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
-            SyncGuildRpgStatus();
-            return true;
-        }
+        //botAI->rpgInfo.Changeto
+        //botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
+        SyncGuildRpgStatus();
+        return true;
     }
     return false;
 }
@@ -225,5 +224,3 @@ bool GuildRpgPvpAction::HandleCompletion(Event event)
     }
     return false;
 }
-
-*/

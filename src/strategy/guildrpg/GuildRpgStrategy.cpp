@@ -9,7 +9,7 @@
 
 GuildRpgStrategy::GuildRpgStrategy(PlayerbotAI* botAI) : Strategy(botAI) {}
 
-NextAction** GuildRpgStrategy::getDefaultActions()
+std::vector<NextAction> GuildRpgStrategy::getDefaultActions()
 {
     return {
             NextAction("guild rpg status update", 12.0f),

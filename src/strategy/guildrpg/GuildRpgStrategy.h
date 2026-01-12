@@ -17,7 +17,7 @@ public:
     GuildRpgStrategy(PlayerbotAI* botAI);
 
     std::string const getName() override { return "guild rpg"; }
-    NextAction** getDefaultActions() override;
+    std::vector<NextAction> getDefaultActions() override;
     void InitTriggers(std::vector<TriggerNode*>& triggers) override;
     void InitMultipliers(std::vector<Multiplier*>& multipliers) override;
 };
