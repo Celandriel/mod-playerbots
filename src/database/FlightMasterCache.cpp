@@ -1,11 +1,11 @@
 #include "FlightMasterCache.h"
 
-void FlightMasterCache::AddHordeFlightMaster(uint32 entry, worldPosition pos)
+void FlightMasterCache::AddHordeFlightMaster(uint32 entry, WorldPosition pos)
 {
     hordeFlightMasterCache[entry] = pos;
 }
 
-void FlightMasterCache::AddAllianceFlightMaster(uint32 entry, worldPosition pos)
+void FlightMasterCache::AddAllianceFlightMaster(uint32 entry, WorldPosition pos)
 {
     allianceFlightMasterCache[entry] = pos;
 }
@@ -13,21 +13,24 @@ void FlightMasterCache::AddAllianceFlightMaster(uint32 entry, worldPosition pos)
 Creature* FlightMasterCache::GetNearestFlightMaster(Player* bot)
 {
     std::map<uint32, WorldPosition>& flightMasterCache =
-        (bot->GetTeam() == ALLIANCE) ? allianceFlightMasterCache : hordeFlightMasterCache;
+        (bot->GetTeamId() == ALLIANCE) ? allianceFlightMasterCache : hordeFlightMasterCache;
 
     Creature* nearestFlightMaster = nullptr;
     float nearestDistance = std::numeric_limits<float>::max();
 
-    for (const auto& [entry, pos] : flightMasterCache)
+    for (auto const& [entry, pos] : flightMasterCache)
     {
-        float distance = bot->GetDistance(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ());
-        if (distance < 500.0f && distance < nearestDistance)
+        if (pos.GetMapId() == bot->GetMapId())
         {
-            Creature* flightMaster = ObjectAccessor::GetSpawnedCreatureByEntry(bot->GetMapId(), entry);
-            if (flightMaster)
+            float distance = bot->GetExactDist2dSq(pos);
+            if (distance < 250000.0f && distance < nearestDistance)
             {
-                nearestDistance = distance;
-                nearestFlightMaster = flightMaster;
+                Creature* flightMaster = ObjectAccessor::GetSpawnedCreatureByDBGUID(bot->GetMapId(), entry);
+                if (flightMaster)
+                {
+                    nearestDistance = distance;
+                    nearestFlightMaster = flightMaster;
+                }
             }
         }
     }
