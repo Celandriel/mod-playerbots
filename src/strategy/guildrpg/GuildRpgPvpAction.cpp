@@ -7,9 +7,10 @@
 #include "Random.h"
 #include "Log.h"
 #include "GuildRpgInfo.h"
+#include "FlightMasterCache.h"
 #include "AiObjectContext.h"
 #include "Value.h"
-
+#include "GuildRpgOutdoorPvP.h"
 
 BattlegroundTypeId  SelectBattlegroundForLevel(uint8 botLevel)
 {
@@ -163,18 +164,63 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
     }
     else if (activity == GuildRpgActivity::WORLD_PVP)
     {
+        bool isAlliance = bot->GetFaction() == TEAM_ALLIANCE;
+        uint32 targetArea, mapId, toNode;
+
         // Go to Lights Hope Chapel in EPL
-        WorldPosition targetPos;
         if (botAI->guildRpgInfo.activityTarget == "EPL")
         {
-            targetPos = WorldPosition(0, 2263.0f, -5286.0f, 82.0f, 0.0f);
+            targetArea = AREA_EASTERN_PLAGUELANDS;
+            mapId = MAP_EASTERN_KINGDOMS;
+            toNode = isAlliance
+                            ? static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_ALLIANCE)
+                            : static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_HORDE);
         }
-
-        botAI->rpgInfo.SetMoveFarTo(targetPos);
-        //botAI->rpgInfo.Changeto
-        //botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
-        SyncGuildRpgStatus();
-        return true;
+        if (!mapId || !targetArea || !toNode)
+        {
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid world PVP target {}, resetting task", bot->GetName(), botAI->guildRpgInfo.activityTarget);
+            botAI->guildRpgInfo.ResetGuildActivity();
+            return false;
+        }
+        //logic to handle travel to location. 1 move if in same area, fly if in same map, teleport if different map. The action only goes to excution when bot is in the target area and then summons the bots.
+        //TODO: make base RPG function since this will likely be used in many instances.
+        if (bot->GetAreaId() == targetArea)
+        {
+            botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
+            botAI->SayToParty("summon");
+            SyncGuildRpgStatus();
+            return true;
+        }
+        if (bot->GetMapId() == mapId)
+        {
+            Creature* nearestFlightMaster = sFlightMasterCache->GetNearestFlightMaster(bot);
+            if (!nearestFlightMaster)
+            {
+                LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find flight master or target position", bot->GetName());
+                botAI->guildRpgInfo.ResetGuildActivity();
+                return false;
+            }
+            uint32 fromNode = sObjectMgr->GetNearestTaxiNode(nearestFlightMaster->GetPositionX(), nearestFlightMaster->GetPositionY(),
+                                              nearestFlightMaster->GetPositionZ(), nearestFlightMaster->GetMapId(),
+                                              bot->GetTeamId());
+            uint32 path, cost;
+            sObjectMgr->GetTaxiPath(fromNode, toNode, path, cost);
+            if (!path)
+            {
+                LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find taxi path from node {} to node {}", bot->GetName(), fromNode, toNode);
+                botAI->guildRpgInfo.ResetGuildActivity();
+                return false;
+            }
+            botAI->rpgInfo.ChangeToTravelFlight(nearestFlightMaster->GetGUID(), fromNode, toNode);
+            return true;
+        }
+        else
+        {
+            TaxiNodesEntry const* taxiNodeEntry = sTaxiNodesStore.LookupEntry(static_cast<uint32>(toNode));
+            WorldPosition targetPos = WorldPosition(mapId, taxiNodeEntry->x, taxiNodeEntry->y, taxiNodeEntry->z);
+            bot->TeleportTo(targetPos);
+            return true;
+        }
     }
     return false;
 }
@@ -185,14 +231,18 @@ bool GuildRpgPvpAction::HandleExecution(Event event)
     GuildRpgActivity activity = botAI->guildRpgInfo.activity;
     if (activity == GuildRpgActivity::BATTLEGROUND)
     {
-        //check if in bg
-        //If not in bg check if in queue
+        //Execute stage is set in previous step after entering BG, therefore, we only check once we leave the BG to be "complete"
         if (bot->InBattleground())
             return true;
 
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
         SyncGuildRpgStatus();
         return true;
+    }
+    else if (activity == GuildRpgActivity::WORLD_PVP)
+    {
+        GuildRpgOutdoorPvpAction outdoorPvpAction(botAI);
+        return outdoorPvpAction.Execute(event);
     }
     return false;
 }

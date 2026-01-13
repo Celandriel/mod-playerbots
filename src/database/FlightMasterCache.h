@@ -5,6 +5,12 @@
 #include "Player.h"
 #include "TravelMgr.h"
 
+enum class FlightMasterNodes : uint32
+{
+    LIGHTS_HOPE_CHAPEL_ALLIANCE = 67,
+    LIGHTS_HOPE_CHAPEL_HORDE = 68
+};
+
 class FlightMasterCache
 {
 public:
