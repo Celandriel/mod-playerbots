@@ -165,8 +165,8 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
     else if (activity == GuildRpgActivity::WORLD_PVP)
     {
         bool isAlliance = bot->GetFaction() == TEAM_ALLIANCE;
-        uint32 targetArea, mapId, toNode;
-
+        uint32 targetArea, toNode;
+        uint32 mapId = MAPID_INVALID;
         // Go to Lights Hope Chapel in EPL
         if (botAI->guildRpgInfo.activityTarget == "EPL")
         {
@@ -175,8 +175,9 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
             toNode = isAlliance
                             ? static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_ALLIANCE)
                             : static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_HORDE);
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} has set target area {}, map {}, node {} for world PVP", bot->GetName(), targetArea, mapId, toNode);
         }
-        if (!mapId || !targetArea || !toNode)
+        if (mapId == MAPID_INVALID || !targetArea || !toNode)
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid world PVP target {}, resetting task", bot->GetName(), botAI->guildRpgInfo.activityTarget);
             botAI->guildRpgInfo.ResetGuildActivity();
@@ -184,6 +185,7 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
         }
         //logic to handle travel to location. 1 move if in same area, fly if in same map, teleport if different map. The action only goes to excution when bot is in the target area and then summons the bots.
         //TODO: make base RPG function since this will likely be used in many instances.
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} has area {}, map {} checking against target area {}", bot->GetName(), bot->GetAreaId(), bot->GetMapId(), targetArea);
         if (bot->GetAreaId() == targetArea)
         {
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
@@ -222,6 +224,7 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
             return true;
         }
     }
+    LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid activity {} resetting task", bot->GetName(), static_cast<int>(activity));
     return false;
 }
 
