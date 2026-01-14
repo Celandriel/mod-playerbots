@@ -13,8 +13,10 @@ public:
 
 protected:
     // Find the best objective (Tower, Bunker, Flag) based on proximity and status
-    ObjectGuid SelectBestObjective();
+    GameObject* SelectBestObjective();
 
+private:
+    OutdoorPvP* outdoorPvP = nullptr;
 };
 
 #endif

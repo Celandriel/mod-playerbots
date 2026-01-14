@@ -262,15 +262,11 @@ bool GuildRpgPvpAction::HandleCompletion(Event event)
             SyncGuildRpgStatus();
             return true;
         }
-        else
-        {
-            LOG_INFO("playerbots", "[Guild RPG] Bot {} BG completed, disbanding", bot->GetName());
-            guildRpgInfo.SetGuildRpgActivity(botAI, GuildRpgActivity::NONE);
-            guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::IDLE);
-            SyncGuildRpgStatus();
-            botAI->LeaveOrDisbandGroup();
-            return true;
-        }
     }
-    return false;
+    LOG_INFO("playerbots", "[Guild RPG] Bot {} BG completed, disbanding", bot->GetName());
+    guildRpgInfo.SetGuildRpgActivity(botAI, GuildRpgActivity::NONE);
+    guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::IDLE);
+    SyncGuildRpgStatus();
+    botAI->LeaveOrDisbandGroup();
+    return true;
 }

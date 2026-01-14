@@ -1,57 +1,52 @@
 #include "GuildRpgOutdoorPvP.h"
+#include "OutdoorPvP.h"
 #include "OutdoorPvPMgr.h"
 
 bool GuildRpgOutdoorPvpAction::Execute(Event event)
 {
-    ObjectGuid objectiveGuid = SelectBestObjective();
-    if (!objectiveGuid)
+    outdoorPvP = sOutdoorPvPMgr->GetOutdoorPvPToZoneId(bot->GetMapId());
+    if (!outdoorPvP)
+        return false;
+    GameObject* objective = SelectBestObjective();
+    if (!objective)
         return true; // No valid objectives, possibly all captured
 
-    OPvPCapturePoint* capturePoint = sOutdoorPvPMgr->GetCapturePoint(objectiveGuid);
-    if (!capturePoint)
-        return false;
-
-    auto radius = (float)capturePoint->GetGOInfo()->capturePoint.radius;
-    if (!capturePoint->IsWithinDistInMap(bot, radius) || !bot->IsOutdoorPvPActive())
+    float radius = objective->GetGOInfo()->capturePoint.radius;
+    if (!objective->IsWithinDistInMap(bot, radius) || !bot->IsOutdoorPvPActive())
         {
-            botAI->rpgInfo.SetMoveFarTo(capturePoint->GetPosition());
+            botAI->rpgInfo.SetMoveFarTo(WorldPosition(objective));
             return true;
         }
     else
-        return botAI->rpgInfo.ChangeToGoGrind(capturePoint->GetPosition());
+    {
+        botAI->rpgInfo.ChangeToGoGrind(WorldPosition(objective));
+        return true;
+    }
     return false;
 }
 
-ObjectGuid GuildRpgOutdoorPvpAction::SelectBestObjective()
+GameObject* GuildRpgOutdoorPvpAction::SelectBestObjective()
 {
-    uint32 mapId = bot->GetMapId();
-    if (mapId == MAPID_INVALID)
-        return ObjectGuid();
-
-    OutdoorPvP* outdoorPvP = sOutdoorPvPMgr->GetOutdoorPvP(mapId);
-    if (!outdoorPvP)
-    {
-        LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find Outdoor PvP for map {}", bot->GetName(), mapId);
-        return ObjectGuid();
-    }
     bool isAlliance = bot->GetFaction() == TEAM_ALLIANCE;
-    OPvPCapturePointMap = outdoorPvP->GetCapturePoints();
-    std::vector<std::pair<ObjectGuid, float>> candidateObjectives;
-    for (auto const& [guid, point] : OPvPCapturePointMap)
+    OutdoorPvP::OPvPCapturePointMap* capturePoints = outdoorPvP->GetCapturePoints();
+    std::vector<std::pair<GameObject*, float>> candidateObjectives;
+    for (auto const& [guid, point] : *capturePoints)
     {
-        float slider = point->GetSlider()
+        float slider = point->GetSlider();
+        GameObject* obj = point->_capturePoint;
         if (isAlliance && slider < 0.0f)
-            candidateObjectives.push_back({guid, bot->GetDistance2d(point->GetPositionX(), point->GetPositionY())});
+            candidateObjectives.push_back({obj, bot->GetDistance2d(obj->GetPositionX(), obj->GetPositionY())});
         else if (!isAlliance && slider > 0.0f)
-            candidateObjectives.push_back({guid, bot->GetDistance2d(point->GetPositionX(), point->GetPositionY())});
+            candidateObjectives.push_back({obj, bot->GetDistance2d(obj->GetPositionX(), obj->GetPositionY())});
     }
     if (candidateObjectives.empty())
         {
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
-            SyncGuildRpgStatus();
-            return ObjectGuid();
+            return nullptr;
         }
-    return std::min_element(candidateObjectives.begin(), candidateObjectives.end(),
-                            [](const auto& a, const auto& b) { return a.second < b.second; })
-        ->first;
+    GameObject* objective =
+        std::min_element(candidateObjectives.begin(), candidateObjectives.end(),
+                         [](const auto& a, const auto& b) { return a.second < b.second; })
+            ->first;
+    return objective;
 }
