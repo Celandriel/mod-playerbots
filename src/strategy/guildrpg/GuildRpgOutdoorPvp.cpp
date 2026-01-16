@@ -4,21 +4,26 @@
 
 bool GuildRpgOutdoorPvpAction::Execute(Event event)
 {
-    outdoorPvP = sOutdoorPvPMgr->GetOutdoorPvPToZoneId(bot->GetMapId());
+    LOG_ERROR("playerbots", "[Guild RPG] Bot {} is executing GuildRpgOutdoorPvpAction", bot->GetName());
+    outdoorPvP = sOutdoorPvPMgr->GetOutdoorPvPToZoneId(bot->GetZoneId());
     if (!outdoorPvP)
+    {
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} is not in an outdoor PVP zone, cannot execute GuildRpgOutdoorPvpAction", bot->GetName());
         return false;
+    }
     GameObject* objective = SelectBestObjective();
     if (!objective)
         return true; // No valid objectives, possibly all captured
-
+    LOG_ERROR("playerbots", "[Guild RPG] Bot {} has found objective for outdoor PVP", bot->GetName());
     float radius = objective->GetGOInfo()->capturePoint.radius;
     if (!objective->IsWithinDistInMap(bot, radius) || !bot->IsOutdoorPvPActive())
         {
-            botAI->rpgInfo.SetMoveFarTo(WorldPosition(objective));
-            return true;
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} is moving to outdoor PVP objective", bot->GetName());
+            return MoveFarTo(WorldPosition(objective));
         }
     else
     {
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} is at outdoor PVP objective, starting capture", bot->GetName());
         botAI->rpgInfo.ChangeToGoGrind(WorldPosition(objective));
         return true;
     }
@@ -27,26 +32,43 @@ bool GuildRpgOutdoorPvpAction::Execute(Event event)
 
 GameObject* GuildRpgOutdoorPvpAction::SelectBestObjective()
 {
-    bool isAlliance = bot->GetFaction() == TEAM_ALLIANCE;
+    bool isHorde = bot->GetFaction();
     OutdoorPvP::OPvPCapturePointMap* capturePoints = outdoorPvP->GetCapturePoints();
-    std::vector<std::pair<GameObject*, float>> candidateObjectives;
+    std::vector<GameObject*> candidateObjectives;
     for (auto const& [guid, point] : *capturePoints)
     {
-        float slider = point->GetSlider();
         GameObject* obj = point->_capturePoint;
-        if (isAlliance && slider < 0.0f)
-            candidateObjectives.push_back({obj, bot->GetDistance2d(obj->GetPositionX(), obj->GetPositionY())});
-        else if (!isAlliance && slider > 0.0f)
-            candidateObjectives.push_back({obj, bot->GetDistance2d(obj->GetPositionX(), obj->GetPositionY())});
+        if (!obj)
+        {
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} found invalid outdoor PVP objective", bot->GetName());
+            continue;
+        }
+        float threshold = obj->GetGOInfo()->capturePoint.minTime;
+        float slider = point->GetSlider();
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} with isHorde {} is evaluating outdoor PVP point {} with threshold {} and slider value {}", bot->GetName(), isHorde, guid, threshold, slider);
+        if (isHorde)
+        {
+            if (slider > -threshold)
+            {
+                LOG_ERROR("playerbots", "[Guild RPG] Bot {} adding outdoor PVP point {} as candidate objective for Horde", bot->GetName(), guid);
+                candidateObjectives.push_back(obj);
+            }
+        }
+        else
+        {
+            if (slider < threshold)
+            {
+                LOG_ERROR("playerbots", "[Guild RPG] Bot {} adding outdoor PVP point {} as candidate objective for Alliance", bot->GetName(), guid);
+                candidateObjectives.push_back(obj);
+            }
+        }
     }
     if (candidateObjectives.empty())
         {
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} found no valid outdoor PVP objectives to capture", bot->GetName());
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
             return nullptr;
         }
-    GameObject* objective =
-        std::min_element(candidateObjectives.begin(), candidateObjectives.end(),
-                         [](const auto& a, const auto& b) { return a.second < b.second; })
-            ->first;
-    return objective;
+    int randomIndex = urand(0, candidateObjectives.size() - 1);
+    return candidateObjectives[randomIndex];
 }
