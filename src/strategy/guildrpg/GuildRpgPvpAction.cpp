@@ -9,7 +9,6 @@
 #include "GuildRpgInfo.h"
 #include "FlightMasterCache.h"
 #include "AiObjectContext.h"
-#include "NewRpgAction.h"
 #include "Value.h"
 #include "GuildRpgOutdoorPvP.h"
 
@@ -165,7 +164,7 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
     }
     else if (activity == GuildRpgActivity::WORLD_PVP)
     {
-        bool isAlliance = bot->GetFaction() == TEAM_ALLIANCE;
+        uint8 faction = bot->GetTeamId();
         uint32 targetZone, toNode;
         uint32 mapId = MAPID_INVALID;
         // Go to Lights Hope Chapel in EPL
@@ -173,61 +172,19 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
         {
             targetZone = AREA_EASTERN_PLAGUELANDS;
             mapId = MAP_EASTERN_KINGDOMS;
-            toNode = isAlliance
-                            ? static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_ALLIANCE)
-                            : static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_HORDE);
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} has set target zone {}, map {}, node {} for world PVP", bot->GetName(), targetZone, mapId, toNode);
+            toNode = faction == HORDE
+                            ? static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_HORDE)
+                            : static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_ALLIANCE);
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} with faction {} has set target zone {}, map {}, node {} for world PVP", bot->GetName(), faction, targetZone, mapId, toNode);
         }
+
         if (mapId == MAPID_INVALID || !targetZone || !toNode)
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid world PVP target {}, resetting task", bot->GetName(), botAI->guildRpgInfo.activityTarget);
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
-        //logic to handle travel to location. 1 move if in same area, fly if in same map, teleport if different map. The action only goes to excution when bot is in the target area and then summons the bots.
-        //TODO: make base RPG function since this will likely be used in many instances.
-        LOG_ERROR("playerbots", "[Guild RPG] Bot {} has area {}, map {} checking against target area {}", bot->GetName(), bot->GetAreaId(), bot->GetMapId(), targetZone);
-        if (bot->GetZoneId() == targetZone)
-        {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} is in target area {}, summoning group", bot->GetName(), targetZone);
-            botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
-            botAI->SayToParty("summon");
-            SyncGuildRpgStatus();
-            return true;
-        }
-        if (bot->GetMapId() == mapId)
-        {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} is in target map {}, flying to world PVP target area {}", bot->GetName(), mapId, targetZone);
-            Creature* nearestFlightMaster = sFlightMasterCache->GetNearestFlightMaster(bot);
-            if (!nearestFlightMaster)
-            {
-                LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find flight master or target position", bot->GetName());
-                botAI->guildRpgInfo.ResetGuildActivity();
-                return false;
-            }
-            uint32 fromNode = sObjectMgr->GetNearestTaxiNode(nearestFlightMaster->GetPositionX(), nearestFlightMaster->GetPositionY(),
-                                              nearestFlightMaster->GetPositionZ(), nearestFlightMaster->GetMapId(),
-                                              bot->GetTeamId());
-            uint32 path, cost;
-            sObjectMgr->GetTaxiPath(fromNode, toNode, path, cost);
-            if (!path)
-            {
-                LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find taxi path from node {} to node {}", bot->GetName(), fromNode, toNode);
-                botAI->guildRpgInfo.ResetGuildActivity();
-                return false;
-            }
-            botAI->rpgInfo.ChangeToTravelFlight(nearestFlightMaster->GetGUID(), fromNode, toNode);
-            NewRpgTravelFlightAction travelFlightAction(botAI);
-            return travelFlightAction.Execute(event);
-        }
-        else
-        {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} teleporting to world PVP target area {}", bot->GetName(), targetZone);
-            TaxiNodesEntry const* taxiNodeEntry = sTaxiNodesStore.LookupEntry(static_cast<uint32>(toNode));
-            WorldPosition targetPos = WorldPosition(mapId, taxiNodeEntry->x, taxiNodeEntry->y, taxiNodeEntry->z);
-            bot->TeleportTo(targetPos);
-            return true;
-        }
+        return SetMovementToRpgLocation(event, mapId, targetZone, toNode);
     }
     LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid activity {} resetting task", bot->GetName(), static_cast<int>(activity));
     return false;
@@ -274,7 +231,7 @@ bool GuildRpgPvpAction::HandleCompletion(Event event)
     LOG_INFO("playerbots", "[Guild RPG] Bot {} BG completed, disbanding", bot->GetName());
     botAI->guildRpgInfo.SetGuildRpgActivity(botAI, GuildRpgActivity::NONE);
     botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::IDLE);
-    SyncGuildRpgStatus();
+    EndGuildRpgActivity();
     botAI->LeaveOrDisbandGroup();
     return true;
 }

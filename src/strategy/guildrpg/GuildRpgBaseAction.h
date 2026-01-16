@@ -24,12 +24,15 @@ public:
     GuildRpgActivity RollRandomActivity(std::vector<uint32> weights, ActivityList activities);
     bool ChooseRandomActivity();
     void SyncGuildRpgStatus();
+    bool SetMovementToRpgLocation(Event event, uint32 mapId, uint32 targetZone, uint32 toNode);
+    void EndGuildRpgActivity();
 
     virtual bool HandleSelection(Event event);
     virtual bool HandleGrouping(Event event);
     virtual bool HandlePreparation(Event event);
     virtual bool HandleExecution(Event event);
     virtual bool HandleCompletion(Event event);
+
 
 protected:
     Guild* GetGuild() const;

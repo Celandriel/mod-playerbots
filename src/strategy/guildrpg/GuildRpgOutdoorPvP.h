@@ -2,6 +2,7 @@
 #define PLAYERBOT_GUILDRPGOUTDOORPVP_H
 
 #include "NewRpgBaseAction.h"
+#include"OutdoorPvP.h"
 
 class GuildRpgOutdoorPvpAction : public NewRpgBaseAction
 {
@@ -12,11 +13,13 @@ public:
     virtual bool Execute(Event event) override;
 
 protected:
-    // Find the best objective (Tower, Bunker, Flag) based on proximity and status
-    GameObject* SelectBestObjective();
+    void SelectNewObjective();
+    void GetCapturePoints();
 
 private:
+    OutdoorPvP::OPvPCapturePointMap* capturePoints = nullptr;
     OutdoorPvP* outdoorPvP = nullptr;
+    GameObject* objective = nullptr;
 };
 
 #endif

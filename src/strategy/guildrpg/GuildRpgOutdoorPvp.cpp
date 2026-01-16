@@ -4,17 +4,39 @@
 
 bool GuildRpgOutdoorPvpAction::Execute(Event event)
 {
+    //TODO: Check travel RPG position for node status, and then stay if captured, if not look for more.
     LOG_ERROR("playerbots", "[Guild RPG] Bot {} is executing GuildRpgOutdoorPvpAction", bot->GetName());
-    outdoorPvP = sOutdoorPvPMgr->GetOutdoorPvPToZoneId(bot->GetZoneId());
+    GetCapturePoints();
     if (!outdoorPvP)
+        return true;
+    GameObject* rpgObjective = botAI->guildRpgInfo.rpgObjective;
+    if (rpgObjective)
     {
-        LOG_ERROR("playerbots", "[Guild RPG] Bot {} is not in an outdoor PVP zone, cannot execute GuildRpgOutdoorPvpAction", bot->GetName());
-        return false;
+        OPvPCapturePoint* point = outdoorPvP->GetCapturePoint(rpgObjective->GetGUID().GetCounter());
+        if (point)
+        {
+            float threshold = point->GetMinValue();
+            float slider = point->GetSlider();
+            uint8 faction = bot->GetTeamId();
+            if ((faction == TEAM_HORDE && slider >= -threshold) ||
+                (faction == TEAM_ALLIANCE && slider <= threshold))
+            {
+                LOG_ERROR("playerbots", "[Guild RPG] Bot {} found current RPG objective not captured", bot->GetName());
+                objective = botAI->guildRpgInfo.rpgObjective;
+            }
+        }
     }
-    GameObject* objective = SelectBestObjective();
+    if (!objective)
+        SelectNewObjective();
+
     if (!objective)
         return true; // No valid objectives, possibly all captured
     LOG_ERROR("playerbots", "[Guild RPG] Bot {} has found objective for outdoor PVP", bot->GetName());
+    if (objective->GetGoType() != GAMEOBJECT_TYPE_CAPTURE_POINT)
+    {
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} found invalid objective type", bot->GetName());
+        return true;
+    }
     float radius = objective->GetGOInfo()->capturePoint.radius;
     if (!objective->IsWithinDistInMap(bot, radius) || !bot->IsOutdoorPvPActive())
         {
@@ -30,28 +52,35 @@ bool GuildRpgOutdoorPvpAction::Execute(Event event)
     return false;
 }
 
-GameObject* GuildRpgOutdoorPvpAction::SelectBestObjective()
+void GuildRpgOutdoorPvpAction::SelectNewObjective()
 {
-    bool isHorde = bot->GetFaction();
-    OutdoorPvP::OPvPCapturePointMap* capturePoints = outdoorPvP->GetCapturePoints();
+    objective = nullptr;
+    uint8 faction = bot->GetTeamId();
     std::vector<GameObject*> candidateObjectives;
+
+    if (!capturePoints)
+    {
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} has no outdoor PVP capture points available", bot->GetName());
+        botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
+        return;
+    }
     for (auto const& [guid, point] : *capturePoints)
     {
-        GameObject* obj = point->_capturePoint;
-        if (!obj)
+        GameObject* capturePointObject = point->_capturePoint;
+        if (!capturePointObject)
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} found invalid outdoor PVP objective", bot->GetName());
             continue;
         }
-        float threshold = obj->GetGOInfo()->capturePoint.minTime;
+        float threshold = point->GetMinValue();
         float slider = point->GetSlider();
-        LOG_ERROR("playerbots", "[Guild RPG] Bot {} with isHorde {} is evaluating outdoor PVP point {} with threshold {} and slider value {}", bot->GetName(), isHorde, guid, threshold, slider);
-        if (isHorde)
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} with faction {} is evaluating outdoor PVP point {} with name {} threshold {} and slider value {}", bot->GetName(), faction, guid, capturePointObject->GetName(), threshold, slider);
+        if (faction == TEAM_HORDE)
         {
             if (slider > -threshold)
             {
                 LOG_ERROR("playerbots", "[Guild RPG] Bot {} adding outdoor PVP point {} as candidate objective for Horde", bot->GetName(), guid);
-                candidateObjectives.push_back(obj);
+                candidateObjectives.push_back(capturePointObject);
             }
         }
         else
@@ -59,7 +88,7 @@ GameObject* GuildRpgOutdoorPvpAction::SelectBestObjective()
             if (slider < threshold)
             {
                 LOG_ERROR("playerbots", "[Guild RPG] Bot {} adding outdoor PVP point {} as candidate objective for Alliance", bot->GetName(), guid);
-                candidateObjectives.push_back(obj);
+                candidateObjectives.push_back(capturePointObject);
             }
         }
     }
@@ -67,8 +96,20 @@ GameObject* GuildRpgOutdoorPvpAction::SelectBestObjective()
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} found no valid outdoor PVP objectives to capture", bot->GetName());
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
-            return nullptr;
+            return;
         }
     int randomIndex = urand(0, candidateObjectives.size() - 1);
-    return candidateObjectives[randomIndex];
+    objective = candidateObjectives[randomIndex];
+}
+
+void GuildRpgOutdoorPvpAction::GetCapturePoints()
+{
+    outdoorPvP = sOutdoorPvPMgr->GetOutdoorPvPToZoneId(bot->GetZoneId());
+    if (!outdoorPvP)
+    {
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} is not in an outdoor PVP zone, cannot execute GuildRpgOutdoorPvpAction", bot->GetName());
+        botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
+        return;
+    }
+    capturePoints = outdoorPvP->GetCapturePoints();
 }

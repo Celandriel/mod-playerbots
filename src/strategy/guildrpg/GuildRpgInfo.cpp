@@ -13,6 +13,8 @@ void GuildRpgInfo::ResetGuildActivity()
 {
     activity = GuildRpgActivity::NONE;
     phase = GuildRpgPhase::IDLE;
+    activityTarget = "";
+    rpgObjective = nullptr;
 }
 
 std::string GuildRpgInfo::GetGuildTypeName(GuildType type)
