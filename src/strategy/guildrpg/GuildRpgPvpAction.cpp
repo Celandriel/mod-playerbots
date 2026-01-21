@@ -210,8 +210,7 @@ bool GuildRpgPvpAction::HandleExecution(Event event)
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} is changing RPG status to outdoor PVP", bot->GetName());
             NewRpgOutdoorPvpAction* outdoorPvpAction = new NewRpgOutdoorPvpAction(botAI);
-            outdoorPvpAction->SelectNewObjective();
-            OPvPCapturePoint* capturePoint = outdoorPvpAction->GetCapturePoint();
+            OPvPCapturePoint* capturePoint = outdoorPvpAction->SelectNewObjective();
             if (!capturePoint)
             {
                 LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find valid outdoor PVP objective, resetting task", bot->GetName());
