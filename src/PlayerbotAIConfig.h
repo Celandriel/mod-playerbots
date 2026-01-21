@@ -54,7 +54,9 @@ enum NewRpgStatus : int
     RPG_REST = 6,
     // Initial status
     RPG_IDLE = 7,
-    RPG_STATUS_END = 8
+    RPG_STATUS_END = 8,
+    // Zone PvP
+    RPG_OUTDOOR_PVP = 9
 };
 
 #define MAX_SPECNO 20

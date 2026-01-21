@@ -66,6 +66,14 @@ void NewRpgInfo::ChangeToIdle()
     status = RPG_IDLE;
 }
 
+void NewRpgInfo::ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint)
+{
+    Reset();
+    status = RPG_OUTDOOR_PVP;
+    outdoor_pvp = OutdoorPvP();
+    outdoor_pvp.capturePoint = capturePoint;
+}
+
 bool NewRpgInfo::CanChangeTo(NewRpgStatus status) { return true; }
 
 void NewRpgInfo::Reset()
@@ -132,6 +140,18 @@ std::string NewRpgInfo::ToString()
             out << "\ntoNode: " << flight.toNode;
             out << "\ninFlight: " << flight.inFlight;
             break;
+        case RPG_OUTDOOR_PVP:
+            out << "OUTDOOR_PVP";
+            if (!outdoor_pvp.capturePoint)
+            {
+                out << "\nNo capture point assigned.";
+                break;
+            }
+            else
+            {
+                out << "\nobjectiveEntry: " << outdoor_pvp.capturePoint->_capturePoint->GetName();
+                break;
+            }
         default:
             out << "UNKNOWN";
     }

@@ -10,7 +10,7 @@
 #include "FlightMasterCache.h"
 #include "AiObjectContext.h"
 #include "Value.h"
-#include "GuildRpgOutdoorPvP.h"
+#include "NewRpgOutdoorPvP.h"
 
 BattlegroundTypeId  SelectBattlegroundForLevel(uint8 botLevel)
 {
@@ -172,19 +172,18 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
         {
             targetZone = AREA_EASTERN_PLAGUELANDS;
             mapId = MAP_EASTERN_KINGDOMS;
-            toNode = faction == HORDE
+            toNode = faction == TEAM_HORDE
                             ? static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_HORDE)
                             : static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_ALLIANCE);
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} with faction {} has set target zone {}, map {}, node {} for world PVP", bot->GetName(), faction, targetZone, mapId, toNode);
         }
-
         if (mapId == MAPID_INVALID || !targetZone || !toNode)
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid world PVP target {}, resetting task", bot->GetName(), botAI->guildRpgInfo.activityTarget);
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
-        return SetMovementToRpgLocation(event, mapId, targetZone, toNode);
+        return PreparationMovementToRpgLocation(event, mapId, targetZone, toNode);
     }
     LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid activity {} resetting task", bot->GetName(), static_cast<int>(activity));
     return false;
@@ -206,9 +205,24 @@ bool GuildRpgPvpAction::HandleExecution(Event event)
     }
     else if (activity == GuildRpgActivity::WORLD_PVP)
     {
-        //Phase progress is handled in the Outdoor PVP action.
-        GuildRpgOutdoorPvpAction outdoorPvpAction(botAI);
-        return outdoorPvpAction.Execute(event);
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} is executing world PVP activity", bot->GetName());
+        if (botAI->rpgInfo.status != RPG_OUTDOOR_PVP)
+        {
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} is changing RPG status to outdoor PVP", bot->GetName());
+            NewRpgOutdoorPvpAction* outdoorPvpAction = new NewRpgOutdoorPvpAction(botAI);
+            outdoorPvpAction->SelectNewObjective();
+            OPvPCapturePoint* capturePoint = outdoorPvpAction->GetCapturePoint();
+            if (!capturePoint)
+            {
+                LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find valid outdoor PVP objective, resetting task", bot->GetName());
+                botAI->guildRpgInfo.ResetGuildActivity();
+                return false;
+            }
+            botAI->rpgInfo.ChangeToOutdoorPvp(capturePoint);
+            return true;
+        }
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} has RPG_OUTDOOR_PVP status already set", bot->GetName());
+        return false;
     }
     return false;
 }

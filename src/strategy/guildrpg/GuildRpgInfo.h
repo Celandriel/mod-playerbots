@@ -95,7 +95,6 @@ struct GuildRpgInfo
     GuildRpgActivity activity = GuildRpgActivity::NONE;
     GuildRpgPhase phase = GuildRpgPhase::IDLE;
     std::string activityTarget = "";
-    GameObject* rpgObjective = nullptr;
 
     void SetGuildRpgActivity(PlayerbotAI* botAI, GuildRpgActivity activity);
     void ResetGuildActivity();

@@ -24,7 +24,7 @@ public:
     GuildRpgActivity RollRandomActivity(std::vector<uint32> weights, ActivityList activities);
     bool ChooseRandomActivity();
     void SyncGuildRpgStatus();
-    bool SetMovementToRpgLocation(Event event, uint32 mapId, uint32 targetZone, uint32 toNode);
+    bool PreparationMovementToRpgLocation(Event event, uint32 mapId, uint32 targetZone, uint32 toNode);
     void EndGuildRpgActivity();
 
     virtual bool HandleSelection(Event event);

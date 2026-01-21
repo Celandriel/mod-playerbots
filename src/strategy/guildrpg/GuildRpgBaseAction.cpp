@@ -235,8 +235,10 @@ bool GuildRpgBaseAction::HandleCompletion(Event event)
     return false;
 }
 
-bool GuildRpgBaseAction::SetMovementToRpgLocation(Event event, uint32 mapId, uint32 targetZone, uint32 toNode)
+bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 mapId, uint32 targetZone, uint32 toNode)
 {
+    if (botAI->guildRpgInfo.phase != GuildRpgPhase::PREPARATION)
+        return false;
         //logic to handle travel to location. 1 move if in same area, fly if in same map, teleport if different map. The action only goes to excution when bot is in the target area and then summons the bots.
         LOG_ERROR("playerbots", "[Guild RPG] Bot {} has area {}, map {} checking against target area {}", bot->GetName(), bot->GetAreaId(), bot->GetMapId(), targetZone);
         if (bot->GetZoneId() == targetZone)
@@ -249,7 +251,12 @@ bool GuildRpgBaseAction::SetMovementToRpgLocation(Event event, uint32 mapId, uin
         }
         if (bot->GetMapId() == mapId)
         {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} is in target map {}, flying to target area {}", bot->GetName(), mapId, targetZone);
+            if (botAI->rpgInfo.status == RPG_TRAVEL_FLIGHT)
+            {
+                LOG_ERROR("playerbots", "[Guild RPG] Bot {} is currently in travel flight, waiting to arrive at destination", bot->GetName());
+                return false;
+            }
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} with faction {} is in target map {}, flying to target area {}", bot->GetName(), bot->GetTeamId(), mapId, targetZone);
             Creature* nearestFlightMaster = sFlightMasterCache->GetNearestFlightMaster(bot);
             if (!nearestFlightMaster)
             {
@@ -257,6 +264,7 @@ bool GuildRpgBaseAction::SetMovementToRpgLocation(Event event, uint32 mapId, uin
                 botAI->guildRpgInfo.ResetGuildActivity();
                 return false;
             }
+            LOG_ERROR("playerbots", "[Guild RPG] Bot {} found nearest flight master {} and is {} yards away", bot->GetName(), nearestFlightMaster->GetName(), bot->GetDistance(nearestFlightMaster));
             uint32 fromNode = sObjectMgr->GetNearestTaxiNode(nearestFlightMaster->GetPositionX(), nearestFlightMaster->GetPositionY(),
                                               nearestFlightMaster->GetPositionZ(), nearestFlightMaster->GetMapId(),
                                               bot->GetTeamId());

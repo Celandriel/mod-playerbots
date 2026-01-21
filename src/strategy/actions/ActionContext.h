@@ -69,6 +69,7 @@
 #include "WorldBuffAction.h"
 #include "XpGainAction.h"
 #include "NewRpgAction.h"
+#include "NewRpgOutdoorPvP.h"
 #include "FishingAction.h"
 #include "CancelChannelAction.h"
 
@@ -268,6 +269,7 @@ public:
         creators["new rpg wander npc"] = &ActionContext::new_rpg_wander_npc;
         creators["new rpg do quest"] = &ActionContext::new_rpg_do_quest;
         creators["new rpg travel flight"] = &ActionContext::new_rpg_travel_flight;
+        creators["new rpg outdoor pvp"] = &ActionContext::new_rpg_outdoor_pvp;
 
         //Guild RPG actions
         creators["guild rpg status update"] = &ActionContext::guild_rpg_status_update;
@@ -469,6 +471,7 @@ private:
     static Action* new_rpg_wander_npc(PlayerbotAI* ai) { return new NewRpgWanderNpcAction(ai); }
     static Action* new_rpg_do_quest(PlayerbotAI* ai) { return new NewRpgDoQuestAction(ai); }
     static Action* new_rpg_travel_flight(PlayerbotAI* ai) { return new NewRpgTravelFlightAction(ai); }
+    static Action* new_rpg_outdoor_pvp(PlayerbotAI* ai) { return new NewRpgOutdoorPvpAction(ai); }
 
     //Guild rpg actions
     static Action* guild_rpg_status_update(PlayerbotAI* botAI) { return new GuildRpgStatusUpdateAction(botAI); }

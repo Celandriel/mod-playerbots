@@ -4,6 +4,7 @@
 #include "Define.h"
 #include "ObjectGuid.h"
 #include "ObjectMgr.h"
+#include "OutdoorPvP.h"
 #include "QuestDef.h"
 #include "Strategy.h"
 #include "Timer.h"
@@ -58,6 +59,11 @@ struct NewRpgInfo
     {
         Rest() = default;
     };
+    // RPG_ZONE_PVP
+    struct OutdoorPvP
+    {
+        OPvPCapturePoint* capturePoint{nullptr};
+    };
     struct Idle
     {
     };
@@ -82,6 +88,7 @@ struct NewRpgInfo
         Rest rest;
         DoQuest quest;
         TravelFlight flight;
+        OutdoorPvP outdoor_pvp;
     };
 
     bool HasStatusPersisted(uint32 maxDuration) { return GetMSTimeDiffToNow(startT) > maxDuration; }
@@ -91,6 +98,7 @@ struct NewRpgInfo
     void ChangeToWanderRandom();
     void ChangeToDoQuest(uint32 questId, const Quest* quest);
     void ChangeToTravelFlight(ObjectGuid fromFlightMaster, uint32 fromNode, uint32 toNode);
+    void ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint);
     void ChangeToRest();
     void ChangeToIdle();
     bool CanChangeTo(NewRpgStatus status);
