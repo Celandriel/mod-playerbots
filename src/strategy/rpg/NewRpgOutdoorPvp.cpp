@@ -4,6 +4,12 @@
 
 bool NewRpgOutdoorPvpAction::Execute(Event event)
 {
+    if (botAI->guildRpgInfo.GetActivityName() != "WORLD_PVP")
+    {
+        botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
+        botAI->rpgInfo.ChangeToIdle();
+        return false;
+    }
     GetCapturePoints();
     OPvPCapturePoint* objective = nullptr;
     if (!this->outdoorPvP)
@@ -22,7 +28,7 @@ bool NewRpgOutdoorPvpAction::Execute(Event event)
             float threshold = capturePoint->GetMinValue();
             float slider = capturePoint->GetSlider();
             uint8 faction = bot->GetTeamId();
-            LOG_ERROR("playerbots", "[NEW RPG] Bot {} with faction {} is evaluating existing RPG objective {} with threshold {} and slider value {}", bot->GetName(), faction, capturePoint->_capturePoint->GetName(), threshold, slider);
+            LOG_DEBUG("playerbots", "[NEW RPG] Bot {} with faction {} is evaluating existing RPG objective {} with threshold {} and slider value {}", bot->GetName(), faction, capturePoint->_capturePoint->GetName(), threshold, slider);
             if ((faction == TEAM_HORDE && slider >= -threshold) ||
                 (faction == TEAM_ALLIANCE && slider <= threshold))
                 objective = capturePoint;
@@ -87,7 +93,7 @@ OPvPCapturePoint* NewRpgOutdoorPvpAction::SelectNewObjective()
     }
     if (candidateObjectives.empty())
         {
-            LOG_ERROR("playerbots", "[New RPG] Bot {} found no valid outdoor PVP objectives to capture", bot->GetName());
+            LOG_DEBUG("playerbots", "[New RPG] Bot {} found no valid outdoor PVP objectives to capture", bot->GetName());
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
             return objective;
         }

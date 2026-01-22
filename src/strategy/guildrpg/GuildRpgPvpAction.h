@@ -36,6 +36,9 @@ public:
     bool HandleExecution(Event event) override;
     bool HandleCompletion(Event event) override;
 
+private:
+    const int32 statusOutdoorPvpDuration = 20 * MINUTE * IN_MILLISECONDS;
+
 };
 
 class FriendlyDuelAction : public GuildRpgBaseAction

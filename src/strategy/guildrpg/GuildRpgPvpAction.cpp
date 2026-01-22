@@ -175,17 +175,15 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
             toNode = faction == TEAM_HORDE
                             ? static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_HORDE)
                             : static_cast<uint32>(FlightMasterNodes::LIGHTS_HOPE_CHAPEL_ALLIANCE);
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} with faction {} has set target zone {}, map {}, node {} for world PVP", bot->GetName(), faction, targetZone, mapId, toNode);
         }
         if (mapId == MAPID_INVALID || !targetZone || !toNode)
         {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid world PVP target {}, resetting task", bot->GetName(), botAI->guildRpgInfo.activityTarget);
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
         return PreparationMovementToRpgLocation(event, mapId, targetZone, toNode);
     }
-    LOG_ERROR("playerbots", "[Guild RPG] Bot {} has invalid activity {} resetting task", bot->GetName(), static_cast<int>(activity));
+    botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
     return false;
 }
 
@@ -217,6 +215,12 @@ bool GuildRpgPvpAction::HandleExecution(Event event)
             botAI->rpgInfo.ChangeToOutdoorPvp(capturePoint);
             return true;
         }
+        if (botAI->rpgInfo.HasStatusPersisted(statusOutdoorPvpDuration))
+        {
+            botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
+            SyncGuildRpgStatus();
+            return true;
+        }
         return false;
     }
     return false;
@@ -238,8 +242,8 @@ bool GuildRpgPvpAction::HandleCompletion(Event event)
         }
     }
     LOG_INFO("playerbots", "[Guild RPG] Bot {} BG completed, disbanding", bot->GetName());
-    botAI->guildRpgInfo.SetGuildRpgActivity(botAI, GuildRpgActivity::NONE);
-    botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::IDLE);
+    botAI->guildRpgInfo.ResetGuildActivity();
+    botAI->rpgInfo.ChangeToIdle();
     EndGuildRpgActivity();
     botAI->LeaveOrDisbandGroup();
     return true;
