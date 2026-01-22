@@ -272,7 +272,7 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 ma
             sObjectMgr->GetTaxiPath(fromNode, toNode, path, cost);
             if (!path)
             {
-                LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find taxi path from node {} to node {}", bot->GetName(), fromNode, toNode);
+                LOG_ERROR("playerbots", "[Guild RPG] Bot {} with taxicheats {} could not find taxi path from node {} to node {}", bot->GetName(), bot->isTaxiCheater(), fromNode, toNode);
                 botAI->guildRpgInfo.ResetGuildActivity();
                 return false;
             }
