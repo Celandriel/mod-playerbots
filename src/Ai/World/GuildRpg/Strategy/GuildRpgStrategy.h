@@ -6,8 +6,8 @@
 #ifndef _PLAYERBOT_GUILDRPGSTRATEGY_H_
 #define _PLAYERBOT_GUILDRPGSTRATEGY_H_
 
-#include "Strategy.h"
 #include "GuildRpgInfo.h"
+#include "Strategy.h"
 
 class PlayerbotAI;
 

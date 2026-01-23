@@ -1104,18 +1104,24 @@ AiPlayerbot.GuildRpgProbability = 10
 AiPlayerbot.GuildTypeRatios = "40,20,20,10"
 AiPlayerbot.GuildSize = "4,3,2,2"
 
-# Set the ratio of Tank, melee dps, ranged dps, and healer dps per guild
+# Set the ratio of Tank, melee dps, ranged dps, and healer dps per guild (Not Implemented Yet)
 AiPlayerbot.GuildPvpSpecRatio = "10, 30, 30, 30"
 AiPlayerbot.GuildPveSpecRatio = "12, 22, 34, 32"
 
 # Activity Ratios
-# Queue for BG, Patrol PVP areas, Attack City, Defend, World PVP
-# Dungeons, Raids, World Bosses
-#
 
+#PVP Guild activity: Battlegrounds , Patrol PVP areas, Attack City, Defend, World PVP
+# Battlegrounds overrides RandomBotAutoJoinBG, but respects Battlegrounds counts
 AiPlayerbot.GuildRpgPvpWeights = "20, 20, 20, 20, 20"
+
+#PVE Guild Activities (Undefined)
+# Dungeons, Raids, World Bosses
 AiPlayerbot.GuildRpgPveWeights = "30, 30, 30"
+
+#Profession Guild Activities (Undefined)
 AiPlayerbot.GuildRpgProfWeights = "20, 20, 20, 20"
+
+#RPG Guild Activities (Undefined)
 AiPlayerbot.GuildRpgRoleplayWeights = "30, 30, 30"
 
 #

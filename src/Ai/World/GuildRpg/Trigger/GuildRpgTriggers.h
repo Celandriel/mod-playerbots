@@ -1,9 +1,9 @@
 #ifndef _PlaYERBOT_GUILDRPGTRIGGER_H
 #define _PLAYERBOT_GUILDRPGTRIGGER_H
 
+#include "GuildRpgInfo.h"
 #include "GuildRpgStrategy.h"
 #include "Trigger.h"
-#include "GuildRpgInfo.h"
 
 class GuildRpgTaskTrigger : public Trigger
 {

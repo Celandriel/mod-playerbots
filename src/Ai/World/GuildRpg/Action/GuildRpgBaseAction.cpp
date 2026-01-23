@@ -1,11 +1,11 @@
-#include "GuildRpgBaseAction.h"
-#include "NewRpgAction.h"
 #include "FlightMasterCache.h"
-#include "Guild.h"
 #include "Group.h"
+#include "Guild.h"
+#include "GuildRpgBaseAction.h"
 #include "PlayerbotGroupMgr.h"
 #include "Playerbots.h"
 #include "PlayerbotAI.h"
+#include "NewRpgAction.h"
 
 bool TellGuildRpgStatusAction::Execute(Event event)
 {

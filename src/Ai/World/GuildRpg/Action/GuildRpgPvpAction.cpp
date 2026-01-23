@@ -1,18 +1,55 @@
-#include "GuildRpgPvpAction.h"
-#include "PlayerbotAI.h"
-#include "PlayerbotGroupMgr.h"
+#include "AiObjectContext.h"
 #include "BattleGroundJoinAction.h"
 #include "BattlegroundMgr.h"
 #include "DBCEnums.h"
-#include "Random.h"
-#include "Log.h"
-#include "GuildRpgInfo.h"
 #include "FlightMasterCache.h"
-#include "AiObjectContext.h"
-#include "Value.h"
+#include "GuildRpgInfo.h"
+#include "GuildRpgPvpAction.h"
+#include "Log.h"
 #include "NewRpgOutdoorPvP.h"
+#include "PlayerbotAI.h"
+#include "PlayerbotGroupMgr.h"
+#include "Random.h"
+#include "RandomPlayerbotMgr.h"
+#include "Value.h"
 
-BattlegroundTypeId  SelectBattlegroundForLevel(uint8 botLevel)
+std::vector<BattlegroundTypeId> FilterBattlegroundsByInstanceCounts(const std::vector<BattlegroundTypeId>& possibleBGs, uint8 botLevel)
+{
+    std::vector<BattlegroundTypeId> filteredBGs;
+    for (BattlegroundTypeId bgTypeId : possibleBGs)
+    {
+        BattlegroundQueueTypeId queueTypeId = sBattlegroundMgr->BGQueueTypeId(bgTypeId, 0);
+        Battleground* bgTemplate = sBattlegroundMgr->GetBattlegroundTemplate(bgTypeId);
+        if (!bgTemplate)
+            continue;
+
+        uint32 mapId = bgTemplate->GetMapId();
+
+        PvPDifficultyEntry const* pvpDiff = GetBattlegroundBracketByLevel(mapId, botLevel);
+        if (!pvpDiff)
+            continue;
+
+        BattlegroundBracketId bracketId = pvpDiff->GetBracketId();
+        uint32 currentInstances = sRandomPlayerbotMgr->BattlegroundData[queueTypeId][bracketId].bgInstanceCount;
+
+        uint32 maxAllowedInstances = 0;
+        switch (bgTypeId)
+        {
+            case BATTLEGROUND_AV: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGAVCount; break;
+            case BATTLEGROUND_AB: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGABCount; break;
+            case BATTLEGROUND_WS: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGWSCount; break;
+            case BATTLEGROUND_EY: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGEYCount; break;
+            case BATTLEGROUND_IC: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGICCount; break;
+            default: maxAllowedInstances = 1; break;
+        }
+
+        if (currentInstances <= maxAllowedInstances)
+            filteredBGs.push_back(bgTypeId);
+    }
+    return filteredBGs;
+}
+
+BattlegroundTypeId SelectBattlegroundForLevel(uint8 botLevel)
 {
     // Available battlegrounds for different level ranges
     //TODO: Align this to core's available battlegrounds and requirements from DBC etc.
@@ -35,6 +72,10 @@ BattlegroundTypeId  SelectBattlegroundForLevel(uint8 botLevel)
         return BATTLEGROUND_TYPE_NONE;
 
     // Randomly select from available BGs
+    possibleBGs = FilterBattlegroundsByInstanceCounts(possibleBGs, botLevel);
+    if (possibleBGs.empty())
+        return BATTLEGROUND_TYPE_NONE;
+
     return possibleBGs[urand(0, possibleBGs.size() - 1)];
 }
 
@@ -104,7 +145,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
         BattlegroundTypeId  battleground = SelectBattlegroundForLevel(botLevel);
         if (battleground == BATTLEGROUND_TYPE_NONE)
         {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find suitable battleground for level {} resetting task", name, botLevel);
+            LOG_DEBUG("playerbots", "[Guild RPG] Bot {} could not find suitable battleground for level {} resetting task", name, botLevel);
             botAI->guildRpgInfo.ResetGuildActivity();
             return false;
         }
@@ -130,7 +171,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
     TargetGroupComposition groupComp = CreatePvpGroupComposition(groupSize, botLevel);
     if (!botAI->SetTargetGroupComposition(groupComp))
     {
-        LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not set target group composition for activity {} resetting task", bot->GetName(), static_cast<int>(activity));
+        LOG_DEBUG("playerbots", "[Guild RPG] Bot {} could not set target group composition for activity {} resetting task", bot->GetName(), static_cast<int>(activity));
         botAI->guildRpgInfo.ResetGuildActivity();
         return false;
     }
@@ -158,7 +199,7 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
         BattlegroundQueueTypeId queueTypeId = BattlegroundQueueTypeId(queueType);
         if (bot->InBattlegroundQueueForBattlegroundQueueType(queueTypeId))
             return false;
-        LOG_ERROR("playerbots", "[GUILD RPG] Bot {} is queuing for battleground", bot->GetName());
+        LOG_TRACE("playerbots", "[GUILD RPG] Bot {} is queuing for battleground", bot->GetName());
         BGJoinAction bgJoinAction(botAI);
         return bgJoinAction.Execute(event);
     }

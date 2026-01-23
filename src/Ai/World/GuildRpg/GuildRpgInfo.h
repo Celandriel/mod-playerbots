@@ -1,13 +1,14 @@
 #ifndef _PLAYERBOT_GUILDRPGINFO_H
 #define _PLAYERBOT_GUILDRPGINFO_H
 
+
+#include "Define.h"
+#include "GameObject.h"
 #include <utility>
 #include <string>
 #include <vector>
 #include <map>
 #include <unordered_map>
-#include "Define.h"
-#include "GameObject.h"
 
 class PlayerbotAI;
 
