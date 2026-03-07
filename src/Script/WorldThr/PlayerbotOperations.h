@@ -14,9 +14,11 @@
 #include "PlayerbotOperation.h"
 #include "Player.h"
 #include "PlayerbotAI.h"
+#include "PlayerbotAIConfig.h"
 #include "PlayerbotMgr.h"
 #include "PlayerbotRepository.h"
 #include "RandomPlayerbotMgr.h"
+#include "UseMeetingStoneAction.h"
 #include "WorldSession.h"
 #include "WorldSessionMgr.h"
 
@@ -74,6 +76,15 @@ public:
         if (group->AddMember(target))
         {
             LOG_DEBUG("playerbots", "GroupInviteOperation: Successfully added {} to group", target->GetName());
+            if (sPlayerbotAIConfig.summonWhenGroup && target->GetDistance(bot) > sPlayerbotAIConfig.sightDistance)
+            {
+                PlayerbotAI* targetAI = sPlayerbotsMgr.GetPlayerbotAI(target);
+                if (targetAI)
+                {
+                    SummonAction summonAction(targetAI, "group summon");
+                    summonAction.Teleport(bot, target, true);
+                }
+            }
             return true;
         }
         else
@@ -355,7 +366,7 @@ public:
             if (!member || !newGroup->IsMember(memberGuid))
                 continue;
 
-            PlayerbotAI* memberBotAI = sPlayerbotsMgr->GetPlayerbotAI(member);
+            PlayerbotAI* memberBotAI = PlayerbotsMgr::instance().GetPlayerbotAI(member);
             if (memberBotAI)
                 memberBotAI->Reset();
 
@@ -412,13 +423,13 @@ public:
         if (!bot)
             return false;
 
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (!botAI)
             return false;
 
         Group* group = bot->GetGroup();
         if (group && !bot->InBattleground() && !bot->InBattlegroundQueue() && botAI->HasActivePlayerMaster())
-            sPlayerbotRepository->Save(botAI);
+            PlayerbotRepository::instance().Save(botAI);
 
         return true;
     }
@@ -448,7 +459,7 @@ public:
 
     bool Execute() override
     {
-        sRandomPlayerbotMgr->AddPlayerBot(m_botGuid, m_masterAccountId);
+        sRandomPlayerbotMgr.AddPlayerBot(m_botGuid, m_masterAccountId);
         return true;
     }
 
@@ -483,13 +494,13 @@ public:
         if (!bot)
             return false;
 
-        PlayerbotHolder* holder = sRandomPlayerbotMgr;
+        PlayerbotHolder* holder = &RandomPlayerbotMgr::instance();
         if (m_masterAccountId)
         {
             WorldSession* masterSession = sWorldSessionMgr->FindSession(m_masterAccountId);
             Player* masterPlayer = masterSession ? masterSession->GetPlayer() : nullptr;
             if (masterPlayer)
-                holder = GET_PLAYERBOT_MGR(masterPlayer);
+                holder = PlayerbotsMgr::instance().GetPlayerbotMgr(masterPlayer);
         }
 
         if (!holder)

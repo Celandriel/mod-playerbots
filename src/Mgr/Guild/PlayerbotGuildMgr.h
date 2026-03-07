@@ -16,15 +16,14 @@ constexpr std::array<GuilderType, 6> GuilderMap =
     GuilderType::VERY_LARGE
 };
 
-class PlayerbotAI;
-
 class PlayerbotGuildMgr
 {
 public:
-    static PlayerbotGuildMgr* instance()
+    static PlayerbotGuildMgr& instance()
     {
         static PlayerbotGuildMgr instance;
-        return &instance;
+
+        return instance;
     }
 
     void Init();
@@ -50,7 +49,15 @@ public:
     BotAvailabilityStatus GetBotAvailability(uint32 guildId, ObjectGuid guid);
 
 private:
-    PlayerbotGuildMgr();
+    PlayerbotGuildMgr() = default;
+    ~PlayerbotGuildMgr() = default;
+
+    PlayerbotGuildMgr(const PlayerbotGuildMgr&) = delete;
+    PlayerbotGuildMgr& operator=(const PlayerbotGuildMgr&) = delete;
+
+    PlayerbotGuildMgr(PlayerbotGuildMgr&&) = delete;
+    PlayerbotGuildMgr& operator=(PlayerbotGuildMgr&&) = delete;
+
     GuildType _defaultGuildType;
     struct GuildInfo
     {
@@ -83,5 +90,4 @@ private:
 void PlayerBotsGuildValidationScript();
 
 #define sPlayerbotGuildMgr PlayerbotGuildMgr::instance()
-
 #endif

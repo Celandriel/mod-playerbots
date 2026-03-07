@@ -11,7 +11,6 @@
 #include "GameObject.h"
 #include "Group.h"
 #include "LastMovementValue.h"
-#include "ObjectDefines.h"
 #include "ObjectGuid.h"
 #include "PlayerbotAI.h"
 #include "PlayerbotAIConfig.h"
@@ -19,11 +18,9 @@
 #include "Position.h"
 #include "RaidUlduarBossHelper.h"
 #include "RaidUlduarScripts.h"
-#include "RaidUlduarStrategy.h"
 #include "RtiValue.h"
 #include "ScriptedCreature.h"
 #include "ServerFacade.h"
-#include "SharedDefines.h"
 #include "Unit.h"
 #include "Vehicle.h"
 #include <RtiTargetValue.h>
@@ -2964,7 +2961,7 @@ bool YoggSaronMoveToEnterPortalAction::Execute(Event event)
     {
         return MoveNear(bot->GetMapId(), assignedPortalPosition.GetPositionX(),
                                assignedPortalPosition.GetPositionY(),
-                 assignedPortalPosition.GetPositionZ(), sPlayerbotAIConfig->contactDistance,
+                 assignedPortalPosition.GetPositionZ(), sPlayerbotAIConfig.contactDistance,
                  MovementPriority::MOVEMENT_FORCED);
     }
 }

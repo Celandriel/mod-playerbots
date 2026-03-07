@@ -4,16 +4,12 @@
 #include "DatabaseEnv.h"
 #include "Guild.h"
 #include "GuildMgr.h"
-#include "RandomPlayerbotMgr.h"
 #include "ScriptMgr.h"
-
-PlayerbotGuildMgr::PlayerbotGuildMgr(){}
 
 void PlayerbotGuildMgr::Init()
 {
     _guildCache.clear();
-
-    if (sPlayerbotAIConfig->deleteRandomBotGuilds)
+    if (sPlayerbotAIConfig.deleteRandomBotGuilds)
         DeleteBotGuilds();
 
     LoadGuildNames();
@@ -207,7 +203,7 @@ std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
         }
         );
 
-    if (count < sPlayerbotAIConfig->randomBotGuildCount)
+    if (count < sPlayerbotAIConfig.randomBotGuildCount)
     {
         if (sPlayerbotAIConfig->enableGuildRpgStrategy)
         {
@@ -341,7 +337,7 @@ void PlayerbotGuildMgr::ValidateGuildCache()
         uint32 guildId = it->first;
         GuildCache cache;
         cache.name = it->second;
-        cache.maxMembers = sPlayerbotAIConfig->randomBotGuildSizeMax;
+        cache.maxMembers = sPlayerbotAIConfig.randomBotGuildSizeMax;
 
         Guild* guild = sGuildMgr ->GetGuildById(guildId);
         if (!guild)
@@ -351,7 +347,7 @@ void PlayerbotGuildMgr::ValidateGuildCache()
         ObjectGuid leaderGuid = guild->GetLeaderGUID();
         CharacterCacheEntry const* leaderEntry = sCharacterCache->GetCharacterCacheByGuid(leaderGuid);
         uint32 leaderAccount = leaderEntry->AccountId;
-        cache.hasRealPlayer = !(sPlayerbotAIConfig->IsInRandomAccountList(leaderAccount));
+        cache.hasRealPlayer = !(sPlayerbotAIConfig.IsInRandomAccountList(leaderAccount));
         cache.faction = Player::TeamIdForRace(leaderEntry->Race);
         if (cache.memberCount == 0)
             cache.status = 0; // empty
@@ -460,7 +456,7 @@ class BotGuildCacheWorldScript : public WorldScript
             if (_validateTimer >= _validateInterval) // Validate every hour
             {
                 _validateTimer = 0;
-                sPlayerbotGuildMgr->ValidateGuildCache();
+                PlayerbotGuildMgr::instance().ValidateGuildCache();
                 LOG_INFO("playerbots", "Scheduled guild cache validation");
             }
         }

@@ -765,9 +765,13 @@ bool FreyaMoveToHealingSporeTrigger::IsActive()
 bool ThorimUnbalancingStrikeTrigger::IsActive()
 {
     Unit* boss = AI_VALUE2(Unit*, "find target", "thorim");
+    if (!boss || !boss->IsInWorld() || boss->IsDuringRemoveFromWorld())
+        return false;
 
-    // Check boss and it is alive
-    if (!boss || !boss->IsAlive() || !boss->IsHostileTo(bot))
+    if (!boss->IsAlive())
+        return false;
+
+    if (!boss->IsHostileTo(bot))
         return false;
 
     return bot->HasAura(SPELL_UNBALANCING_STRIKE);
@@ -804,8 +808,13 @@ bool ThorimMarkDpsTargetTrigger::IsActive()
 
         Unit* boss = AI_VALUE2(Unit*, "find target", "thorim");
 
-        // Check boss and it is alive
-        if (!boss || !boss->IsAlive() || !boss->IsHostileTo(bot))
+        if (!boss || !boss->IsInWorld() || boss->IsDuringRemoveFromWorld())
+            return false;
+
+        if (!boss->IsAlive())
+            return false;
+
+        if (!boss->IsHostileTo(bot))
             return false;
 
         if (boss->GetPositionZ() < ULDUAR_THORIM_AXIS_Z_FLOOR_THRESHOLD && (!currentSkullUnit || !currentSkullUnit->IsAlive()))
@@ -982,9 +991,13 @@ bool ThorimGauntletPositioningTrigger::IsActive()
 bool ThorimArenaPositioningTrigger::IsActive()
 {
     Unit* boss = AI_VALUE2(Unit*, "find target", "thorim");
+    if (!boss || !boss->IsInWorld() || boss->IsDuringRemoveFromWorld())
+        return false;
 
-    // Check boss and it is alive
-    if (!boss || !boss->IsAlive() || !boss->IsHostileTo(bot))
+    if (!boss->IsAlive())
+        return false;
+
+    if (!boss->IsHostileTo(bot))
         return false;
 
     if (boss->GetPositionZ() < ULDUAR_THORIM_AXIS_Z_FLOOR_THRESHOLD)
@@ -1080,9 +1093,13 @@ bool ThorimPhase2PositioningTrigger::IsActive()
         return false;
 
     Unit* boss = AI_VALUE2(Unit*, "find target", "thorim");
+    if (!boss || !boss->IsInWorld() || boss->IsDuringRemoveFromWorld())
+    return false;
 
-    // Check boss and it is alive
-    if (!boss || !boss->IsAlive() || !boss->IsHostileTo(bot))
+    if (!boss->IsAlive())
+        return false;
+
+    if (!boss->IsHostileTo(bot))
         return false;
 
     if (boss->GetPositionZ() > ULDUAR_THORIM_AXIS_Z_FLOOR_THRESHOLD)
@@ -1604,7 +1621,7 @@ bool VezaxCheatTrigger::IsActive()
         return false;
     }
 
-    return AI_VALUE2(uint8, "mana", "self target") < sPlayerbotAIConfig->lowMana;
+    return AI_VALUE2(uint8, "mana", "self target") < sPlayerbotAIConfig.lowMana;
 }
 
 bool VezaxShadowCrashTrigger::IsActive()
@@ -1617,7 +1634,7 @@ bool VezaxShadowCrashTrigger::IsActive()
         return false;
     }
 
-    return botAI->HasAura(SPELL_SHADOW_CRASH, bot);
+    return botAI->HasAura(SPELL_VEZAX_SHADOW_CRASH, bot);
 }
 
 bool VezaxMarkOfTheFacelessTrigger::IsActive()

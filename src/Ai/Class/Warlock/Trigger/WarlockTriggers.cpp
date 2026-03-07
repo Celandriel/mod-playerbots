@@ -79,6 +79,16 @@ bool SoulLinkTrigger::IsActive()
     return !botAI->HasAura("soul link", target);
 }
 
+bool UnendingBreathTrigger::IsActive()
+{
+    return BuffTrigger::IsActive() && AI_VALUE2(bool, "swimming", "self target");
+}
+
+bool UnendingBreathOnPartyTrigger::IsActive()
+{
+    return BuffOnPartyTrigger::IsActive() && AI_VALUE2(bool, "swimming", "self target");
+}
+
 bool DemonicEmpowermentTrigger::IsActive()
 {
     Pet* pet = bot->GetPet();
@@ -96,7 +106,7 @@ bool DecimationTrigger::IsActive()
 // Checks if the bot's mana is below 85% and health is above a low health threshold
 bool LifeTapTrigger::IsActive()
 {
-    if (AI_VALUE2(uint8, "health", "self target") <= sPlayerbotAIConfig->lowHealth)
+    if (AI_VALUE2(uint8, "health", "self target") <= sPlayerbotAIConfig.lowHealth)
         return false;
 
     if (!AI_VALUE2(bool, "has mana", "self target"))
