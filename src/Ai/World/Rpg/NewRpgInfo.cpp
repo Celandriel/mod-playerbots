@@ -61,16 +61,10 @@ void NewRpgInfo::ChangeToIdle()
 
 void NewRpgInfo::ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint)
 {
-    Reset();
-    status = RPG_IDLE;
-}
-
-void NewRpgInfo::ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint)
-{
-    Reset();
-    status = RPG_OUTDOOR_PVP;
-    outdoor_pvp = OutdoorPvP();
-    outdoor_pvp.capturePoint = capturePoint;
+    startT = getMSTime();
+    OutdoorPvP pvp;
+    pvp.capturePoint = capturePoint;
+    data = pvp;
 }
 
 bool NewRpgInfo::CanChangeTo(NewRpgStatus)
@@ -104,7 +98,7 @@ NewRpgStatus NewRpgInfo::GetStatus()
         if constexpr (std::is_same_v<T, Rest>) return RPG_REST;
         if constexpr (std::is_same_v<T, DoQuest>) return RPG_DO_QUEST;
         if constexpr (std::is_same_v<T, TravelFlight>) return RPG_TRAVEL_FLIGHT;
-        if constexpr (std::is_same_v<T, OutdoorPVP>) return RPG_OUTDOOR_PVP;
+        if constexpr (std::is_same_v<T, OutdoorPvP>) return RPG_OUTDOOR_PVP;
         return RPG_IDLE;
     }, data);
 }
@@ -163,27 +157,22 @@ std::string NewRpgInfo::ToString()
         else if constexpr (std::is_same_v<T, TravelFlight>)
         {
             out << "TRAVEL_FLIGHT";
-            out << "\nfromFlightMaster: " << flight.fromFlightMaster.GetEntry();
-            out << "\nfromNode: " << flight.path[0];
-            out << "\ntoNode: " << flight.path[arg.path.size() - 1];
-            out << "\ninFlight: " << flight.inFlight;
-            break;
+            out << "\nfromFlightMaster: " << arg.fromFlightMaster.GetEntry();
+            if (!arg.path.empty())
+            {
+                out << "\nfromNode: " << arg.path[0];
+                out << "\ntoNode: " << arg.path[arg.path.size() - 1];
+            }
+            out << "\ninFlight: " << arg.inFlight;
         }
-        else if constexpr (std::is_same_v<T, OutdoorPVP>)
+        else if constexpr (std::is_same_v<T, OutdoorPvP>)
         {
             out << "OUTDOOR_PVP";
-            if (!outdoor_pvp.capturePoint)
-            {
+            if (!arg.capturePoint)
                 out << "\nNo capture point assigned.";
-                break;
-            }
             else
-            {
-                out << "\nobjectiveEntry: " << outdoor_pvp.capturePoint->_capturePoint->GetName();
-                break;
-            }
-        default:
-            out << "UNKNOWN";
+                out << "\nobjectiveEntry: " << arg.capturePoint->_capturePoint->GetName();
+        }
     }, data);
     return out.str();
 }

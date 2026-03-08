@@ -1,4 +1,4 @@
-#include "FlightMasterCache.h"
+#include "TravelMgr.h"
 #include "Group.h"
 #include "Guild.h"
 #include "GuildRpgBaseAction.h"
@@ -251,13 +251,13 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 ma
         }
         if (bot->GetMapId() == mapId)
         {
-            if (botAI->rpgInfo.status == RPG_TRAVEL_FLIGHT)
+            if (botAI->rpgInfo.GetStatus() == RPG_TRAVEL_FLIGHT)
             {
                 LOG_ERROR("playerbots", "[Guild RPG] Bot {} is currently in travel flight, waiting to arrive at destination", bot->GetName());
                 return false;
             }
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} with faction {} is in target map {}, flying to target area {}", bot->GetName(), bot->GetTeamId(), mapId, targetZone);
-            Creature* nearestFlightMaster = sFlightMasterCache->GetNearestFlightMaster(bot);
+            Creature* nearestFlightMaster = sTravelMgr.GetNearestFlightMaster(bot);
             if (!nearestFlightMaster)
             {
                 LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find flight master or target position", bot->GetName());
@@ -276,7 +276,7 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 ma
                 botAI->guildRpgInfo.ResetGuildActivity();
                 return false;
             }
-            botAI->rpgInfo.ChangeToTravelFlight(nearestFlightMaster->GetGUID(), fromNode, toNode);
+            botAI->rpgInfo.ChangeToTravelFlight(nearestFlightMaster->GetGUID(), {fromNode, toNode});
             NewRpgTravelFlightAction travelFlightAction(botAI);
             return travelFlightAction.Execute(event);
         }

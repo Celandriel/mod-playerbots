@@ -2,7 +2,7 @@
 #include "BattleGroundJoinAction.h"
 #include "BattlegroundMgr.h"
 #include "DBCEnums.h"
-#include "FlightMasterCache.h"
+#include "TravelMgr.h"
 #include "GuildRpgInfo.h"
 #include "GuildRpgPvpAction.h"
 #include "Log.h"
@@ -244,7 +244,7 @@ bool GuildRpgPvpAction::HandleExecution(Event event)
     }
     else if (activity == GuildRpgActivity::WORLD_PVP)
     {
-        if (botAI->rpgInfo.status != RPG_OUTDOOR_PVP)
+        if (botAI->rpgInfo.GetStatus() != RPG_OUTDOOR_PVP)
         {
             NewRpgOutdoorPvpAction* outdoorPvpAction = new NewRpgOutdoorPvpAction(botAI);
             OPvPCapturePoint* capturePoint = outdoorPvpAction->SelectNewObjective();
