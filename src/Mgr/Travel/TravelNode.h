@@ -62,6 +62,12 @@ enum class TravelNodePathType : uint8
     teleportSpell = 5
 };
 
+enum class FlightMasterNodes : uint32
+{
+    LIGHTS_HOPE_CHAPEL_ALLIANCE = 67,
+    LIGHTS_HOPE_CHAPEL_HORDE = 68
+};
+
 // A connection between two nodes.
 class TravelNodePath
 {
@@ -580,6 +586,10 @@ public:
     void calcMapOffset();
     WorldPosition getMapOffset(uint32 mapId);
 
+    // Taxi graph (BFS-based path lookup between taxi nodes)
+    void InitTaxiGraph();
+    std::vector<uint32> FindTaxiPath(uint32 fromNode, uint32 toNode);
+
     std::shared_timed_mutex m_nMapMtx;
     std::unordered_map<ObjectGuid, std::unordered_map<uint32, TravelNode*>> teleportNodes;
 
@@ -592,6 +602,16 @@ private:
 
     TravelNodeMap(TravelNodeMap&&) = delete;
     TravelNodeMap& operator=(TravelNodeMap&&) = delete;
+
+    // Taxi graph internals
+    void BuildTaxiGraph();
+    void ComputeAllPaths();
+    std::unordered_map<uint32, uint32> BFS(uint32 startNode);
+    std::vector<uint32> BuildPath(uint32 fromNode, uint32 toNode,
+                                  const std::unordered_map<uint32, uint32>& parentMap);
+
+    std::unordered_map<uint32, std::vector<uint32>> taxiGraph;
+    std::map<uint32, std::map<uint32, std::vector<uint32>>> taxiPathCache;
 
     std::vector<TravelNode*> m_nodes;
 
