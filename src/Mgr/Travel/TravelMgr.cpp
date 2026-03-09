@@ -2519,7 +2519,7 @@ void TravelMgr::LoadQuestTravelTable()
         startNames[RACE_DRAENEI] = "Draenei";
         startNames[RACE_BLOODELF] = "Blood Elf";
 
-        for (uint32 i = 0; i < MAX_RACES; i++)
+        for (uint32 i = 0; i < sRaceMgr->GetMaxRaces(); i++)
         {
             for (uint32 j = 0; j < MAX_CLASSES; j++)
             {
@@ -4764,7 +4764,7 @@ void TravelMgr::PrepareDestinationCache()
         }
     }
     // Add travel hubs based on player start locations
-    for (uint32 i = 1; i < MAX_RACES; i++)
+    for (uint32 i = 1; i < sRaceMgr->GetMaxRaces(); i++)
     {
         for (uint32 j = 1; j < MAX_CLASSES; j++)
         {
@@ -4777,7 +4777,7 @@ void TravelMgr::PrepareDestinationCache()
 
             for (int32 l = 1; l <= 5; l++)
             {
-                if ((1 << (i - 1)) & RACEMASK_ALLIANCE)
+                if ((1 << (i - 1)) & sRaceMgr->GetAllianceRaceMask())
                     allianceHubsPerLevelCache[(uint8)l].push_back(pos);
                 else
                     hordeHubsPerLevelCache[(uint8)l].push_back(pos);
