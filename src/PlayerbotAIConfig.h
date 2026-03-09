@@ -52,13 +52,10 @@ enum NewRpgStatus : int
     // Do Quest (based on quest status)
     RPG_DO_QUEST = 5,
     // Travel
-
     RPG_TRAVEL_FLIGHT = 6,
-    // Taking a break
-    RPG_REST = 6,
     // Initial status
     RPG_REST = 7,
-    RPG_STATUS_END = 8
+    RPG_STATUS_END = 8,
     RPG_OUTDOOR_PVP = 9
 };
 

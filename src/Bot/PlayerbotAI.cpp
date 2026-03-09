@@ -43,11 +43,8 @@
 #include "PlayerbotMgr.h"
 #include "PlayerbotGuildMgr.h"
 #include "Playerbots.h"
-<<<<<<< HEAD
 #include "PlayerbotGroupMgr.h"
 #include "PointMovementGenerator.h"
-=======
->>>>>>> master
 #include "PositionValue.h"
 #include "RandomPlayerbotMgr.h"
 #include "SayAction.h"
@@ -417,9 +414,9 @@ void PlayerbotAI::UpdateAIGroupMaster()
     bool isGroupLeaderBot = GET_PLAYERBOT_AI(groupLeader);
 
     bool hasRealPlayerMaster = master && (!masterBotAI || masterBotAI->IsRealPlayer());
-    bool enableBotMaster = sPlayerbotAIConfig->enableGuildRpgStrategy && isGroupLeaderBot && groupLeader == master;
+    bool enableBotMaster = sPlayerbotAIConfig.enableGuildRpgStrategy && isGroupLeaderBot && groupLeader == master;
 
-    if (bot == groupLeader && sPlayerbotAIConfig->enableGuildRpgStrategy)
+    if (bot == groupLeader && sPlayerbotAIConfig.enableGuildRpgStrategy)
     {
         if (master)
             master = nullptr;
@@ -4289,7 +4286,7 @@ Player* PlayerbotAI::FindNewMaster()
     Player* groupLeader = GetGroupLeader();
     PlayerbotAI* leaderBotAI = GET_PLAYERBOT_AI(groupLeader);
 
-    if (!leaderBotAI || leaderBotAI->IsRealPlayer() || sPlayerbotAIConfig->enableGuildRpgStrategy)
+    if (!leaderBotAI || leaderBotAI->IsRealPlayer() || sPlayerbotAIConfig.enableGuildRpgStrategy)
         return groupLeader;
 
     // Find the real player in group

@@ -15,21 +15,21 @@ void PlayerbotGuildMgr::Init()
     LoadGuildNames();
     ValidateGuildCache();
 
-    if (sPlayerbotAIConfig->enableGuildRpgStrategy)
+    if (sPlayerbotAIConfig.enableGuildRpgStrategy)
     {
         _defaultGuildType = static_cast<GuildType>(
             std::distance
             (
-                sPlayerbotAIConfig->GuildTypeRatios.begin(),
+                sPlayerbotAIConfig.GuildTypeRatios.begin(),
                 std::max_element
                 (
-                    sPlayerbotAIConfig->GuildTypeRatios.begin(),
-                    sPlayerbotAIConfig->GuildTypeRatios.end()
+                    sPlayerbotAIConfig.GuildTypeRatios.begin(),
+                    sPlayerbotAIConfig.GuildTypeRatios.end()
                 )
             ) + 1
         );
 
-        std::vector<uint32> guildSizes = sPlayerbotAIConfig->GuildSize;
+        std::vector<uint32> guildSizes = sPlayerbotAIConfig.GuildSize;
         if (guildSizes.size()!= _nTypes)
         {
             LOG_ERROR("playerbots", "Config Error: GuildSize must have 4 numbers separated by commas.");
@@ -70,8 +70,8 @@ bool PlayerbotGuildMgr::CreateGuild(Player* player, std::string guildName)
     entry.status = 1;
     entry.type = _guildData[guildName].type;;
     entry.faction = player->GetTeamId();
-    if (!sPlayerbotAIConfig->enableGuildRpgStrategy || entry.type == GuildType::NONE)
-        entry.maxMembers = sPlayerbotAIConfig->randomBotGuildSizeMax;
+    if (!sPlayerbotAIConfig.enableGuildRpgStrategy || entry.type == GuildType::NONE)
+        entry.maxMembers = sPlayerbotAIConfig.randomBotGuildSizeMax;
     else
         entry.maxMembers = _guildNumPlayers[static_cast<uint8>(entry.type) - 1];
     _guildCache[guild->GetId()] = entry;
@@ -155,12 +155,12 @@ GuildType PlayerbotGuildMgr::DetermineGuildType(uint8 faction)
 
     float maxDiff = -std::numeric_limits<float>::infinity();
     GuildType bestType = _defaultGuildType; // default
-    for (size_t i = 0; i < sPlayerbotAIConfig->GuildTypeRatios.size(); ++i)
+    for (size_t i = 0; i < sPlayerbotAIConfig.GuildTypeRatios.size(); ++i)
     {
         GuildType type = static_cast<GuildType>(i + 1); // PVP starts at 1
-        float desired = sPlayerbotAIConfig->GuildTypeRatios[i];
-        if (i < sPlayerbotAIConfig->GuildTypeRatios.size())
-            desired = sPlayerbotAIConfig->GuildTypeRatios[i];
+        float desired = sPlayerbotAIConfig.GuildTypeRatios[i];
+        if (i < sPlayerbotAIConfig.GuildTypeRatios.size())
+            desired = sPlayerbotAIConfig.GuildTypeRatios[i];
 
         float diff = desired - currentRatios[type];
         if (diff > maxDiff)
@@ -205,7 +205,7 @@ std::string PlayerbotGuildMgr::AssignToGuild(Player* player)
 
     if (count < sPlayerbotAIConfig.randomBotGuildCount)
     {
-        if (sPlayerbotAIConfig->enableGuildRpgStrategy)
+        if (sPlayerbotAIConfig.enableGuildRpgStrategy)
         {
             GuildType guildType = DetermineGuildType(playerFaction);
             for (auto& keyValue : _guildData)

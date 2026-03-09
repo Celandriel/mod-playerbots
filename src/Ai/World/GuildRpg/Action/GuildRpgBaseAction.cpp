@@ -49,7 +49,7 @@ bool GuildRpgBaseAction::ChooseRandomActivity()
     {
         case GuildType::PVP:
             {
-                weights = sPlayerbotAIConfig->GuildRpgPvpWeights;
+                weights = sPlayerbotAIConfig.GuildRpgPvpWeights;
                 break;
             }
         case GuildType::PVE:
@@ -296,7 +296,7 @@ bool GuildRpgStatusUpdateAction::Execute(Event event)
     if (botAI->guildRpgInfo.GetActivityName()=="NONE")
     {
         uint32 roll = urand(0, 100);
-        if (roll < sPlayerbotAIConfig->guildRpgProbability)
+        if (roll < sPlayerbotAIConfig.guildRpgProbability)
             return ChooseRandomActivity();
     }
     return false;

@@ -30,16 +30,16 @@ std::vector<BattlegroundTypeId> FilterBattlegroundsByInstanceCounts(const std::v
             continue;
 
         BattlegroundBracketId bracketId = pvpDiff->GetBracketId();
-        uint32 currentInstances = sRandomPlayerbotMgr->BattlegroundData[queueTypeId][bracketId].bgInstanceCount;
+        uint32 currentInstances = sRandomPlayerbotMgr.BattlegroundData[queueTypeId][bracketId].bgInstanceCount;
 
         uint32 maxAllowedInstances = 0;
         switch (bgTypeId)
         {
-            case BATTLEGROUND_AV: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGAVCount; break;
-            case BATTLEGROUND_AB: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGABCount; break;
-            case BATTLEGROUND_WS: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGWSCount; break;
-            case BATTLEGROUND_EY: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGEYCount; break;
-            case BATTLEGROUND_IC: maxAllowedInstances = sPlayerbotAIConfig->randomBotAutoJoinBGICCount; break;
+            case BATTLEGROUND_AV: maxAllowedInstances = sPlayerbotAIConfig.randomBotAutoJoinBGAVCount; break;
+            case BATTLEGROUND_AB: maxAllowedInstances = sPlayerbotAIConfig.randomBotAutoJoinBGABCount; break;
+            case BATTLEGROUND_WS: maxAllowedInstances = sPlayerbotAIConfig.randomBotAutoJoinBGWSCount; break;
+            case BATTLEGROUND_EY: maxAllowedInstances = sPlayerbotAIConfig.randomBotAutoJoinBGEYCount; break;
+            case BATTLEGROUND_IC: maxAllowedInstances = sPlayerbotAIConfig.randomBotAutoJoinBGICCount; break;
             default: maxAllowedInstances = 1; break;
         }
 

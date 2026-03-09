@@ -201,7 +201,7 @@ void PlayerbotGroupMgr::UpdateComposition()
 
 std::vector<ObjectGuid> PlayerbotGroupMgr::GetGuildMembers(uint32 guildId)
 {
-    return sPlayerbotGuildMgr->GetAvailableGuildMembers(guildId);
+    return sPlayerbotGuildMgr.GetAvailableGuildMembers(guildId);
 }
 
 // Figure out if the group is complete

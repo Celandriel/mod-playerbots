@@ -51,7 +51,7 @@ struct NewRpgInfo
     struct TravelFlight
     {
         ObjectGuid fromFlightMaster{};
-        std::vector<uint32> path;
+        std::vector<uint32> path {};
         bool inFlight{false};
     };
     // RPG_REST

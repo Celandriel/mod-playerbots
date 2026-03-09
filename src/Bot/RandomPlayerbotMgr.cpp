@@ -1480,7 +1480,7 @@ bool RandomPlayerbotMgr::ProcessBot(Player* bot)
 
     // leave group if leader is rndbot
     Group* group = bot->GetGroup();
-    if (group && !group->isLFGGroup() && IsRandomBot(group->GetLeader()) && !sPlayerbotAIConfig->enableGuildRpgStrategy)
+    if (group && !group->isLFGGroup() && IsRandomBot(group->GetLeader()) && !sPlayerbotAIConfig.enableGuildRpgStrategy)
     {
         botAI->LeaveOrDisbandGroup();
         LOG_INFO("playerbots", "Bot {} remove from group since leader is random bot.", bot->GetName().c_str());

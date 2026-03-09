@@ -4,6 +4,7 @@
 
 bool NewRpgOutdoorPvpAction::Execute(Event event)
 {
+    NewRpgInfo& info = botAI->rpgInfo;
     if (botAI->guildRpgInfo.GetActivityName() != "WORLD_PVP")
     {
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
@@ -17,11 +18,13 @@ bool NewRpgOutdoorPvpAction::Execute(Event event)
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::PREPARATION);
         return true;
     }
-    OPvPCapturePoint* capturePoint = botAI->rpgInfo.outdoor_pvp.capturePoint;
+    auto& data = std::get<NewRpgInfo::OutdoorPvP>(info.data);
+
+    OPvPCapturePoint* capturePoint = data.capturePoint;
     if (capturePoint)
     {
         if (!capturePoint->_capturePoint)
-            botAI->rpgInfo.outdoor_pvp.capturePoint = nullptr;
+            data.capturePoint = nullptr;
 
         else
         {
@@ -43,7 +46,7 @@ bool NewRpgOutdoorPvpAction::Execute(Event event)
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
             return true; // No valid objectives, possibly all captured
         }
-        botAI->rpgInfo.outdoor_pvp.capturePoint = objective;
+        data.capturePoint = objective;
     }
     GameObject* objectiveGO = objective->_capturePoint;
     if (!objectiveGO)

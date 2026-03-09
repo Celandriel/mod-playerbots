@@ -55,7 +55,8 @@ enum class GuildRpgActivity : uint8_t
 
     // ROLEPLAY
     INN_MEETUP,
-    EMOTE_EVENT
+    EMOTE_EVENT,
+    DAILY_LIFE
 };
 using ActivityList = std::vector<GuildRpgActivity>;
 
@@ -87,6 +88,7 @@ static const std::map<GuildType, ActivityList> ActivitiesByGuildType =
     { GuildType::ROLEPLAY, {
         GuildRpgActivity::INN_MEETUP,
         GuildRpgActivity::EMOTE_EVENT,
+        GuildRpgActivity::DAILY_LIFE,
     }}
 };
 

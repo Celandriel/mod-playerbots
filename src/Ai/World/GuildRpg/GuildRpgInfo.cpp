@@ -70,6 +70,7 @@ std::string GuildRpgInfo::GetActivityName(GuildRpgActivity activity) const
 
         case GuildRpgActivity::INN_MEETUP:       return "INN_MEETUP";
         case GuildRpgActivity::EMOTE_EVENT:       return "EMOTE_EVENT";
+        case GuildRpgActivity::DAILY_LIFE:        return "DAILY_LIFE";
         default: return "NONE";
     }
 

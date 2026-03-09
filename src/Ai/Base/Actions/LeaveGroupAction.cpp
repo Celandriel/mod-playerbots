@@ -128,7 +128,7 @@ bool LeaveFarAwayAction::isUseful()
         return false;
 
     if (groupLeaderBotAI && !groupLeaderBotAI->IsRealPlayer() &&
-      sPlayerbotAIConfig->enableGuildRpgStrategy)     // Don't leave group when alt grouped with player groupLeader.
+      sPlayerbotAIConfig.enableGuildRpgStrategy)     // Don't leave group when alt grouped with player groupLeader.
         return false;
 
     if (botAI->GetGrouperType() == GrouperType::SOLO)

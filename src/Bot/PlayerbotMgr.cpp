@@ -398,7 +398,7 @@ void PlayerbotHolder::LogoutPlayerBot(ObjectGuid guid)
         uint32 guildId = bot->GetGuildId();
         if(guildId)
         {
-            sPlayerbotGuildMgr->SetBotAvailability(
+            sPlayerbotGuildMgr.SetBotAvailability(
                 guildId,
                 bot->GetGUID(),
                 BOT_STATUS_OFFLINE);
@@ -715,22 +715,22 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
     uint32 guildID = bot->GetGuildId();
     if(guildID)
     {
-        GuildType guildType = sPlayerbotGuildMgr->GetGuildTypeById(guildID);
+        GuildType guildType = sPlayerbotGuildMgr.GetGuildTypeById(guildID);
         botAI->SetGuildType(guildType);
         if (group)
         {
             if (botAI->HasRealPlayerMaster())
             {
-            sPlayerbotGuildMgr->SetBotAvailability( guildID, bot->GetGUID(), BOT_STATUS_WITH_MASTER);
+            sPlayerbotGuildMgr.SetBotAvailability( guildID, bot->GetGUID(), BOT_STATUS_WITH_MASTER);
             }
             else
             {
-                sPlayerbotGuildMgr->SetBotAvailability(guildID, bot->GetGUID(),BOT_STATUS_IN_GROUP);
+                sPlayerbotGuildMgr.SetBotAvailability(guildID, bot->GetGUID(),BOT_STATUS_IN_GROUP);
             }
         }
         else
         {
-            sPlayerbotGuildMgr->SetBotAvailability(guildID, bot->GetGUID(), BOT_STATUS_ONLINE);
+            sPlayerbotGuildMgr.SetBotAvailability(guildID, bot->GetGUID(), BOT_STATUS_ONLINE);
         }
     }
 }
