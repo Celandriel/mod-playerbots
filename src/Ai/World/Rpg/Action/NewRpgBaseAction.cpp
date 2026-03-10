@@ -120,9 +120,7 @@ bool NewRpgBaseAction::MoveFarTo(WorldPosition dest)
 bool NewRpgBaseAction::MoveWorldObjectTo(ObjectGuid guid, float distance)
 {
     if (IsWaitingForLastMove(MovementPriority::MOVEMENT_NORMAL))
-    {
         return false;
-    }
 
     WorldObject* object = botAI->GetWorldObject(guid);
     if (!object)
@@ -152,18 +150,17 @@ bool NewRpgBaseAction::MoveWorldObjectTo(ObjectGuid guid, float distance)
     return MoveTo(mapId, x, y, z, false, false, false, true);
 }
 
-bool NewRpgBaseAction::MoveRandomNear(float moveStep, MovementPriority priority)
+bool NewRpgBaseAction::MoveRandomNear(float moveStep, MovementPriority priority, WorldObject* center)
 {
     if (IsWaitingForLastMove(priority))
-    {
         return false;
-    }
 
     float distance = rand_norm() * moveStep;
     Map* map = bot->GetMap();
-    const float x = bot->GetPositionX();
-    const float y = bot->GetPositionY();
-    const float z = bot->GetPositionZ();
+    const float x = center ? center->GetPositionX() : bot->GetPositionX();
+    const float y = center ? center->GetPositionY() : bot->GetPositionY();
+    const float z = center ? center->GetPositionZ() : bot->GetPositionZ();
+
     int attempts = 1;
     while (attempts--)
     {

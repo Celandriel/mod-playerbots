@@ -14,6 +14,7 @@ public:
 
 protected:
     void GetCapturePoints();
+    bool PatrolCapturePoint(GameObject* objectiveGO, float radius);
 
 private:
     OutdoorPvP::OPvPCapturePointMap* capturePointMap = nullptr;

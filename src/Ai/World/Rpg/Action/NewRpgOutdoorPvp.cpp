@@ -55,11 +55,12 @@ bool NewRpgOutdoorPvpAction::Execute(Event event)
     if (objectiveGO->GetGoType() != GAMEOBJECT_TYPE_CAPTURE_POINT)
         return false;
 
-    float radius = objectiveGO->GetGOInfo()->capturePoint.radius/2.0f;
+    float radius = objectiveGO->GetGOInfo()->capturePoint.radius / 2.0f;
     if (!objectiveGO->IsWithinDistInMap(bot, radius) || !bot->IsOutdoorPvPActive())
         return MoveFarTo(WorldPosition(objectiveGO));
 
-    return false;
+    // Within capture range - patrol the area while capturing
+    return PatrolCapturePoint(objectiveGO, radius);
 }
 
 OPvPCapturePoint* NewRpgOutdoorPvpAction::SelectNewObjective()
@@ -114,4 +115,20 @@ void NewRpgOutdoorPvpAction::GetCapturePoints()
         return;
     }
     capturePointMap = outdoorPvP->GetCapturePoints();
+}
+
+bool NewRpgOutdoorPvpAction::PatrolCapturePoint(GameObject* objectiveGO, float radius)
+{
+    if (IsWaitingForLastMove(MovementPriority::MOVEMENT_NORMAL))
+        return false;
+
+    // Randomly pause at the current spot before picking a new patrol point
+    if (urand(0, 2) == 0)
+        return ForceToWait(urand(3000, 6000));
+
+    float patrolRadius = radius * 0.8f;
+    if (MoveRandomNear(patrolRadius, MovementPriority::MOVEMENT_NORMAL, objectiveGO))
+        return true;
+
+    return ForceToWait(urand(3000, 6000));
 }
