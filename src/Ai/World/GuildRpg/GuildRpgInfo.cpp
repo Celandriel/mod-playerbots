@@ -9,11 +9,19 @@ void GuildRpgInfo::SetGuildRpgActivity(PlayerbotAI* botAI, GuildRpgActivity acti
     this->activity = activity; // Set the actual GuildRpgActivity enum
 }
 
-void GuildRpgInfo::ResetGuildActivity()
+void GuildRpgInfo::ResetGuildActivity(bool sleep)
 {
     activity = GuildRpgActivity::NONE;
     phase = GuildRpgPhase::IDLE;
     activityTarget = "";
+
+    if (sleep)
+        sleepUntil = time(nullptr) + 5 * MINUTE;
+}
+
+bool GuildRpgInfo::IsSleep() const
+{
+    return time(nullptr) < sleepUntil;
 }
 
 std::string GuildRpgInfo::GetGuildTypeName(GuildType type)

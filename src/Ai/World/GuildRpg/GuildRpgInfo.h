@@ -4,6 +4,7 @@
 
 #include "Define.h"
 #include "GameObject.h"
+#include <ctime>
 #include <utility>
 #include <string>
 #include <vector>
@@ -98,9 +99,11 @@ struct GuildRpgInfo
     GuildRpgActivity activity = GuildRpgActivity::NONE;
     GuildRpgPhase phase = GuildRpgPhase::IDLE;
     std::string activityTarget = "";
+    time_t sleepUntil = 0;
 
     void SetGuildRpgActivity(PlayerbotAI* botAI, GuildRpgActivity activity);
-    void ResetGuildActivity();
+    void ResetGuildActivity(bool sleep = false);
+    bool IsSleep() const;
 
     static std::string GetGuildTypeName(GuildType type);
     static std::string GetPhaseName(GuildRpgPhase phase);

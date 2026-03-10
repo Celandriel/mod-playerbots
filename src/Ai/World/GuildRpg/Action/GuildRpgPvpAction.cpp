@@ -146,7 +146,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
         if (battleground == BATTLEGROUND_TYPE_NONE)
         {
             LOG_DEBUG("playerbots", "[Guild RPG] Bot {} could not find suitable battleground for level {} resetting task", name, botLevel);
-            botAI->guildRpgInfo.ResetGuildActivity();
+            botAI->guildRpgInfo.ResetGuildActivity(true);
             return false;
         }
         botAI->GetAiObjectContext()->GetValue<uint32>("bg type")->Set(BattlegroundMgr::BGQueueTypeId(battleground, 0));
@@ -161,7 +161,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
         }
         else
         {
-            botAI->guildRpgInfo.ResetGuildActivity();
+            botAI->guildRpgInfo.ResetGuildActivity(true);
             return false; // No world PVP area available for bot level
         }
     }
@@ -172,7 +172,7 @@ bool GuildRpgPvpAction::HandleSelection(Event event)
     if (!botAI->SetTargetGroupComposition(groupComp))
     {
         LOG_DEBUG("playerbots", "[Guild RPG] Bot {} could not set target group composition for activity {} resetting task", bot->GetName(), static_cast<int>(activity));
-        botAI->guildRpgInfo.ResetGuildActivity();
+        botAI->guildRpgInfo.ResetGuildActivity(true);
         return false;
     }
     botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::GROUPING);
@@ -219,7 +219,7 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
         }
         if (mapId == MAPID_INVALID || !targetZone || !toNode)
         {
-            botAI->guildRpgInfo.ResetGuildActivity();
+            botAI->guildRpgInfo.ResetGuildActivity(true);
             return false;
         }
         return PreparationMovementToRpgLocation(event, mapId, targetZone, toNode);
@@ -250,7 +250,7 @@ bool GuildRpgPvpAction::HandleExecution(Event event)
             OPvPCapturePoint* capturePoint = outdoorPvpAction->SelectNewObjective();
             if (!capturePoint)
             {
-                botAI->guildRpgInfo.ResetGuildActivity();
+                botAI->guildRpgInfo.ResetGuildActivity(true);
                 return false;
             }
             botAI->rpgInfo.ChangeToOutdoorPvp(capturePoint);

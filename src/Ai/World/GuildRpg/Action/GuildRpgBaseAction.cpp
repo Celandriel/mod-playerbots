@@ -80,9 +80,11 @@ bool GuildRpgBaseAction::isUseful()
         return false;
 
     if (bot->GetGroup() && bot->GetGroup()->GetLeaderGUID() != bot->GetGUID())
-    {
         return false;
-    }
+
+    if (botAI->guildRpgInfo.IsSleep())
+        return false;
+
     return true;
 }
 
@@ -174,7 +176,7 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
         if (!groupMgr->IsCompositionAvailable())
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {}: Required group composition not available", bot->GetName());
-            botAI->guildRpgInfo.ResetGuildActivity();
+            botAI->guildRpgInfo.ResetGuildActivity(true);
             return false;
         }
 
@@ -182,7 +184,7 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
         if (!groupMgr->CreateGroup())
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {}: Failed to create group", bot->GetName());
-            botAI->guildRpgInfo.ResetGuildActivity();
+            botAI->guildRpgInfo.ResetGuildActivity(true);
             return false;
         }
         LOG_DEBUG("playerbots", "[Guild RPG] Bot {} created group for activity", bot->GetName());
@@ -204,7 +206,7 @@ bool GuildRpgBaseAction::HandleGrouping(Event event)
         if (!groupMgr->CreateGroup())
         {
             LOG_ERROR("playerbots", "[Guild RPG] Bot {}: Failed to send re-invites to complete group. Reset activity.", bot->GetName());
-            botAI->guildRpgInfo.ResetGuildActivity();
+            botAI->guildRpgInfo.ResetGuildActivity(true);
             groupMgr->DisbandGroup();
             groupMgr->Reset();
             return false;
@@ -261,7 +263,7 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 ma
             if (!nearestFlightMaster)
             {
                 LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find flight master or target position", bot->GetName());
-                botAI->guildRpgInfo.ResetGuildActivity();
+                botAI->guildRpgInfo.ResetGuildActivity(true);
                 return false;
             }
             LOG_ERROR("playerbots", "[Guild RPG] Bot {} found nearest flight master {} and is {} yards away", bot->GetName(), nearestFlightMaster->GetName(), bot->GetDistance(nearestFlightMaster));
@@ -273,7 +275,7 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 ma
             if (!path)
             {
                 LOG_ERROR("playerbots", "[Guild RPG] Bot {} with taxicheats {} could not find taxi path from node {} to node {}", bot->GetName(), bot->isTaxiCheater(), fromNode, toNode);
-                botAI->guildRpgInfo.ResetGuildActivity();
+                botAI->guildRpgInfo.ResetGuildActivity(true);
                 return false;
             }
             botAI->rpgInfo.ChangeToTravelFlight(nearestFlightMaster->GetGUID(), {fromNode, toNode});
