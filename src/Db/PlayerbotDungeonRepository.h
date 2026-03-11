@@ -34,6 +34,7 @@ public:
 
     void LoadDungeonSuggestions();
     std::vector<DungeonSuggestion> const GetDungeonSuggestions();
+    std::vector<const DungeonSuggestion*> GetDungeonsForLevel(uint8 level) const;
 
 private:
     PlayerbotDungeonRepository() = default;

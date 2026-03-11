@@ -52,3 +52,14 @@ void PlayerbotDungeonRepository::LoadDungeonSuggestions()
     LOG_INFO("server.loading", "{} playerbots dungeon suggestions loaded in {} ms", count,
              GetMSTimeDiffToNow(oldMSTime));
 }
+
+std::vector<const DungeonSuggestion*> PlayerbotDungeonRepository::GetDungeonsForLevel(uint8 level) const
+{
+    std::vector<const DungeonSuggestion*> result;
+    for (const auto& d : m_dungeonSuggestions)
+    {
+        if (level >= d.min_level && level <= d.max_level)
+            result.push_back(&d);
+    }
+    return result;
+}
