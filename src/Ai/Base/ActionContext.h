@@ -72,7 +72,7 @@
 #include "NewRpgOutdoorPvP.h"
 #include "FishingAction.h"
 #include "CancelChannelAction.h"
-#include "DungeonPathMoveAction.h"
+#include "NewRpgDungeonPve.h"
 
 
 class PlayerbotAI;
@@ -208,8 +208,6 @@ public:
         creators["remove bobber strategy"] = &ActionContext::remove_bobber_strategy;
         creators["roll"] = &ActionContext::roll_action;
         creators["cancel channel"] = &ActionContext::cancel_channel;
-        creators["dungeon path move"] = &ActionContext::dungeon_path_move;
-
         // BG Tactics
         creators["bg tactics"] = &ActionContext::bg_tactics;
         creators["bg move to start"] = &ActionContext::bg_move_to_start;
@@ -273,6 +271,7 @@ public:
         creators["new rpg do quest"] = &ActionContext::new_rpg_do_quest;
         creators["new rpg travel flight"] = &ActionContext::new_rpg_travel_flight;
         creators["new rpg outdoor pvp"] = &ActionContext::new_rpg_outdoor_pvp;
+        creators["new rpg dungeon pve"] = &ActionContext::new_rpg_dungeon_pve;
 
         //Guild RPG actions
         creators["guild rpg status update"] = &ActionContext::guild_rpg_status_update;
@@ -284,7 +283,6 @@ public:
     }
 
 private:
-    static Action* dungeon_path_move(PlayerbotAI* botAI) { return new DungeonPathMoveAction(botAI, &AiObjectContext::s_dungeonWaypointMgr); }
     static Action* give_water(PlayerbotAI* botAI) { return new GiveWaterAction(botAI); }
     static Action* give_food(PlayerbotAI* botAI) { return new GiveFoodAction(botAI); }
     static Action* ra(PlayerbotAI* botAI) { return new RemoveAuraAction(botAI); }
@@ -477,6 +475,7 @@ private:
     static Action* new_rpg_do_quest(PlayerbotAI* ai) { return new NewRpgDoQuestAction(ai); }
     static Action* new_rpg_travel_flight(PlayerbotAI* ai) { return new NewRpgTravelFlightAction(ai); }
     static Action* new_rpg_outdoor_pvp(PlayerbotAI* ai) { return new NewRpgOutdoorPvpAction(ai); }
+    static Action* new_rpg_dungeon_pve(PlayerbotAI* ai) { return new NewRpgDungeonPveAction(ai, &AiObjectContext::s_dungeonWaypointMgr); }
 
     //Guild rpg actions
     static Action* guild_rpg_status_update(PlayerbotAI* botAI) { return new GuildRpgStatusUpdateAction(botAI); }

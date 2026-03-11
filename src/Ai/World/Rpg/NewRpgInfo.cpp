@@ -67,6 +67,15 @@ void NewRpgInfo::ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint)
     data = pvp;
 }
 
+void NewRpgInfo::ChangeToDungeonPve(uint32 mapId, const std::string& dungeonName)
+{
+    startT = getMSTime();
+    DungeonPve dungeon;
+    dungeon.mapId = mapId;
+    dungeon.dungeonName = dungeonName;
+    data = dungeon;
+}
+
 bool NewRpgInfo::CanChangeTo(NewRpgStatus)
 {
     return true;
@@ -99,6 +108,7 @@ NewRpgStatus NewRpgInfo::GetStatus()
         if constexpr (std::is_same_v<T, DoQuest>) return RPG_DO_QUEST;
         if constexpr (std::is_same_v<T, TravelFlight>) return RPG_TRAVEL_FLIGHT;
         if constexpr (std::is_same_v<T, OutdoorPvP>) return RPG_OUTDOOR_PVP;
+        if constexpr (std::is_same_v<T, DungeonPve>) return RPG_DUNGEON_PVE;
         return RPG_IDLE;
     }, data);
 }
@@ -172,6 +182,12 @@ std::string NewRpgInfo::ToString()
                 out << "\nNo capture point assigned.";
             else
                 out << "\nobjectiveEntry: " << arg.capturePoint->_capturePoint->GetName();
+        }
+        else if constexpr (std::is_same_v<T, DungeonPve>)
+        {
+            out << "DUNGEON_PVE";
+            out << "\nmapId: " << arg.mapId;
+            out << "\ndungeon: " << arg.dungeonName;
         }
     }, data);
     return out.str();

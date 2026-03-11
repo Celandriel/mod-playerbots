@@ -1,5 +1,5 @@
 #include "AiObjectContext.h"
-#include "DungeonPathMoveAction.h"
+#include "NewRpgDungeonPve.h"
 #include "DungeonWaypointMgr.h"
 #include "GenericActions.h"
 #include "AttackersValue.h"
@@ -8,31 +8,27 @@
 #include <limits>
 #include <chrono>
 
-DungeonPathMoveAction::DungeonPathMoveAction(PlayerbotAI* ai, DungeonWaypointMgr* mgr)
-    : MovementAction(ai, "dungeon path move"), waypointMgr(mgr) {}
-
-bool DungeonPathMoveAction::Execute(Event event)
+bool NewRpgDungeonPveAction::Execute(Event event)
 {
     Player* bot = botAI->GetBot();
     uint32 mapId = bot->GetMapId();
 
-    if (!waypointMgr)
-    {
+    // Only the main tank follows waypoints; non-tanks rely on formations to follow tank
+    Player* leadingTank = PlayerbotAI::FindGroupTankToFollow(bot, bot);
+    if (leadingTank != bot)
         return false;
-    }
+
+    if (!waypointMgr)
+        return false;
 
     const auto& allPaths = waypointMgr->GetAllPaths();
     auto it = allPaths.find(mapId);
     if (it == allPaths.end() || it->second.empty())
-    {
         return false;
-    }
 
     const DungeonPath* path = &it->second.begin()->second;
     if (path->size() < 2)
-    {
         return false;
-    }
 
     size_t closest = FindClosestWaypoint(path, bot);
 
@@ -81,14 +77,14 @@ bool DungeonPathMoveAction::Execute(Event event)
     if (wp.next_index == index)
     {
         botAI->TellMasterNoFacing("No next waypoint found, following you instead.");
-        botAI->ChangeStrategy("+follow", BOT_STATE_NON_COMBAT);
+        botAI->rpgInfo.ChangeToIdle();
     }
 
     HandleCombatEngagement(bot, event);
     return result;
 }
 
-size_t DungeonPathMoveAction::FindClosestWaypoint(const DungeonPath* path, Player* bot) const
+size_t NewRpgDungeonPveAction::FindClosestWaypoint(const DungeonPath* path, Player* bot) const
 {
     size_t closest = 0;
     float minDist = std::numeric_limits<float>::max();
@@ -110,7 +106,7 @@ size_t DungeonPathMoveAction::FindClosestWaypoint(const DungeonPath* path, Playe
     return closest;
 }
 
-size_t DungeonPathMoveAction::DetermineTargetIndex(const DungeonPath* path, Player* bot, size_t closestIndex)
+size_t NewRpgDungeonPveAction::DetermineTargetIndex(const DungeonPath* path, Player* bot, size_t closestIndex)
 {
     float distToPrev = 0.0f;
     if (previousIndex < path->size())
@@ -148,7 +144,7 @@ size_t DungeonPathMoveAction::DetermineTargetIndex(const DungeonPath* path, Play
     return closestIndex;
 }
 
-bool DungeonPathMoveAction::CheckGroupConditions(Player* bot, const DungeonWaypoint& waypoint) const
+bool NewRpgDungeonPveAction::CheckGroupConditions(Player* bot, const DungeonWaypoint& waypoint) const
 {
     Group* group = bot->GetGroup();
     if (!group) return true;
@@ -161,19 +157,13 @@ bool DungeonPathMoveAction::CheckGroupConditions(Player* bot, const DungeonWaypo
         if (!member) continue;
 
         if (!member->IsAlive())
-        {
             return false;
-        }
 
         if (member->GetMapId() != bot->GetMapId())
-        {
             return false;
-        }
 
         if (bot->GetDistance(member) > maxDistance)
-        {
             return false;
-        }
 
         if (botAI->IsHeal(member))
         {
@@ -181,9 +171,7 @@ bool DungeonPathMoveAction::CheckGroupConditions(Player* bot, const DungeonWaypo
             uint32 maxMana = member->GetMaxPower(POWER_MANA);
 
             if (maxMana > 0 && static_cast<float>(mana) < waypoint.healer_mana_pct * static_cast<float>(maxMana))
-            {
                 return false;
-            }
         }
 
         if (botAI->IsTank(member))
@@ -192,16 +180,14 @@ bool DungeonPathMoveAction::CheckGroupConditions(Player* bot, const DungeonWaypo
             uint32 maxHealth = member->GetMaxHealth();
 
             if (maxHealth > 0 && static_cast<float>(health) < waypoint.healer_mana_pct * static_cast<float>(maxHealth))
-            {
                 return false;
-            }
         }
     }
 
     return true;
 }
 
-void DungeonPathMoveAction::HandleWaypointInteraction(const DungeonWaypoint& waypoint, Player* bot, size_t waypointIndex)
+void NewRpgDungeonPveAction::HandleWaypointInteraction(const DungeonWaypoint& waypoint, Player* bot, size_t waypointIndex)
 {
     if (pendingMenuInteractionIndex == waypointIndex)
     {
@@ -236,9 +222,7 @@ void DungeonPathMoveAction::HandleWaypointInteraction(const DungeonWaypoint& way
     if (waypoint.interact_type == 1 && waypoint.interact_guid != 0)
     {
         if (lastInteractedIndex == waypointIndex)
-        {
             return;
-        }
 
         std::list<Unit*> npcs;
         Acore::AnyUnitInObjectRangeCheck npcCheck(bot, NPC_INTERACT_DISTANCE);
@@ -277,7 +261,7 @@ void DungeonPathMoveAction::HandleWaypointInteraction(const DungeonWaypoint& way
     }
 }
 
-void DungeonPathMoveAction::HandleWaypointNotification(const DungeonWaypoint& waypoint)
+void NewRpgDungeonPveAction::HandleWaypointNotification(const DungeonWaypoint& waypoint)
 {
     auto now = std::chrono::steady_clock::now();
 
@@ -297,7 +281,7 @@ void DungeonPathMoveAction::HandleWaypointNotification(const DungeonWaypoint& wa
     }
 }
 
-void DungeonPathMoveAction::HandleCombatEngagement(Player* bot, Event event)
+void NewRpgDungeonPveAction::HandleCombatEngagement(Player* bot, Event event)
 {
     if (bot->IsInCombat()) return;
 

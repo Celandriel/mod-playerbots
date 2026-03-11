@@ -64,6 +64,12 @@ struct NewRpgInfo
     {
         OPvPCapturePoint* capturePoint{nullptr};
     };
+    // RPG_DUNGEON_PVE
+    struct DungeonPve
+    {
+        uint32 mapId{0};
+        std::string dungeonName;
+    };
     struct Idle
     {
     };
@@ -86,7 +92,8 @@ struct NewRpgInfo
         DoQuest,
         Rest,
         TravelFlight,
-        OutdoorPvP
+        OutdoorPvP,
+        DungeonPve
     >;
     RpgData data;
 
@@ -99,6 +106,7 @@ struct NewRpgInfo
     void ChangeToDoQuest(uint32 questId, const Quest* quest);
     void ChangeToTravelFlight(ObjectGuid fromFlightMaster, std::vector<uint32> path);
     void ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint);
+    void ChangeToDungeonPve(uint32 mapId, const std::string& dungeonName);
     void ChangeToRest();
     void ChangeToIdle();
     bool CanChangeTo(NewRpgStatus status);

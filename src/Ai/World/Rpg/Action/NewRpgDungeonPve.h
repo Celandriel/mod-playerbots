@@ -1,15 +1,16 @@
-#ifndef _PLAYERBOT_DUNGEONPATHMOVEACTION_H
-#define _PLAYERBOT_DUNGEONPATHMOVEACTION_H
+#ifndef _PLAYERBOT_NEWRPGDUNGEONPVE_H
+#define _PLAYERBOT_NEWRPGDUNGEONPVE_H
 
-#include "MovementActions.h"
+#include "NewRpgBaseAction.h"
 #include "DungeonWaypointMgr.h"
-#include "PlayerbotAI.h"
 #include <chrono>
 
-class DungeonPathMoveAction : public MovementAction
+class NewRpgDungeonPveAction : public NewRpgBaseAction
 {
 public:
-    DungeonPathMoveAction(PlayerbotAI* ai, DungeonWaypointMgr* mgr);
+    NewRpgDungeonPveAction(PlayerbotAI* botAI, DungeonWaypointMgr* mgr)
+        : NewRpgBaseAction(botAI, "new rpg dungeon pve"), waypointMgr(mgr) {}
+
     bool Execute(Event event) override;
 
 private:

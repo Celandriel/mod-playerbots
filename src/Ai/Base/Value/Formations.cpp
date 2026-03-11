@@ -143,7 +143,7 @@ public:
         if (!master)
             return Formation::NullLocation;
 
-        if (botAI->HasStrategy("dungeon path", BOT_STATE_NON_COMBAT) || botAI->HasStrategy("follow tank", BOT_STATE_NON_COMBAT))
+        if (botAI->rpgInfo.GetStatus() == RPG_DUNGEON_PVE)
         {
             followTarget = PlayerbotAI::FindGroupTankToFollow(bot, master);
         }
