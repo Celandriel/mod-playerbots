@@ -72,6 +72,7 @@
 #include "NewRpgOutdoorPvP.h"
 #include "FishingAction.h"
 #include "CancelChannelAction.h"
+#include "DungeonPathMoveAction.h"
 
 
 class PlayerbotAI;
@@ -207,6 +208,7 @@ public:
         creators["remove bobber strategy"] = &ActionContext::remove_bobber_strategy;
         creators["roll"] = &ActionContext::roll_action;
         creators["cancel channel"] = &ActionContext::cancel_channel;
+        creators["dungeon path move"] = &ActionContext::dungeon_path_move;
 
         // BG Tactics
         creators["bg tactics"] = &ActionContext::bg_tactics;
@@ -282,6 +284,7 @@ public:
     }
 
 private:
+    static Action* dungeon_path_move(PlayerbotAI* botAI) { return new DungeonPathMoveAction(botAI, &AiObjectContext::s_dungeonWaypointMgr); }
     static Action* give_water(PlayerbotAI* botAI) { return new GiveWaterAction(botAI); }
     static Action* give_food(PlayerbotAI* botAI) { return new GiveFoodAction(botAI); }
     static Action* ra(PlayerbotAI* botAI) { return new RemoveAuraAction(botAI); }

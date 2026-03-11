@@ -20,6 +20,8 @@
 #include "EmoteStrategy.h"
 #include "FleeStrategy.h"
 #include "FollowMasterStrategy.h"
+#include "FollowTankStrategy.h"
+#include "DungeonPathStrategy.h"
 #include "GrindingStrategy.h"
 #include "GroupStrategy.h"
 #include "GuardStrategy.h"
@@ -206,15 +208,19 @@ public:
     MovementStrategyContext() : NamedObjectContext<Strategy>(false, true)
     {
         creators["follow"] = &MovementStrategyContext::follow_master;
+        creators["follow tank"] = &MovementStrategyContext::follow_tank;
         creators["stay"] = &MovementStrategyContext::stay;
         creators["runaway"] = &MovementStrategyContext::runaway;
         creators["flee from adds"] = &MovementStrategyContext::flee_from_adds;
         creators["guard"] = &MovementStrategyContext::guard;
+        creators["dungeon path"] = &MovementStrategyContext::dungeon_path;
     }
 
 private:
     static Strategy* guard(PlayerbotAI* botAI) { return new GuardStrategy(botAI); }
     static Strategy* follow_master(PlayerbotAI* botAI) { return new FollowMasterStrategy(botAI); }
+    static Strategy* follow_tank(PlayerbotAI* botAI) { return new FollowTankStrategy(botAI); }
+    static Strategy* dungeon_path(PlayerbotAI* botAI) { return new DungeonPathStrategy(botAI); }
     static Strategy* stay(PlayerbotAI* botAI) { return new StayStrategy(botAI); }
     static Strategy* runaway(PlayerbotAI* botAI) { return new RunawayStrategy(botAI); }
     static Strategy* flee_from_adds(PlayerbotAI* botAI) { return new FleeFromAddsStrategy(botAI); }

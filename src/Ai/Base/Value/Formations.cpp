@@ -137,9 +137,26 @@ public:
 
     WorldLocation GetLocationInternal() override
     {
+        Player* followTarget = nullptr;
         Player* master = GetMaster();
-        Map* map = nullptr;
-        if (!ValidateTargetContext(master, bot, map))
+
+        if (!master)
+            return Formation::NullLocation;
+
+        if (botAI->HasStrategy("dungeon path", BOT_STATE_NON_COMBAT) || botAI->HasStrategy("follow tank", BOT_STATE_NON_COMBAT))
+        {
+            followTarget = PlayerbotAI::FindGroupTankToFollow(bot, master);
+        }
+        else
+        {
+            followTarget = master;
+        }
+
+        if (!followTarget)
+            return Formation::NullLocation;
+
+        Map* map = followTarget->GetMap();
+        if (!map)
             return Formation::NullLocation;
 
         float range = sPlayerbotAIConfig.followDistance;
@@ -155,22 +172,21 @@ public:
             dr = std::sqrt(dx * dx + dy * dy);
         }
 
-        float x = master->GetPositionX() + std::cos(angle) * range + dx;
-        float y = master->GetPositionY() + std::sin(angle) * range + dy;
-        float z = master->GetPositionZ() + master->GetHoverHeight();
+        float x = followTarget->GetPositionX() + std::cos(angle) * range + dx;
+        float y = followTarget->GetPositionY() + std::sin(angle) * range + dy;
+        float z = followTarget->GetPositionZ() + followTarget->GetHoverHeight();
 
-        if (!map->CheckCollisionAndGetValidCoords(master, master->GetPositionX(), master->GetPositionY(),
-                                                  master->GetPositionZ(), x, y, z))
+        if (!map->CheckCollisionAndGetValidCoords(followTarget, followTarget->GetPositionX(), followTarget->GetPositionY(),
+                                                  followTarget->GetPositionZ(), x, y, z))
         {
-            // Recompute a clean fallback and clamp Z
-            x = master->GetPositionX() + std::cos(angle) * range + dx;
-            y = master->GetPositionY() + std::sin(angle) * range + dy;
-            z = master->GetPositionZ() + master->GetHoverHeight();
+            x = followTarget->GetPositionX() + std::cos(angle) * range + dx;
+            y = followTarget->GetPositionY() + std::sin(angle) * range + dy;
+            z = followTarget->GetPositionZ() + followTarget->GetHoverHeight();
 
-            master->UpdateAllowedPositionZ(x, y, z);
+            followTarget->UpdateAllowedPositionZ(x, y, z);
         }
 
-        return WorldLocation(master->GetMapId(), x, y, z);
+        return WorldLocation(followTarget->GetMapId(), x, y, z);
     }
 
     float GetMaxDistance() override { return sPlayerbotAIConfig.followDistance + dr; }

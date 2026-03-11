@@ -16,6 +16,7 @@
 #include "Strategy.h"
 #include "Trigger.h"
 #include "Value.h"
+#include "DungeonWaypointMgr.h"
 
 class PlayerbotAI;
 
@@ -27,6 +28,7 @@ typedef UntypedValue* (*ValueCreator)(PlayerbotAI* botAI);
 class AiObjectContext : public PlayerbotAIAware
 {
 public:
+    static DungeonWaypointMgr s_dungeonWaypointMgr;
     static BoolCalculatedValue* custom_glyphs(PlayerbotAI* ai); // Added for cutom glyphs
     AiObjectContext(PlayerbotAI* botAI,
                     SharedNamedObjectContextList<Strategy>& sharedStrategyContext = sharedStrategyContexts,

@@ -146,3 +146,5 @@ std::string const AiObjectContext::FormatValues()
 
     return out.str();
 }
+
+DungeonWaypointMgr AiObjectContext::s_dungeonWaypointMgr;
