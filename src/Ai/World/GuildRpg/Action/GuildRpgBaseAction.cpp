@@ -53,6 +53,10 @@ bool GuildRpgBaseAction::ChooseRandomActivity()
                 break;
             }
         case GuildType::PVE:
+            {
+                weights = sPlayerbotAIConfig.GuildRpgPveWeights;
+                break;
+            }
         case GuildType::PROFESSION:
         case GuildType::ROLEPLAY:
         case GuildType::NONE:
