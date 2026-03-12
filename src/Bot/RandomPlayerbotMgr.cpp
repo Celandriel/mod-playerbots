@@ -26,6 +26,7 @@
 #include "GridNotifiers.h"
 #include "LFGMgr.h"
 #include "MapMgr.h"
+#include "GuildRpgInfo.h"
 #include "NewRpgInfo.h"
 #include "NewRpgStrategy.h"
 #include "ObjectGuid.h"
@@ -2696,6 +2697,9 @@ void RandomPlayerbotMgr::PrintStats()
     std::unordered_map<NewRpgStatus, int> rpgStatusCount;
     // static NewRpgStatistic rpgStasticTotal;
     std::unordered_map<uint32, int> zoneCount;
+    std::unordered_map<GuildType, uint32> guildTypeCount;
+    std::unordered_map<GuildRpgActivity, uint32> guildActivityCount;
+    std::unordered_map<GuildRpgPhase, uint32> guildPhaseCount;
     uint8 maxBotLevel = 0;
     for (PlayerBotMap::iterator i = playerBots.begin(); i != playerBots.end(); ++i)
     {
@@ -2785,6 +2789,16 @@ void RandomPlayerbotMgr::PrintStats()
             rpgStasticTotal += botAI->rpgStatistic;
             botAI->rpgStatistic = NewRpgStatistic();
         }
+
+        GuildRpgInfo& guildInfo = botAI->guildRpgInfo;
+        if (guildInfo.type != GuildType::NONE)
+        {
+            guildTypeCount[guildInfo.type]++;
+            if (guildInfo.activity != GuildRpgActivity::NONE)
+                guildActivityCount[guildInfo.activity]++;
+            if (guildInfo.phase != GuildRpgPhase::IDLE)
+                guildPhaseCount[guildInfo.phase]++;
+        }
     }
 
     LOG_INFO("playerbots", "Bots level:");
@@ -2866,6 +2880,27 @@ void RandomPlayerbotMgr::PrintStats()
         LOG_INFO("playerbots", "Bots total quests:");
         LOG_INFO("playerbots", "    Accepted: {}, Rewarded: {}, Dropped: {}", rpgStasticTotal.questAccepted,
                  rpgStasticTotal.questRewarded, rpgStasticTotal.questDropped);
+    }
+
+    if (!guildTypeCount.empty())
+    {
+        LOG_INFO("playerbots", "Guild RPG guilds:");
+        for (const auto& [type, count] : guildTypeCount)
+            LOG_INFO("playerbots", "    {}: {}", GuildRpgInfo::GetGuildTypeName(type), count);
+
+        if (!guildPhaseCount.empty())
+        {
+            LOG_INFO("playerbots", "Guild RPG phases:");
+            for (const auto& [phase, count] : guildPhaseCount)
+                LOG_INFO("playerbots", "    {}: {}", GuildRpgInfo::GetPhaseName(phase), count);
+        }
+
+        if (!guildActivityCount.empty())
+        {
+            LOG_INFO("playerbots", "Guild RPG activities:");
+            for (const auto& [activity, count] : guildActivityCount)
+                LOG_INFO("playerbots", "    {}: {}", GuildRpgInfo::GetActivityName(activity), count);
+        }
     }
 
     LOG_INFO("playerbots", "Bots engine:", dead);

@@ -55,7 +55,7 @@ std::string GuildRpgInfo::GetActivityName() const
 {
     return GetActivityName(activity);
 }
-std::string GuildRpgInfo::GetActivityName(GuildRpgActivity activity) const
+std::string GuildRpgInfo::GetActivityName(GuildRpgActivity activity)
 {
     switch (activity)
     {
