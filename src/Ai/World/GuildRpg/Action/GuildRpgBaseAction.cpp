@@ -1,4 +1,5 @@
 #include "TravelMgr.h"
+#include "TravelNode.h"
 #include "Group.h"
 #include "Guild.h"
 #include "GuildRpgBaseAction.h"
@@ -245,56 +246,51 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 ma
 {
     if (botAI->guildRpgInfo.phase != GuildRpgPhase::PREPARATION)
         return false;
-        //logic to handle travel to location. 1 move if in same area, fly if in same map, teleport if different map. The action only goes to excution when bot is in the target area and then summons the bots.
-        LOG_ERROR("playerbots", "[Guild RPG] Bot {} has area {}, map {} checking against target area {}", bot->GetName(), bot->GetAreaId(), bot->GetMapId(), targetZone);
-        if (bot->GetZoneId() == targetZone)
-        {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} is in target area {}, summoning group", bot->GetName(), targetZone);
-            botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
-            botAI->SayToParty("summon");
-            SyncGuildRpgStatus();
-            return true;
-        }
-        if (bot->GetMapId() == mapId)
-        {
-            if (botAI->rpgInfo.GetStatus() == RPG_TRAVEL_FLIGHT)
-            {
-                LOG_ERROR("playerbots", "[Guild RPG] Bot {} is currently in travel flight, waiting to arrive at destination", bot->GetName());
-                return false;
-            }
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} with faction {} is in target map {}, flying to target area {}", bot->GetName(), bot->GetTeamId(), mapId, targetZone);
-            Creature* nearestFlightMaster = sTravelMgr.GetNearestFlightMaster(bot);
-            if (!nearestFlightMaster)
-            {
-                LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find flight master or target position", bot->GetName());
-                botAI->guildRpgInfo.ResetGuildActivity(true);
-                return false;
-            }
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} found nearest flight master {} and is {} yards away", bot->GetName(), nearestFlightMaster->GetName(), bot->GetDistance(nearestFlightMaster));
-            uint32 fromNode = sObjectMgr->GetNearestTaxiNode(nearestFlightMaster->GetPositionX(), nearestFlightMaster->GetPositionY(),
-                                              nearestFlightMaster->GetPositionZ(), nearestFlightMaster->GetMapId(),
-                                              bot->GetTeamId());
-            uint32 path, cost;
-            sObjectMgr->GetTaxiPath(fromNode, toNode, path, cost);
-            if (!path)
-            {
-                LOG_ERROR("playerbots", "[Guild RPG] Bot {} with taxicheats {} could not find taxi path from node {} to node {}", bot->GetName(), bot->isTaxiCheater(), fromNode, toNode);
-                botAI->guildRpgInfo.ResetGuildActivity(true);
-                return false;
-            }
-            botAI->rpgInfo.ChangeToTravelFlight(nearestFlightMaster->GetGUID(), {fromNode, toNode});
-            NewRpgTravelFlightAction travelFlightAction(botAI);
-            return travelFlightAction.Execute(event);
-        }
-        else
-        {
-            LOG_ERROR("playerbots", "[Guild RPG] Bot {} in different map teleporting to target area {}", bot->GetName(), targetZone);
-            TaxiNodesEntry const* taxiNodeEntry = sTaxiNodesStore.LookupEntry(static_cast<uint32>(toNode));
-            WorldPosition targetPos = WorldPosition(mapId, taxiNodeEntry->x, taxiNodeEntry->y, taxiNodeEntry->z);
-            bot->TeleportTo(targetPos);
-            return true;
-        }
+
+    LOG_DEBUG("playerbots", "[Guild RPG] Bot {} has zone {}, map {} checking against target zone {}", bot->GetName(), bot->GetZoneId(), bot->GetMapId(), targetZone);
+
+    // Already in target zone — transition to execution
+    if (bot->GetZoneId() == targetZone)
+    {
+        LOG_DEBUG("playerbots", "[Guild RPG] Bot {} is in target zone {}, summoning group", bot->GetName(), targetZone);
+        botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
+        botAI->SayToParty("summon");
+        SyncGuildRpgStatus();
+        return true;
+    }
+
+    // NewRpg is still walking/flying the travel path — wait
+    if (botAI->rpgInfo.GetStatus() == RPG_MOVE_FAR || botAI->rpgInfo.GetStatus() == RPG_TRAVEL_FLIGHT)
+        return false;
+
+    // Resolve target position from the taxi node
+    TaxiNodesEntry const* taxiNodeEntry = sTaxiNodesStore.LookupEntry(static_cast<uint32>(toNode));
+    if (!taxiNodeEntry)
+    {
+        LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find taxi node {}", bot->GetName(), toNode);
+        botAI->guildRpgInfo.ResetGuildActivity(true);
+        return false;
+    }
+
+    WorldPosition targetPos(mapId, taxiNodeEntry->x, taxiNodeEntry->y, taxiNodeEntry->z);
+    WorldPosition currentPos(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
+
+    // Compute full travel path using the travel node system
+    TravelPath travelPath = TravelNodeMap::getFullPath(currentPos, targetPos, bot);
+
+    if (travelPath.empty())
+    {
+        LOG_DEBUG("playerbots", "[Guild RPG] Bot {} could not find travel path to zone {}, falling back to teleport", bot->GetName(), targetZone);
+        bot->TeleportTo(targetPos);
+        return true;
+    }
+
+    LOG_DEBUG("playerbots", "[Guild RPG] Bot {} starting travel path to zone {} ({} waypoints)", bot->GetName(), targetZone, travelPath.getPath().size());
+    botAI->rpgInfo.travelPath = std::move(travelPath);
+    botAI->rpgInfo.ChangeToMoveFar();
+    return true;
 }
+
 bool GuildRpgStatusUpdateAction::Execute(Event event)
 {
     if (bot->GetLevel() < 10)

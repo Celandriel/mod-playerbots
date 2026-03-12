@@ -434,7 +434,7 @@ public:
     }
     void clear() { fullPath.clear(); }
 
-    bool empty() { return fullPath.empty(); }
+    bool empty() const { return fullPath.empty(); }
     std::vector<PathNodePoint> getPath() { return fullPath; }
     WorldPosition getFront() { return fullPath.front().point; }
     WorldPosition getBack() { return fullPath.back().point; }
