@@ -263,7 +263,7 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, WorldPosi
 
     // Compute full travel path using the travel node system
     WorldPosition currentPos(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
-    TravelPath travelPath = TravelNodeMap::getFullPath(currentPos, targetPos, bot);
+    TravelPath travelPath = sTravelNodeMap.getFullPath(currentPos, targetPos, bot);
 
     if (travelPath.empty())
     {
