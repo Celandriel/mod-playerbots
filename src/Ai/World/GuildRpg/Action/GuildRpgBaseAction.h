@@ -4,6 +4,7 @@
 #include "Action.h"
 #include "Guild.h"
 #include "GuildRpgInfo.h"
+#include "TravelMgr.h"
 
 class TellGuildRpgStatusAction : public Action
 {

@@ -570,7 +570,7 @@ public:
                              Player* bot = nullptr);
 
     // Find the full path between those locations
-    static TravelPath getFullPath(WorldPosition startPos, WorldPosition endPos, Player* bot = nullptr);
+    TravelPath getFullPath(WorldPosition startPos, WorldPosition endPos, Player* bot = nullptr);
 
     // Manage/update nodes
     void manageNodes(Unit* bot, bool mapFull = false);

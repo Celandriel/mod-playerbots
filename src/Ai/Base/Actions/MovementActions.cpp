@@ -357,7 +357,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
 
     //     if (startPosition.GetMapId() != endPosition.GetMapId() || totalDistance > maxDist)
     //     {
-    //         if (!TravelNodeMap::instance().getNodes().empty() && !bot->InBattleground())
+    //         if (!sTravelNodeMap.getNodes().empty() && !bot->InBattleground())
     //         {
     //             if (sPlayerbotAIConfig.tweakValue)
     //             {
@@ -373,7 +373,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
     //                 }
     //             }
     //             else
-    //                 movePath = TravelNodeMap::instance().getFullPath(startPosition, endPosition, bot);
+    //                 movePath = sTravelNodeMap.getFullPath(startPosition, endPosition, bot);
 
     //             if (movePath.empty())
     //             {
