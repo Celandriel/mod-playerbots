@@ -64,8 +64,28 @@ enum class TravelNodePathType : uint8
 
 enum class FlightMasterNodes : uint32
 {
+    // Major cities
+    STORMWIND          = 2,
+    SENTINEL_HILL      = 4,    // Westfall
+    IRONFORGE          = 6,
+    THELSAMAR          = 8,    // Loch Modan
+    THE_SEPULCHER      = 10,   // Silverpine Forest
+    UNDERCITY          = 11,
+    THUNDER_BLUFF      = 22,
+    ORGRIMMAR          = 23,
+    CROSSROADS         = 25,   // The Barrens
+    DARNASSUS          = 25,   // Rut'theran Village (Darnassus)
+    AUBERDINE          = 26,   // Darkshore / Ashenvale (Alliance)
+    ZORAMGAR_OUTPOST   = 28,   // Ashenvale (Horde)
+    GADGETZAN          = 39,   // Tanaris
+    FEATHERMOON        = 41,   // Feralas (Alliance)
+    CAMP_MOJACHE       = 42,   // Feralas (Horde)
+    STONARD            = 56,   // Swamp of Sorrows
+    CHILLWIND_CAMP     = 66,   // Western Plaguelands
     LIGHTS_HOPE_CHAPEL_ALLIANCE = 67,
-    LIGHTS_HOPE_CHAPEL_HORDE = 68
+    LIGHTS_HOPE_CHAPEL_HORDE = 68,
+    THORIUM_POINT      = 71,   // Burning Steppes / Searing Gorge
+    SHADOWPREY_VILLAGE = 136,  // Desolace (Horde)
 };
 
 // A connection between two nodes.
