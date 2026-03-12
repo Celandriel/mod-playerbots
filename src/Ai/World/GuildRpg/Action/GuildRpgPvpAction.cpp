@@ -222,7 +222,14 @@ bool GuildRpgPvpAction::HandlePreparation(Event event)
             botAI->guildRpgInfo.ResetGuildActivity(true);
             return false;
         }
-        return PreparationMovementToRpgLocation(event, mapId, targetZone, toNode);
+        TaxiNodesEntry const* taxiNodeEntry = sTaxiNodesStore.LookupEntry(static_cast<uint32>(toNode));
+        if (!taxiNodeEntry)
+        {
+            botAI->guildRpgInfo.ResetGuildActivity(true);
+            return false;
+        }
+        WorldPosition targetPos(mapId, taxiNodeEntry->x, taxiNodeEntry->y, taxiNodeEntry->z);
+        return PreparationMovementToRpgLocation(event, targetPos, targetZone);
     }
     botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::COMPLETED);
     return false;

@@ -242,17 +242,15 @@ bool GuildRpgBaseAction::HandleCompletion(Event event)
     return false;
 }
 
-bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 mapId, uint32 targetZone, uint32 toNode)
+bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, WorldPosition targetPos, uint32 targetZone)
 {
     if (botAI->guildRpgInfo.phase != GuildRpgPhase::PREPARATION)
         return false;
 
-    LOG_DEBUG("playerbots", "[Guild RPG] Bot {} has zone {}, map {} checking against target zone {}", bot->GetName(), bot->GetZoneId(), bot->GetMapId(), targetZone);
-
-    // Already in target zone — transition to execution
-    if (bot->GetZoneId() == targetZone)
+    // Optional zone arrival check — used by callers that want zone-based completion
+    if (targetZone && bot->GetZoneId() == targetZone)
     {
-        LOG_DEBUG("playerbots", "[Guild RPG] Bot {} is in target zone {}, summoning group", bot->GetName(), targetZone);
+        LOG_DEBUG("playerbots", "[Guild RPG] Bot {} arrived in target zone {}, transitioning to EXECUTING", bot->GetName(), targetZone);
         botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
         botAI->SayToParty("summon");
         SyncGuildRpgStatus();
@@ -263,29 +261,18 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, uint32 ma
     if (botAI->rpgInfo.GetStatus() == RPG_MOVE_FAR || botAI->rpgInfo.GetStatus() == RPG_TRAVEL_FLIGHT)
         return false;
 
-    // Resolve target position from the taxi node
-    TaxiNodesEntry const* taxiNodeEntry = sTaxiNodesStore.LookupEntry(static_cast<uint32>(toNode));
-    if (!taxiNodeEntry)
-    {
-        LOG_ERROR("playerbots", "[Guild RPG] Bot {} could not find taxi node {}", bot->GetName(), toNode);
-        botAI->guildRpgInfo.ResetGuildActivity(true);
-        return false;
-    }
-
-    WorldPosition targetPos(mapId, taxiNodeEntry->x, taxiNodeEntry->y, taxiNodeEntry->z);
-    WorldPosition currentPos(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
-
     // Compute full travel path using the travel node system
+    WorldPosition currentPos(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
     TravelPath travelPath = TravelNodeMap::getFullPath(currentPos, targetPos, bot);
 
     if (travelPath.empty())
     {
-        LOG_DEBUG("playerbots", "[Guild RPG] Bot {} could not find travel path to zone {}, falling back to teleport", bot->GetName(), targetZone);
+        LOG_DEBUG("playerbots", "[Guild RPG] Bot {} could not find travel path, falling back to teleport", bot->GetName());
         bot->TeleportTo(targetPos);
         return true;
     }
 
-    LOG_DEBUG("playerbots", "[Guild RPG] Bot {} starting travel path to zone {} ({} waypoints)", bot->GetName(), targetZone, travelPath.getPath().size());
+    LOG_DEBUG("playerbots", "[Guild RPG] Bot {} starting travel path ({} waypoints)", bot->GetName(), travelPath.getPath().size());
     botAI->rpgInfo.travelPath = std::move(travelPath);
     botAI->rpgInfo.ChangeToMoveFar();
     return true;

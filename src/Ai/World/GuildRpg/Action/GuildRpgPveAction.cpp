@@ -253,12 +253,9 @@ bool GuildRpgPveAction::HandlePreparation(Event event)
             return true;
         }
 
-        // NewRpg is still walking/flying the travel path — wait
-        if (botAI->rpgInfo.GetStatus() == RPG_MOVE_FAR || botAI->rpgInfo.GetStatus() == RPG_TRAVEL_FLIGHT)
-            return false;
-
         // Travel path was consumed — bot has arrived on the entrance map
-        if (bot->GetMapId() == entrance->entranceMapId)
+        if (botAI->rpgInfo.GetStatus() != RPG_MOVE_FAR && botAI->rpgInfo.GetStatus() != RPG_TRAVEL_FLIGHT
+            && bot->GetMapId() == entrance->entranceMapId)
         {
             botAI->guildRpgInfo.SetGuildRpgPhase(GuildRpgPhase::EXECUTING);
             SyncGuildRpgStatus();
@@ -288,23 +285,7 @@ bool GuildRpgPveAction::HandlePreparation(Event event)
             return false;
         }
 
-        // Compute full travel path from current position to the dungeon entrance
-        WorldPosition currentPos(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
-        TravelPath travelPath = TravelNodeMap::getFullPath(currentPos, entrancePos, bot);
-
-        if (travelPath.empty())
-        {
-            LOG_DEBUG("playerbots", "[Guild RPG] Bot {} could not find travel path to {}, falling back to teleport",
-                      bot->GetName(), targetName);
-            bot->TeleportTo(entrancePos);
-            return true;
-        }
-
-        LOG_DEBUG("playerbots", "[Guild RPG] Bot {} starting travel path to {} ({} waypoints)",
-                  bot->GetName(), targetName, travelPath.getPath().size());
-        botAI->rpgInfo.travelPath = std::move(travelPath);
-        botAI->rpgInfo.ChangeToMoveFar();
-        return true;
+        return PreparationMovementToRpgLocation(event, entrancePos);
     }
     else if (activity == GuildRpgActivity::RUN_RAID)
     {
