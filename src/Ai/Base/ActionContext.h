@@ -272,6 +272,7 @@ public:
         creators["new rpg travel flight"] = &ActionContext::new_rpg_travel_flight;
         creators["new rpg outdoor pvp"] = &ActionContext::new_rpg_outdoor_pvp;
         creators["new rpg dungeon pve"] = &ActionContext::new_rpg_dungeon_pve;
+        creators["new rpg move far"] = &ActionContext::new_rpg_move_far;
 
         //Guild RPG actions
         creators["guild rpg status update"] = &ActionContext::guild_rpg_status_update;
@@ -476,6 +477,7 @@ private:
     static Action* new_rpg_travel_flight(PlayerbotAI* ai) { return new NewRpgTravelFlightAction(ai); }
     static Action* new_rpg_outdoor_pvp(PlayerbotAI* ai) { return new NewRpgOutdoorPvpAction(ai); }
     static Action* new_rpg_dungeon_pve(PlayerbotAI* ai) { return new NewRpgDungeonPveAction(ai, &AiObjectContext::s_dungeonWaypointMgr); }
+    static Action* new_rpg_move_far(PlayerbotAI* ai) { return new NewRpgMoveFarAction(ai); }
 
     //Guild rpg actions
     static Action* guild_rpg_status_update(PlayerbotAI* botAI) { return new GuildRpgStatusUpdateAction(botAI); }

@@ -70,6 +70,10 @@ struct NewRpgInfo
         uint32 mapId{0};
         std::string dungeonName;
     };
+    // RPG_MOVE_FAR
+    struct MoveFar
+    {
+    };
     struct Idle
     {
     };
@@ -83,6 +87,9 @@ struct NewRpgInfo
     WorldPosition moveFarPos;
     // END MOVE_FAR
 
+    TravelPath travelPath{};
+    bool HasTravelPath() const { return !travelPath.empty(); }
+
     using RpgData = std::variant<
         Idle,
         GoGrind,
@@ -93,7 +100,8 @@ struct NewRpgInfo
         Rest,
         TravelFlight,
         OutdoorPvP,
-        DungeonPve
+        DungeonPve,
+        MoveFar
     >;
     RpgData data;
 
@@ -107,6 +115,7 @@ struct NewRpgInfo
     void ChangeToTravelFlight(ObjectGuid fromFlightMaster, std::vector<uint32> path);
     void ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint);
     void ChangeToDungeonPve(uint32 mapId, const std::string& dungeonName);
+    void ChangeToMoveFar();
     void ChangeToRest();
     void ChangeToIdle();
     bool CanChangeTo(NewRpgStatus status);

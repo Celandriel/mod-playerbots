@@ -56,8 +56,9 @@ enum NewRpgStatus : int
     // Initial status
     RPG_REST = 7,
     RPG_STATUS_END = 8,
-    RPG_OUTDOOR_PVP = 9,
-    RPG_DUNGEON_PVE = 10
+    RPG_MOVE_FAR = 9,
+    RPG_OUTDOOR_PVP = 10,
+    RPG_DUNGEON_PVE = 11
 };
 
 #define MAX_SPECNO 20

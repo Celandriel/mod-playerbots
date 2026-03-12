@@ -47,6 +47,12 @@ void NewRpgInfo::ChangeToTravelFlight(ObjectGuid fromFlightMaster, std::vector<u
     data = flight;
 }
 
+void NewRpgInfo::ChangeToMoveFar()
+{
+    startT = getMSTime();
+    data = MoveFar{};
+}
+
 void NewRpgInfo::ChangeToRest()
 {
     startT = getMSTime();
@@ -85,6 +91,7 @@ void NewRpgInfo::Reset()
 {
     data = Idle{};
     startT = getMSTime();
+    travelPath.clear();
 }
 
 void NewRpgInfo::SetMoveFarTo(WorldPosition pos)
@@ -109,6 +116,7 @@ NewRpgStatus NewRpgInfo::GetStatus()
         if constexpr (std::is_same_v<T, TravelFlight>) return RPG_TRAVEL_FLIGHT;
         if constexpr (std::is_same_v<T, OutdoorPvP>) return RPG_OUTDOOR_PVP;
         if constexpr (std::is_same_v<T, DungeonPve>) return RPG_DUNGEON_PVE;
+        if constexpr (std::is_same_v<T, MoveFar>) return RPG_MOVE_FAR;
         return RPG_IDLE;
     }, data);
 }
@@ -188,6 +196,11 @@ std::string NewRpgInfo::ToString()
             out << "DUNGEON_PVE";
             out << "\nmapId: " << arg.mapId;
             out << "\ndungeon: " << arg.dungeonName;
+        }
+        else if constexpr (std::is_same_v<T, MoveFar>)
+        {
+            out << "MOVE_FAR";
+            out << "\nhasTravelPath: " << (HasTravelPath() ? "yes" : "no");
         }
     }, data);
     return out.str();

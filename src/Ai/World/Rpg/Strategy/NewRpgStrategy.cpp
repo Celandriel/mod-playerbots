@@ -81,6 +81,14 @@ void NewRpgStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
             }
         )
     );
+    triggers.push_back(
+        new TriggerNode(
+            "move far status",
+            {
+                NextAction("new rpg move far", 3.0f)
+            }
+        )
+    );
 }
 
 void NewRpgStrategy::InitMultipliers(std::vector<Multiplier*>&)

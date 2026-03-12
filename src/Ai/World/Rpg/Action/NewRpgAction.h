@@ -103,4 +103,11 @@ public:
     bool Execute(Event event) override;
 };
 
+class NewRpgMoveFarAction : public NewRpgBaseAction
+{
+public:
+    NewRpgMoveFarAction(PlayerbotAI* botAI) : NewRpgBaseAction(botAI, "new rpg move far") {}
+    bool Execute(Event event) override;
+};
+
 #endif

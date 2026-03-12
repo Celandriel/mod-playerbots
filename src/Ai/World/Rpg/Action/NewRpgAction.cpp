@@ -124,8 +124,11 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
             auto& data = std::get<NewRpgInfo::TravelFlight>(info.data);
             if (data.inFlight && !bot->IsInFlight())
             {
-                // flight arrival
-                info.ChangeToIdle();
+                // flight arrival — resume travel path if remaining, otherwise idle
+                if (info.HasTravelPath())
+                    info.ChangeToMoveFar();
+                else
+                    info.ChangeToIdle();
                 return true;
             }
             break;
@@ -134,6 +137,16 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
         {
             // REST -> IDLE
             if (info.HasStatusPersisted(statusRestDuration))
+            {
+                info.ChangeToIdle();
+                return true;
+            }
+            break;
+        }
+        case RPG_MOVE_FAR:
+        {
+            // MOVE_FAR -> IDLE when travel path is exhausted
+            if (!info.HasTravelPath())
             {
                 info.ChangeToIdle();
                 return true;
@@ -450,4 +463,15 @@ bool NewRpgTravelFlightAction::Execute(Event /*event*/)
         botAI->rpgInfo.ChangeToIdle();
     }
     return true;
+}
+
+bool NewRpgMoveFarAction::Execute(Event /*event*/)
+{
+    NewRpgInfo& info = botAI->rpgInfo;
+    if (!info.HasTravelPath())
+    {
+        info.ChangeToIdle();
+        return true;
+    }
+    return FollowTravelPath();
 }
