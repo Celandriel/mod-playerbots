@@ -558,10 +558,10 @@ AiPlayerbot.AutoGearScoreLimit = 0
 # Default: food, taxi, and raid are enabled
 AiPlayerbot.BotCheats = "food,taxi,raid"
 
-# List of attunement quests (comma-separated list of quest IDs) that are automatically completed for all bots.  
+# List of attunement quests (comma-separated list of quest IDs) that are automatically completed for all bots.
 # While mod-playerbots does not restore removed attunement requirements, although other mods, such as mod-individual-progression, may do so.
 # This is meant to exclude bots from such requirements.
-# 
+#
 # Default:
 # Caverns of Time - Part 1
 # - 10279, To The Master's Lair
@@ -1145,11 +1145,16 @@ AiPlayerbot.RandomBotGuildSizeMax = 15
 # Delete all randombot guilds if set to 1
 AiPlayerbot.DeleteRandomBotGuilds = 0
 
+# Enable the Guild Rpg Strategy
+AiPlayerbot.EnableGuildRPG = 0
+# Probability out of 100 that the a new activity will get triggered every tick.
+AiPlayerbot.GuildRpgProbability = 10
+# How long to pause trying a new guild rpg action if bot failed in an unrecoverable way.
+AiPlayerbot.GuildRpgSleepMinutes = 5
+
 # Set the percentage of guild types and the number of bots per guild.
 # Entries are in order by type PvP, PvE, Gathering/Crafter, Roleplaying"
 # Guild Sizes, 0= SOLO, 1 = TINY (30), 2 = SMALL (50), 3 = MEDIUM (70), 4 = LARGE (120), 5 = VERY LARGE (250)
-AiPlayerbot.EnableGuildRPG = 0
-AiPlayerbot.GuildRpgProbability = 10
 AiPlayerbot.GuildTypeRatios = "40,20,20,10"
 AiPlayerbot.GuildSize = "4,3,2,2"
 

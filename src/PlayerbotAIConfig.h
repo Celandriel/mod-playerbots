@@ -280,6 +280,7 @@ public:
     uint32 randomBotGuildCount, randomBotGuildSizeMax;
     bool enableGuildRpgStrategy;
     uint32 guildRpgProbability;
+    uint32 guildRpgSleepMinutes;
     bool deleteRandomBotGuilds;
 
     std::vector<uint32> GuildTypeRatios, GuildSize, GuildPveSpecRatio, GuildPvpSpecRatio, GuildRpgPvpWeights, GuildRpgPveWeights, GuildRpgProfWeights, GuildRpRpgWeights;

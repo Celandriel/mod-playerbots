@@ -231,6 +231,7 @@ bool PlayerbotAIConfig::Initialize()
     //////////////////////////// Guild RPG
     enableGuildRpgStrategy = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableGuildRPG", true);
     guildRpgProbability = sConfigMgr->GetOption<uint32>("AiPlayerbot.GuildRpgProbability", 10);
+    guildRpgSleepMinutes = sConfigMgr->GetOption<uint32>("AiPlayerbot.GuildRpgSleepMinutes", 1);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildTypeRatios", "40,20,20,10"), GuildTypeRatios);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildSize", "4,3,2,2,2"), GuildSize);
     LoadList<std::vector<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.GuildPvpSpecRatio", "0,33,33,33"), GuildPvpSpecRatio);

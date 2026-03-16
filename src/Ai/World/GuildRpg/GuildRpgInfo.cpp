@@ -1,6 +1,7 @@
 #include "GuildRpgInfo.h"
 #include "Log.h"
 #include "PlayerbotAI.h"
+#include "Playerbots.h"
 // Global guild statistics storage
 
 void GuildRpgInfo::SetGuildRpgActivity(PlayerbotAI* botAI, GuildRpgActivity activity)
@@ -16,7 +17,7 @@ void GuildRpgInfo::ResetGuildActivity(bool sleep)
     activityTarget = "";
 
     if (sleep)
-        sleepUntil = time(nullptr) + 5 * MINUTE;
+        sleepUntil = time(nullptr) + sPlayerbotAIConfig.guildRpgSleepMinutes * 60;
 }
 
 bool GuildRpgInfo::IsSleep() const
