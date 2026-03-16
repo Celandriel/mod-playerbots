@@ -138,7 +138,7 @@ public:
         creators["pet"] = &ChatTriggerContext::pet;
         creators["pet attack"] = &ChatTriggerContext::pet_attack;
         creators["roll"] = &ChatTriggerContext::roll_action;
-        creators["guildrpg status"] = &ChatTriggerContext::guildrpg_status;
+        creators["guildrpg"] = &ChatTriggerContext::guildrpg_command;
     }
 
 private:
@@ -256,7 +256,7 @@ private:
     static Trigger* pet(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "pet"); }
     static Trigger* pet_attack(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "pet attack"); }
     static Trigger* roll_action(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "roll"); }
-    static Trigger* guildrpg_status(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "guildrpg status"); }
+    static Trigger* guildrpg_command(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "guildrpg"); }
 };
 
 #endif

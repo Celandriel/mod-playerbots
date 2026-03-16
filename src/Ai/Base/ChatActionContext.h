@@ -200,7 +200,7 @@ public:
         creators["pet"] = &ChatActionContext::pet;
         creators["pet attack"] = &ChatActionContext::pet_attack;
         creators["roll"] = &ChatActionContext::roll_action;
-        creators["guildrpg status"] = &ChatActionContext::guildrpg_status;
+        creators["guildrpg"] = &ChatActionContext::guildrpg_command;
     }
 
 private:
@@ -313,7 +313,7 @@ private:
     static Action* pet(PlayerbotAI* botAI) { return new PetsAction(botAI); }
     static Action* pet_attack(PlayerbotAI* botAI) { return new PetsAction(botAI, "attack"); }
     static Action* roll_action(PlayerbotAI* botAI) { return new RollAction(botAI); }
-    static Action* guildrpg_status(PlayerbotAI* botAI) { return new TellGuildRpgStatusAction(botAI); }
+    static Action* guildrpg_command(PlayerbotAI* botAI) { return new GuildRpgCommandAction(botAI); }
 };
 
 #endif

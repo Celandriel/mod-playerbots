@@ -6,10 +6,10 @@
 #include "GuildRpgInfo.h"
 #include "TravelMgr.h"
 
-class TellGuildRpgStatusAction : public Action
+class GuildRpgCommandAction : public Action
 {
 public:
-    TellGuildRpgStatusAction(PlayerbotAI* botAI) : Action(botAI, "guildrpg status") {}
+    GuildRpgCommandAction(PlayerbotAI* botAI) : Action(botAI, "guildrpg") {}
     bool Execute(Event event) override;
 };
 

@@ -6,7 +6,6 @@
 #include "DebugAction.h"
 
 #include "ChooseTravelTargetAction.h"
-#include "GuildRpgInfo.h"
 #include "MapMgr.h"
 #include "TravelMgr.h"
 #include "TravelNode.h"
@@ -914,62 +913,6 @@ bool DebugAction::Execute(Event event)
     {
         uint32 soundEffect = stoi(text.substr(6));
         bot->PlayDistanceSound(soundEffect);
-        return true;
-    }
-
-    else if (text.find("guildrpg") != std::string::npos)
-    {
-        std::string sub = text.substr(text.find("guildrpg") + 9); // skip "guildrpg "
-
-        if (sub.find("type ") == 0)
-        {
-            std::string val = sub.substr(5);
-            GuildType newType = GuildType::NONE;
-            if (val == "pve") newType = GuildType::PVE;
-            else if (val == "pvp") newType = GuildType::PVP;
-            else if (val == "profession") newType = GuildType::PROFESSION;
-            else if (val == "roleplay") newType = GuildType::ROLEPLAY;
-            else if (val == "none") newType = GuildType::NONE;
-            else { botAI->TellMaster("Usage: debug guildrpg type <pve|pvp|profession|roleplay|none>"); return true; }
-
-            botAI->guildRpgInfo.SetGuildType(newType);
-            botAI->TellMaster("Guild RPG type set to: " + GuildRpgInfo::GetGuildTypeName(newType));
-        }
-        else if (sub.find("activity ") == 0)
-        {
-            std::string val = sub.substr(9);
-            GuildRpgActivity newActivity = GuildRpgActivity::NONE;
-            if (val == "dungeon") newActivity = GuildRpgActivity::RUN_DUNGEON;
-            else if (val == "raid") newActivity = GuildRpgActivity::RUN_RAID;
-            else if (val == "worldevent") newActivity = GuildRpgActivity::WORLD_EVENT;
-            else if (val == "battleground") newActivity = GuildRpgActivity::BATTLEGROUND;
-            else if (val == "worldpvp") newActivity = GuildRpgActivity::WORLD_PVP;
-            else if (val == "none") newActivity = GuildRpgActivity::NONE;
-            else { botAI->TellMaster("Usage: debug guildrpg activity <dungeon|raid|worldevent|battleground|worldpvp|none>"); return true; }
-
-            botAI->guildRpgInfo.SetGuildRpgActivity(botAI, newActivity);
-            botAI->TellMaster("Guild RPG activity set to: " + GuildRpgInfo::GetActivityName(newActivity));
-        }
-        else if (sub.find("phase ") == 0)
-        {
-            std::string val = sub.substr(6);
-            GuildRpgPhase newPhase = GuildRpgPhase::IDLE;
-            if (val == "idle") newPhase = GuildRpgPhase::IDLE;
-            else if (val == "selection") newPhase = GuildRpgPhase::SELECTION;
-            else if (val == "grouping") newPhase = GuildRpgPhase::GROUPING;
-            else if (val == "preparation") newPhase = GuildRpgPhase::PREPARATION;
-            else if (val == "executing") newPhase = GuildRpgPhase::EXECUTING;
-            else if (val == "completed") newPhase = GuildRpgPhase::COMPLETED;
-            else { botAI->TellMaster("Usage: debug guildrpg phase <idle|selection|grouping|preparation|executing|completed>"); return true; }
-
-            botAI->guildRpgInfo.SetGuildRpgPhase(newPhase);
-            botAI->TellMaster("Guild RPG phase set to: " + GuildRpgInfo::GetPhaseName(newPhase));
-        }
-        else
-        {
-            // Default: show status
-            botAI->TellMaster(botAI->guildRpgInfo.ToString());
-        }
         return true;
     }
 
