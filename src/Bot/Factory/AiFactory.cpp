@@ -589,12 +589,15 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
     if (sPlayerbotAIConfig.autoSaveMana && PlayerbotAI::IsHeal(player, true))
         nonCombatEngine->addStrategy("save mana", false);
 
-    if (sPlayerbotAIConfig.enableGuildRpgStrategy)
-        nonCombatEngine->addStrategy("guild rpg", false);
-
     if ((sRandomPlayerbotMgr.IsRandomBot(player)) && !player->InBattleground())
     {
         Player* master = facade->GetMaster();
+
+        if (sPlayerbotAIConfig.enableGuildRpgStrategy)
+            nonCombatEngine->addStrategy("guild rpg", false);
+
+        if (sPlayerbotAIConfig.enableNewRpgStrategy)
+            nonCombatEngine->addStrategy("new rpg", false);
 
         // let 25% of free bots start duels.
         if (!urand(0, 3))
@@ -615,15 +618,16 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
             // nonCombatEngine->addStrategy("guild");
             nonCombatEngine->addStrategy("grind", false);
 
-            if (sPlayerbotAIConfig.enableNewRpgStrategy)
-                nonCombatEngine->addStrategy("new rpg", false);
-            else if (sPlayerbotAIConfig.autoDoQuests)
+            if (!sPlayerbotAIConfig.enableNewRpgStrategy)
             {
-                // nonCombatEngine->addStrategy("travel");
-                nonCombatEngine->addStrategy("rpg", false);
+                if (sPlayerbotAIConfig.autoDoQuests)
+                {
+                    // nonCombatEngine->addStrategy("travel");
+                    nonCombatEngine->addStrategy("rpg", false);
+                }
+                else
+                    nonCombatEngine->addStrategy("move random", false);
             }
-            else
-                nonCombatEngine->addStrategy("move random", false);
 
             if (sPlayerbotAIConfig.randomBotJoinBG)
                 nonCombatEngine->addStrategy("bg", false);
