@@ -150,13 +150,12 @@ void PlayerbotGuildMgr::OnGuildUpdate(Guild* guild)
 
 void PlayerbotGuildMgr::ResetGuildCache()
 {
-    for (auto it = _guildCache.begin(); it != _guildCache.end();)
-    {
-        GuildCache& cached = it->second;
-        cached.memberCount = 0;
-        cached.faction = 2;
-        cached.status = 0;
-    }
+    // Full runtime reset: forget cached guild snapshots.
+    _guildCache.clear();
+
+    // Mark all names as available until ValidateGuildCache marks existing guild names as used.
+    for (auto& nameEntry : _guildNames)
+        nameEntry.second = true;
 }
 
 void PlayerbotGuildMgr::LoadGuildNames()

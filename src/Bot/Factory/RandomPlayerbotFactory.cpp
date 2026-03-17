@@ -807,7 +807,14 @@ void RandomPlayerbotFactory::CreateRandomArenaTeams(ArenaType type, uint32 count
         if (arenateam)
         {
             ++arenaTeamNumber;
-            sPlayerbotAIConfig.randomBotArenaTeams.push_back(arenateam->GetId());
+            // Only add to cache if not already present (InitArenaTeamCache may have pre-populated it)
+            uint32 teamId = arenateam->GetId();
+            if (std::find(sPlayerbotAIConfig.randomBotArenaTeams.begin(),
+                          sPlayerbotAIConfig.randomBotArenaTeams.end(), teamId) ==
+                sPlayerbotAIConfig.randomBotArenaTeams.end())
+            {
+                sPlayerbotAIConfig.randomBotArenaTeams.push_back(teamId);
+            }
         }
         else
         {

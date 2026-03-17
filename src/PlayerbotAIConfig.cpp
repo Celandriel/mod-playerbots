@@ -5,6 +5,8 @@
 
 #include "PlayerbotAIConfig.h"
 #include <iostream>
+#include "ArenaTeamMgr.h"
+#include "CharacterCache.h"
 #include "Config.h"
 #include "NewRpgInfo.h"
 #include "PlayerbotDungeonRepository.h"
@@ -697,6 +699,63 @@ bool PlayerbotAIConfig::Initialize()
     LOG_INFO("server.loading", "---------------------------------------");
 
     return true;
+}
+
+void PlayerbotAIConfig::InitArenaTeamCache()
+{
+    if (deleteRandomBotArenaTeams)
+    {
+        LOG_INFO("playerbots", "Deleting random bot arena teams...");
+
+        std::vector<uint32> teamsToDisband;
+        for (auto const& [id, arenateam] : sArenaTeamMgr->GetArenaTeams())
+        {
+            ObjectGuid captainGuid = arenateam->GetCaptain();
+            if (!captainGuid || !captainGuid.IsPlayer())
+                continue;
+
+            uint32 accountId = sCharacterCache->GetCharacterAccountIdByGuid(captainGuid);
+            if (accountId && IsInRandomAccountList(accountId))
+                teamsToDisband.push_back(id);
+        }
+
+        for (uint32 teamId : teamsToDisband)
+        {
+            ArenaTeam* team = sArenaTeamMgr->GetArenaTeamById(teamId);
+            if (team)
+                team->Disband(nullptr);
+        }
+
+        LOG_INFO("playerbots", "Deleted {} random bot arena teams", teamsToDisband.size());
+        return;
+    }
+
+    // Scan ArenaTeamMgr for existing bot-captained arena teams and populate the cache
+    uint32 count2v2 = 0, count3v3 = 0, count5v5 = 0;
+
+    for (auto const& [id, arenateam] : sArenaTeamMgr->GetArenaTeams())
+    {
+        ObjectGuid captainGuid = arenateam->GetCaptain();
+        if (!captainGuid || !captainGuid.IsPlayer())
+            continue;
+
+        uint32 accountId = sCharacterCache->GetCharacterAccountIdByGuid(captainGuid);
+        if (!accountId || !IsInRandomAccountList(accountId))
+            continue;
+
+        randomBotArenaTeams.push_back(id);
+
+        switch (arenateam->GetType())
+        {
+            case ARENA_TYPE_2v2: ++count2v2; break;
+            case ARENA_TYPE_3v3: ++count3v3; break;
+            case ARENA_TYPE_5v5: ++count5v5; break;
+            default: break;
+        }
+    }
+
+    LOG_INFO("playerbots", "Found {} existing random bot arena teams (2v2: {}, 3v3: {}, 5v5: {})",
+             randomBotArenaTeams.size(), count2v2, count3v3, count5v5);
 }
 
 bool PlayerbotAIConfig::IsInRandomAccountList(uint32 id)

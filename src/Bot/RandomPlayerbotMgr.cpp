@@ -2133,6 +2133,8 @@ void RandomPlayerbotMgr::Init()
     if (sPlayerbotAIConfig.randomBotJoinBG)
         sRandomPlayerbotMgr.LoadBattleMastersCache();
 
+    sPlayerbotAIConfig.InitArenaTeamCache();
+
     PlayerbotsDatabase.Execute("DELETE FROM playerbots_random_bots WHERE event = 'add'");
 }
 
@@ -2993,6 +2995,11 @@ void RandomPlayerbotMgr::OnBotLoginInternal(Player* const bot)
             _isBotLogging = false;
         }
     }
+
+    PlayerbotFactory factory(bot, bot->GetLevel());
+    factory.InitGuild();
+
+    factory.InitArenaTeam();
 
     if (sPlayerbotAIConfig.randomBotFixedLevel)
     {
