@@ -1406,22 +1406,39 @@ TravelPath TravelNodeMap::getFullPath(WorldPosition startPos, WorldPosition endP
     PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
     std::vector<WorldPosition> beginPath, endPath;
 
+    LOG_DEBUG("playerbots", "[getFullPath] Bot {} from ({:.1f},{:.1f},{:.1f} map={}) to ({:.1f},{:.1f},{:.1f} map={})",
+        bot->GetName(),
+        startPos.GetPositionX(), startPos.GetPositionY(), startPos.GetPositionZ(), startPos.GetMapId(),
+        endPos.GetPositionX(), endPos.GetPositionY(), endPos.GetPositionZ(), endPos.GetMapId());
+
     beginPath = endPos.getPathFromPath({startPos}, nullptr, 40);
 
     if (endPos.isPathTo(beginPath))
+    {
+        LOG_DEBUG("playerbots", "[getFullPath] Bot {} direct path found ({} points), no node routing needed",
+            bot->GetName(), beginPath.size());
         return TravelPath(beginPath);
+    }
+
+    LOG_DEBUG("playerbots", "[getFullPath] Bot {} no direct path, trying node routing (nodes loaded: {})",
+        bot->GetName(), getNodes().size());
 
     //[[Node pathfinding system]]
     // We try to find nodes near the bot and near the end position that have a route between them.
     // Then bot has to move towards/along the route.
-    m_nMapMtx.lock_shared();
+    std::shared_lock<std::shared_timed_mutex> lock(m_nMapMtx);
 
     // Find the route of nodes starting at a node closest to the start position and ending at a node closest to the
     // endposition. Also returns longPath: The path from the start position to the first node in the route.
     TravelNodeRoute route = getRoute(startPos, endPos, beginPath, bot);
 
     if (route.isEmpty())
+    {
+        LOG_DEBUG("playerbots", "[getFullPath] Bot {} route is empty, returning empty path", bot->GetName());
         return movePath;
+    }
+
+    LOG_DEBUG("playerbots", "[getFullPath] Bot {} route found with {} nodes", bot->GetName(), route.getNodes().size());
 
     if (sPlayerbotAIConfig.hasLog("bot_pathfinding.csv"))
     {
@@ -1435,6 +1452,8 @@ TravelPath TravelNodeMap::getFullPath(WorldPosition startPos, WorldPosition endP
     endPath = route.getNodes().back()->getPosition()->getPathTo(endPos, nullptr);
     movePath = route.buildPath(beginPath, endPath);
 
+    LOG_DEBUG("playerbots", "[getFullPath] Bot {} final path built with {} waypoints", bot->GetName(), movePath.getPath().size());
+
     if (sPlayerbotAIConfig.hasLog("bot_pathfinding.csv"))
     {
         if (botAI->HasStrategy("debug move", BOT_STATE_NON_COMBAT))
@@ -1443,8 +1462,6 @@ TravelPath TravelNodeMap::getFullPath(WorldPosition startPos, WorldPosition endP
             sPlayerbotAIConfig.log("bot_pathfinding.csv", movePath.print().str().c_str());
         }
     }
-
-    m_nMapMtx.unlock_shared();
 
     return movePath;
 }
@@ -2567,6 +2584,12 @@ WorldPosition TravelNodeMap::getMapOffset(uint32 mapId)
 // ============================================================
 // TravelNodeMap taxi graph (BFS-based flight path lookup)
 // ============================================================
+
+void TravelNodeMap::Init()
+{
+    InitTaxiGraph();
+    loadNodeStore();
+}
 
 void TravelNodeMap::InitTaxiGraph()
 {

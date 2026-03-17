@@ -4364,7 +4364,7 @@ void TravelMgr::Init()
         PrepareZone2LevelBracket();
         PrepareDestinationCache();
     }
-    sTravelNodeMap.InitTaxiGraph();
+    sTravelNodeMap.Init();
     LOG_INFO("playerbots", "Playerbots Taxi graph and destination cache built.");
 }
 
