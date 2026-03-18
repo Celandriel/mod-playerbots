@@ -26,6 +26,7 @@ public:
     bool ChooseRandomActivity();
     void SyncGuildRpgStatus();
     bool PreparationMovementToRpgLocation(Event event, WorldPosition targetPos, uint32 targetZone = 0);
+    void TeleportGroupTo(WorldPosition targetPos);
     void EndGuildRpgActivity();
 
     virtual bool HandleSelection(Event event);

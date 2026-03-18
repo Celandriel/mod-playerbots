@@ -274,7 +274,10 @@ bool NewRpgBaseAction::MoveWorldObjectTo(ObjectGuid guid, float distance)
 bool NewRpgBaseAction::MoveRandomNear(float moveStep, MovementPriority priority, WorldObject* center)
 {
     if (IsWaitingForLastMove(priority))
+    {
+        LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: waiting for last move", bot->GetName());
         return false;
+    }
 
     float distance = rand_norm() * moveStep;
     Map* map = bot->GetMap();
@@ -297,19 +300,36 @@ bool NewRpgBaseAction::MoveRandomNear(float moveStep, MovementPriority priority,
         bool canReach = !(type & (~typeOk));
 
         if (!canReach)
+        {
+            LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: path type {} not reachable (from {:.1f},{:.1f},{:.1f} to {:.1f},{:.1f},{:.1f})",
+                bot->GetName(), type, x, y, z, dx, dy, dz);
             continue;
+        }
 
         if (!map->CanReachPositionAndGetValidCoords(bot, dx, dy, dz))
+        {
+            LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: CanReachPositionAndGetValidCoords failed (to {:.1f},{:.1f},{:.1f})",
+                bot->GetName(), dx, dy, dz);
             continue;
+        }
 
         if (map->IsInWater(bot->GetPhaseMask(), dx, dy, dz, bot->GetCollisionHeight()))
+        {
+            LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: target is in water ({:.1f},{:.1f},{:.1f})",
+                bot->GetName(), dx, dy, dz);
             continue;
+        }
 
         bool moved = MoveTo(bot->GetMapId(), dx, dy, dz, false, false, false, true, priority);
         if (moved)
             return true;
+
+        LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: MoveTo failed (to {:.1f},{:.1f},{:.1f})",
+            bot->GetName(), dx, dy, dz);
     }
 
+    LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: all attempts exhausted (moveStep={:.1f}, center={})",
+        bot->GetName(), moveStep, center ? center->GetName() : "self");
     return false;
 }
 

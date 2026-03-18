@@ -4350,7 +4350,7 @@ Player* PlayerbotAI::FindNewMaster()
     Player* groupLeader = GetGroupLeader();
     PlayerbotAI* leaderBotAI = GET_PLAYERBOT_AI(groupLeader);
 
-    if (!leaderBotAI || leaderBotAI->IsRealPlayer() || sPlayerbotAIConfig.enableGuildRpgStrategy)
+    if ((!leaderBotAI || leaderBotAI->IsRealPlayer() || sPlayerbotAIConfig.enableGuildRpgStrategy) && groupLeader != bot)
         return groupLeader;
 
     // Find the real player in group

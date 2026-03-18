@@ -29,24 +29,49 @@ void PlayerbotGroupMgr::Reset()
 bool PlayerbotGroupMgr::CreateGroup()
 {
     if (!_botAI)
+    {
+        LOG_DEBUG("playerbots", "[BotGroupMgr] CreateGroup: _botAI is null");
         return false;
+    }
     if (_targetComposition.groupSize == 0)
+    {
+        LOG_DEBUG("playerbots", "[BotGroupMgr] CreateGroup: target groupSize is 0");
         return false;
+    }
     Player* leader = _botAI->GetBot();
     if (!leader)
+    {
+        LOG_DEBUG("playerbots", "[BotGroupMgr] CreateGroup: leader bot is null");
         return false;
+    }
     ObjectGuid leaderGuid = leader->GetGUID();
     Guild* guild = leader->GetGuild();
     if (!guild)
+    {
+        LOG_DEBUG("playerbots", "[BotGroupMgr] CreateGroup: leader {} has no guild", leader->GetName());
         return false;
+    }
+
+    LOG_DEBUG("playerbots", "CreateGroup: leader {} (guild {}), target size {}, tanks {}, healers {}-{}, dps {}-{}",
+        leader->GetName(), guild->GetName(), _targetComposition.groupSize,
+        _targetComposition.tanks, _targetComposition.minHealers, _targetComposition.maxHealers,
+        _targetComposition.minDps, _targetComposition.maxDps);
+
     std::vector<GuildMember> availableMembers = FindAvailableGuildMembers(guild);
     if (availableMembers.empty())
+    {
+        LOG_DEBUG("playerbots", "[BotGroupMgr] CreateGroup: no available guild members found for {}", leader->GetName());
         return false;
+    }
+
+    LOG_DEBUG("playerbots", "[BotGroupMgr] CreateGroup: found {} available guild members", availableMembers.size());
 
     InviteToGroupAction InviteToGroupAction(_botAI);
     BotRoles leaderRole = GetBotRole(leaderGuid);
     _roleComposition[leaderRole] = 1;
     totalMembers = 1;
+
+    LOG_DEBUG("playerbots", "[BotGroupMgr] CreateGroup: leader {} assigned role {}", leader->GetName(), static_cast<int>(leaderRole));
 
     // Shuffle the available members to randomize selection
     std::random_device rd;
@@ -56,19 +81,42 @@ bool PlayerbotGroupMgr::CreateGroup()
     for (auto& member : availableMembers)
     {
         if (totalMembers >= _targetComposition.groupSize)
+        {
+            LOG_DEBUG("playerbots", "CreateGroup: reached target group size {}", totalMembers);
             break;
+        }
         if (CanInviteMore(member.role))
         {
             Player* player = ObjectAccessor::FindPlayer(member.guid);
             if (!player)
+            {
+                LOG_DEBUG("playerbots", "CreateGroup: player for guid {} not found (offline?)", member.guid.GetCounter());
                 continue;
+            }
             if (InviteToGroupAction.Invite(leader, player))
             {
                 _roleComposition[member.role]++;
                 totalMembers++;
+                LOG_DEBUG("playerbots", "CreateGroup: invited {} (role {}), totalMembers now {}",
+                    player->GetName(), static_cast<int>(member.role), totalMembers);
+            }
+            else
+            {
+                LOG_DEBUG("playerbots", "CreateGroup: failed to invite {} (role {})",
+                    player->GetName(), static_cast<int>(member.role));
             }
         }
+        else
+        {
+            LOG_DEBUG("playerbots", "CreateGroup: skipping member (role {}), role slots full. Current: T={} H={} D={}",
+                static_cast<int>(member.role),
+                _roleComposition[BOT_ROLE_TANK], _roleComposition[BOT_ROLE_HEALER], _roleComposition[BOT_ROLE_DPS]);
+        }
     }
+
+    LOG_DEBUG("playerbots", "CreateGroup: finished with {} members (T={} H={} D={})",
+        totalMembers, _roleComposition[BOT_ROLE_TANK], _roleComposition[BOT_ROLE_HEALER], _roleComposition[BOT_ROLE_DPS]);
+
     return true;
 }
 
@@ -79,24 +127,48 @@ std::vector<GuildMember> PlayerbotGroupMgr::FindAvailableGuildMembers(Guild* gui
         return availableMembers;
     std::vector<ObjectGuid> guildMembers = GetGuildMembers(guild->GetId());
 
+    LOG_DEBUG("playerbots", "FindAvailableGuildMembers: guild {} has {} total members from GetGuildMembers",
+        guild->GetName(), guildMembers.size());
+
+    uint32 skippedOffline = 0, skippedInGroup = 0, skippedLevel = 0, skippedNoRole = 0;
+
     for (const auto& memberGuid : guildMembers)
     {
         Player* player = ObjectAccessor::FindPlayer(memberGuid);
         if (!player)
+        {
+            skippedOffline++;
             continue;
+        }
         if (player->GetGroup())
+        {
+            skippedInGroup++;
             continue;
+        }
 
         uint8 playerlevel = player->GetLevel();
         if (levelrangeset &&
             (playerlevel < _targetComposition.lowerLevelLimit || playerlevel > _targetComposition.upperLevelLimit))
+        {
+            LOG_DEBUG("playerbots", "FindAvailableGuildMembers: {} level {} outside range [{}-{}]",
+                player->GetName(), playerlevel, _targetComposition.lowerLevelLimit, _targetComposition.upperLevelLimit);
+            skippedLevel++;
             continue;
+        }
 
         BotRoles role = GetBotRole(memberGuid);
         if (role == BOT_ROLE_NONE)
+        {
+            LOG_DEBUG("playerbots", "FindAvailableGuildMembers: {} has BOT_ROLE_NONE, skipping", player->GetName());
+            skippedNoRole++;
             continue;
+        }
         availableMembers.push_back({memberGuid, playerlevel, role});
     }
+
+    LOG_DEBUG("playerbots", "FindAvailableGuildMembers: {} available, skipped: {} offline, {} in group, {} out of level range, {} no role",
+        availableMembers.size(), skippedOffline, skippedInGroup, skippedLevel, skippedNoRole);
+
     return availableMembers;
 }
 
