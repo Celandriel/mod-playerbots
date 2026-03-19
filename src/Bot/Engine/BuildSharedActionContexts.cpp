@@ -3,6 +3,7 @@
 #include "ChatActionContext.h"
 #include "WorldPacketActionContext.h"
 #include "Ai/Raid/Aq20/RaidAq20ActionContext.h"
+#include "Ai/Raid/Aq40/RaidAq40ActionContext.h"
 #include "Ai/Raid/MoltenCore/RaidMcActionContext.h"
 #include "Ai/Raid/BlackwingLair/RaidBwlActionContext.h"
 #include "Ai/Raid/Karazhan/RaidKarazhanActionContext.h"
@@ -25,6 +26,7 @@ void AiObjectContext::BuildSharedActionContexts(SharedNamedObjectContextList<Act
     actionContexts.Add(new ChatActionContext());
     actionContexts.Add(new WorldPacketActionContext());
     actionContexts.Add(new RaidAq20ActionContext());
+    actionContexts.Add(new RaidAq40ActionContext());
     actionContexts.Add(new RaidMcActionContext());
     actionContexts.Add(new RaidBwlActionContext());
     actionContexts.Add(new RaidKarazhanActionContext());
