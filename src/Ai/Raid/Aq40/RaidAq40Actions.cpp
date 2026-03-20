@@ -46,8 +46,8 @@ bool Aq40UseResistanceBuffsAction::Execute(Event event)
             }
         }
         break;
-        case default;
-        break;
+        default:
+            break;
     }
 
     return false;
@@ -65,7 +65,7 @@ bool Aq40MoveFromOtherEmperorAction::Execute(Event event)
     if (Unit* boss2 = AI_VALUE2(Unit*, "find target", "emperor vek'nilash"))
     {
         ObjectGuid botGuid = bot->GetGUID();
-        ObjectGuid petGuid = (ObjectGuid)0UL;
+        ObjectGuid petGuid = ObjectGuid::Empty;
         if (Pet* pet = bot->GetPet())
             petGuid = pet->GetGUID();
 
@@ -188,17 +188,72 @@ bool Aq40MoveTowardsEmperorAction::Execute(Event event)
         {
             Unit* target = botAI->GetUnit(bossTarget);
 
-            long travelTarger = -1;//radius - bot->GetDistance(target);
-            long travelBoss = radius - bot->GetDistance(boss);
+            if (target)
+            {
+                float travelTarget = radius - bot->GetDistance(target);
+                float travelBoss = radius - bot->GetDistance(boss);
 
-            if (travelTarger > travelBoss)
-                return MoveTo(target, travelTarger);
-
+                if (travelTarget > travelBoss)
+                    return MoveTo(target, travelTarget);
+                else
+                    return MoveTo(boss, travelBoss);
+            }
             else
-                return MoveTo(boss, travelBoss);
+            {
+                float travelBoss = radius - bot->GetDistance(boss);
+                if (travelBoss > 0)
+                    return MoveTo(boss, travelBoss);
+            }
         }
     }
 
+    return false;
+}
+
+bool Aq40TankAnchorPositionAction::Execute(Event event)
+{
+    // Torch positions at opposite ends of the room
+    const float leftX = -8894.3f, leftY = 1285.5f, leftZ = -112.25f;
+    const float rightX = -9029.1f, rightY = 1261.8f, rightZ = -112.25f;
+    const float roomCenterX = -8961.7f;
+
+    // Determine which anchor this tank is assigned to based on current position
+    bool botOnLeft = bot->GetPositionX() > roomCenterX;
+    float anchorX = botOnLeft ? leftX : rightX;
+    float anchorY = botOnLeft ? leftY : rightY;
+    float anchorZ = botOnLeft ? leftZ : rightZ;
+
+    // Move to anchor if more than 10yd away
+    if (bot->GetDistance(anchorX, anchorY, anchorZ) > 10.0f)
+    {
+        return MoveTo(bot->GetMapId(), anchorX, anchorY, anchorZ,
+            false, false, false, true, MovementPriority::MOVEMENT_COMBAT);
+    }
+    return false;
+}
+
+bool Aq40MoveToRoomCenterAction::Execute(Event event)
+{
+    // Midpoint between torch_left (-8894.3, 1285.5) and torch_right (-9029.1, 1261.8)
+    const float centerX = -8961.7f;
+    const float centerY = 1273.65f;
+    const float centerZ = -112.25f;
+
+    if (bot->GetDistance(centerX, centerY, centerZ) > 10.0f)
+    {
+        return MoveTo(bot->GetMapId(), centerX, centerY, centerZ,
+            false, false, false, true, MovementPriority::MOVEMENT_COMBAT);
+    }
+    return false;
+}
+
+bool Aq40MoveFromVeklorAction::Execute(Event event)
+{
+    if (Unit* veklor = AI_VALUE2(Unit*, "find target", "emperor vek'lor"))
+    {
+        if (bot->GetDistance(veklor) < 15.0f)
+            return MoveAway(veklor, 15.0f);
+    }
     return false;
 }
 
@@ -547,7 +602,7 @@ bool Aq40Cthun2PositionAction::Execute(Event event)
 
             if (!attackPositioned)
             {
-                point = insideattack;
+                point = insideAttack;
 
                 if (bot->GetDistance(*point) < 1.0)
                 {

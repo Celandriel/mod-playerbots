@@ -21,10 +21,6 @@ public:
     Aq40MoveFromOtherEmperorAction(PlayerbotAI* botAI, std::string const name = "aq40 move from other emperor")
         : MovementAction(botAI, name) {}
     bool Execute(Event event) override;
-protected:
-    const Position* torch_left = new Position(-8894.3, 1285.5, -112.25);
-    const Position* torch_right = new Position(-9029.1, 1261.8, -112.25);
-    float lastdist = 0.0F;
 };
 
 BEGIN_RANGED_SPELL_ACTION(Aq40WarlockCastSearingPainAction, "searing pain")
@@ -46,7 +42,7 @@ public:
     Aq40AttackTargetByNameAction(PlayerbotAI* botAI, std::string const name) : AttackAction(botAI, name) {}
     bool Execute(Event event) override;
 
-    virtual std::string const WhichEmperor() { return NULL; }
+    virtual std::string const WhichEmperor() { return ""; }
 };
 
 class Aq40AttackEmperorVekLorAction : public Aq40AttackTargetByNameAction
@@ -79,10 +75,10 @@ public:
         : MovementAction(botAI, name) {}
     bool Execute(Event event) override;
 
-    virtual std::string const WhichEmperor() { return NULL; }
+    virtual std::string const WhichEmperor() { return ""; }
 };
 
-class Aq40MoveTowardsEmperorVekLorAction : Aq40MoveTowardsEmperorAction
+class Aq40MoveTowardsEmperorVekLorAction : public Aq40MoveTowardsEmperorAction
 {
 public:
     Aq40MoveTowardsEmperorVekLorAction(PlayerbotAI* botAI)
@@ -91,13 +87,37 @@ public:
     std::string const WhichEmperor() override { return "emperor vek'lor"; }
 };
 
-class Aq40MoveTowardsEmperorVekNilashAction : Aq40MoveTowardsEmperorAction
+class Aq40MoveTowardsEmperorVekNilashAction : public Aq40MoveTowardsEmperorAction
 {
 public:
     Aq40MoveTowardsEmperorVekNilashAction(PlayerbotAI* botAI)
         : Aq40MoveTowardsEmperorAction(botAI, "aq40 move towards emperor vek'nilash") {}
     
     std::string const WhichEmperor() override { return "emperor vek'nilash"; }
+};
+
+class Aq40TankAnchorPositionAction : public MovementAction
+{
+public:
+    Aq40TankAnchorPositionAction(PlayerbotAI* botAI)
+        : MovementAction(botAI, "aq40 tank anchor position") {}
+    bool Execute(Event event) override;
+};
+
+class Aq40MoveToRoomCenterAction : public MovementAction
+{
+public:
+    Aq40MoveToRoomCenterAction(PlayerbotAI* botAI)
+        : MovementAction(botAI, "aq40 move to room center") {}
+    bool Execute(Event event) override;
+};
+
+class Aq40MoveFromVeklorAction : public MovementAction
+{
+public:
+    Aq40MoveFromVeklorAction(PlayerbotAI* botAI)
+        : MovementAction(botAI, "aq40 move from veklor") {}
+    bool Execute(Event event) override;
 };
 
 class Aq40OuroBurrowedFleeAction : public Action
@@ -125,22 +145,20 @@ public:
                     outer ring 23 bots about 13.7 units apart
                     inner ring 17 bots about 13.3 units apart
         */
-        for (int n = 0; n < outerpointscount; n++)
+        for (int n = 0; n < outerPointsCount; n++)
         {
             Position* what = new Position(-8579.0F, 1987.0F, 101.0F);
-            // 45.0: outside of 25 yard range, inside of 30 yard range
-            what->RelocatePolarOffset(n * M_PI * 2.0 / outerpointscount, 43.0);
-            outerpoints[n] = what;
-            //printf("build outerpoint %d: x=%f y=%f z=%f\n",n,what->GetPositionX(),what->GetPositionY(),what->GetPositionZ());
+            // 43.0: outside of 25 yard range, inside of 30 yard range
+            what->RelocatePolarOffset(n * M_PI * 2.0 / outerPointsCount, 43.0);
+            outerPoints[n] = what;
         }
 
-        for (int n = 0; n < innerpointscount; n++)
+        for (int n = 0; n < innerPointsCount; n++)
         {
             Position* what = new Position(-8579.0F, 1987.0F, 101.0F);
-            // 45.0: outside of 25 yard range, inside of 30 yard range
-            what->RelocatePolarOffset(n * M_PI * 2.0 / outerpointscount, 31.0);
-            innerpoints[n] = what;
-            //printf("build innerpoint %d: x=%f y=%f z=%f\n",n,what->GetPositionX(),what->GetPositionY(),what->GetPositionZ());
+            // 31.0: inner ring radius
+            what->RelocatePolarOffset(n * M_PI * 2.0 / innerPointsCount, 31.0);
+            innerPoints[n] = what;
         }
     }
     bool Execute(Event event) override;

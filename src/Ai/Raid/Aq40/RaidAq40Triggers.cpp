@@ -9,7 +9,7 @@ bool Aq40HasEmperorAggroTrigger::IsActive()
     const int NPC_VEKNILASH           = 15275;
 
     ObjectGuid botguid = bot->GetGUID();
-    ObjectGuid petguid = (ObjectGuid)0UL;
+    ObjectGuid petguid = ObjectGuid::Empty;
     if (Unit* pet = bot->GetPet())
     {
         petguid = pet->GetGUID();
@@ -48,12 +48,13 @@ bool Aq40WarlockTankEmperorTrigger::IsActive()
             {
                 Player* bosstarget = botAI->GetPlayer(bosstargetguid);
 
-                if (!bosstarget || bosstarget->getClass() != CLASS_WARLOCK || !botAI->IsTank(bosstarget, true))
-                {
-                    //std::ostringstream out;
-                    //out << "want tank?  target="<<bottarget.GetRawValue()<<" vek'lor="<<bossguid.GetRawValue();
-                    //botAI->TellError(out.str());
+                // Check if Vek'lor already has a valid spell-damage tank
+                bool hasSpellTank = bosstarget
+                    && (bosstarget->getClass() == CLASS_WARLOCK
+                        || (bosstarget->getClass() == CLASS_PALADIN && botAI->IsTank(bosstarget, true)));
 
+                if (!hasSpellTank)
+                {
                     return bottarget == bossguid && bosstargetguid != bot->GetGUID();
                 }
             }
@@ -113,7 +114,10 @@ bool Aq40EmperorTrigger::IsActive()
         }
 
         ObjectGuid self = bot->GetGUID();
-        ObjectGuid masterguid = botAI->GetMaster()->GetGUID();
+        Player* master = botAI->GetMaster();
+        if (!master)
+            return false;
+        ObjectGuid masterguid = master->GetGUID();
 
         std::vector<Player*> memberlists[4];
         for (int n = 0; n < 4; n++)
@@ -138,7 +142,12 @@ bool Aq40EmperorTrigger::IsActive()
                     int assignedtype;
                     if (member->getClass() == CLASS_WARLOCK)
                     {
-                        // lol warlock tanks
+                        // Warlock: spell-damage tank for Vek'lor
+                        assignedtype = 0;
+                    }
+                    else if (member->getClass() == CLASS_PALADIN && memberAI->IsTank(member))
+                    {
+                        // Paladin tank: Holy damage works on both emperors
                         assignedtype = 0;
                     }
                     else if (memberAI->IsTank(member))
@@ -168,16 +177,48 @@ bool Aq40EmperorTrigger::IsActive()
             return false;
         }
 
+        // Position-based assignment for tanks.
+        // Each side of the room has a spell tank + melee tank.
+        // Tanks stay at their anchor position and pick up whichever emperor lands there.
+        // Room center X = -8961.7 (midpoint between torch_left=-8894.3 and torch_right=-9029.1)
+        const float roomCenterX = -8961.7f;
 
+        if (selftype == 0 || selftype == 1)
+        {
+            // Determine which emperor is on the bot's side of the room
+            bool botOnLeft = bot->GetPositionX() > roomCenterX;
+            bool veklorOnLeft = boss1->GetPositionX() > roomCenterX;
+
+            // Spell tanks (type 0): target Vek'lor if he's on their side, otherwise pest control
+            if (selftype == 0)
+            {
+                if (veklorOnLeft == botOnLeft)
+                    return IsVekLor();
+                else
+                    return IsPestControl();
+            }
+
+            // Melee tanks (type 1): target Vek'nilash if he's on their side, otherwise hold Vek'lor temporarily
+            if (selftype == 1)
+            {
+                bool veknilashOnLeft = boss2->GetPositionX() > roomCenterX;
+                if (veknilashOnLeft == botOnLeft)
+                    return IsVekNilash();
+                else
+                    return IsVekLor();  // Hold Vek'lor for initial aggro until spell tank takes over
+            }
+        }
+
+        // Types 2 (healers) and 3 (DPS): alternating assignment by proximity
         int sametypecount = memberlists[selftype].size();
 
-        float dist1[sametypecount];
-        ObjectGuid dist1who[sametypecount];
-        Unit* dist1unit[sametypecount];
+        std::vector<float> dist1(sametypecount);
+        std::vector<ObjectGuid> dist1who(sametypecount);
+        std::vector<Unit*> dist1unit(sametypecount);
 
-        float dist2[sametypecount];
-        ObjectGuid dist2who[sametypecount];
-        Unit* dist2unit[sametypecount];
+        std::vector<float> dist2(sametypecount);
+        std::vector<ObjectGuid> dist2who(sametypecount);
+        std::vector<Unit*> dist2unit(sametypecount);
 
         for (int n = 0; n < sametypecount; n++)
         {
@@ -227,25 +268,18 @@ bool Aq40EmperorTrigger::IsActive()
             }
         }
 
-        ObjectGuid boss1assigned[sametypecount];
-        int boss1assignedindex=0;
-        ObjectGuid boss2assigned[sametypecount];
-        int boss2assignedindex=0;
+        std::vector<ObjectGuid> boss1assigned(sametypecount);
+        int boss1assignedindex = 0;
+        std::vector<ObjectGuid> boss2assigned(sametypecount);
+        int boss2assignedindex = 0;
 
         if (selftype == 3)
         {
-            sametypecount -= 4;
-        }
-        else if (selftype == 1)
-        {
-            if (sametypecount > 3)
-            {
-                sametypecount -= 2;
-            }
-            else if (sametypecount > 2)
-            {
-                sametypecount--;
-            }
+            // Reserve up to 4 DPS for pest control
+            if (sametypecount > 4)
+                sametypecount -= 4;
+            else
+                sametypecount = 0;
         }
         else if (selftype == 2)
         {
@@ -271,11 +305,11 @@ bool Aq40EmperorTrigger::IsActive()
                         {
                             if (dist2who[subn] == dist1who[n])
                             {
-                                dist2who[subn] = (ObjectGuid)0UL;
+                                dist2who[subn] = ObjectGuid::Empty;
                                 break;
                             }
                         }
-                        dist1who[n] = (ObjectGuid)0UL;
+                        dist1who[n] = ObjectGuid::Empty;
                     }
                 }
 
@@ -295,11 +329,11 @@ bool Aq40EmperorTrigger::IsActive()
                         {
                             if (dist1who[subn] == dist2who[n])
                             {
-                                dist1who[subn] = (ObjectGuid)0UL;
+                                dist1who[subn] = ObjectGuid::Empty;
                                 break;
                             }
                         }
-                        dist2who[n] = (ObjectGuid)0UL;
+                        dist2who[n] = ObjectGuid::Empty;
                     }
                 }
             }
@@ -356,6 +390,105 @@ bool Aq40EmperorTrigger::IsActive()
             return true;
         }
     }
+
+    return false;
+}
+
+bool Aq40TankAnchorTrigger::IsActive()
+{
+    Unit* boss1 = AI_VALUE2(Unit*, "find target", "emperor vek'lor");
+    Unit* boss2 = AI_VALUE2(Unit*, "find target", "emperor vek'nilash");
+
+    if (!boss1 || !boss2 || (!boss1->IsInCombat() && !boss2->IsInCombat()))
+        return false;
+
+    // Only for tanks (type 0 and type 1)
+    if (bot->getClass() == CLASS_WARLOCK)
+        return true;
+    if (bot->getClass() == CLASS_PALADIN && botAI->IsTank(bot))
+        return true;
+    if (botAI->IsTank(bot))
+        return true;
+
+    return false;
+}
+
+bool Aq40CenterPositionTrigger::IsActive()
+{
+    Unit* boss1 = AI_VALUE2(Unit*, "find target", "emperor vek'lor");
+    Unit* boss2 = AI_VALUE2(Unit*, "find target", "emperor vek'nilash");
+
+    if (!boss1 || !boss2 || (!boss1->IsInCombat() && !boss2->IsInCombat()))
+        return false;
+
+    // Only for healers and caster DPS — not tanks, not melee DPS
+    if (bot->getClass() == CLASS_WARLOCK)
+        return false;
+    if (botAI->IsTank(bot))
+        return false;
+
+    // Melee DPS follows Vek'nilash (pain train), not center
+    if (botAI->IsMelee(bot) && !botAI->IsHeal(bot))
+        return false;
+
+    // Fire if healer or caster DPS is too far from center
+    const float roomCenterX = -8961.7f;
+    const float roomCenterY = 1273.65f;
+    const float roomCenterZ = -112.25f;
+    return bot->GetDistance(roomCenterX, roomCenterY, roomCenterZ) > 35.0f;
+}
+
+bool Aq40EmperorPreTeleportTrigger::IsActive()
+{
+    const int NPC_VEKLOR    = 15276;
+    const int NPC_VEKNILASH = 15275;
+
+    Unit* boss1 = AI_VALUE2(Unit*, "find target", "emperor vek'lor");
+    Unit* boss2 = AI_VALUE2(Unit*, "find target", "emperor vek'nilash");
+
+    if (!boss1 || !boss2 || (!boss1->IsInCombat() && !boss2->IsInCombat()))
+    {
+        fightStarted = false;
+        return false;
+    }
+
+    // Initialize timer on fight start
+    if (!fightStarted)
+    {
+        lastTeleportTime = getMSTime();
+        fightStarted = true;
+    }
+
+    // Detect teleport: either emperor is rooted (2.3s root after swap)
+    if (boss1->HasUnitState(UNIT_STATE_ROOT) || boss2->HasUnitState(UNIT_STATE_ROOT))
+    {
+        lastTeleportTime = getMSTime();
+        return false;
+    }
+
+    // Don't fire for tanks — they must keep emperors separated until the swap
+    if (bot->getClass() == CLASS_WARLOCK)
+        return false;
+    if (bot->getClass() == CLASS_PALADIN && botAI->IsTank(bot))
+        return false;
+    if (botAI->IsTank(bot))
+        return false;
+
+    // Fire when >25s since last teleport (teleport happens every 30-40s)
+    uint32 elapsed = getMSTime() - lastTeleportTime;
+    return elapsed > 25000;
+}
+
+bool Aq40NearVeklorTrigger::IsActive()
+{
+    // Don't fire for spell tanks (they need to be near Vek'lor)
+    if (bot->getClass() == CLASS_WARLOCK)
+        return false;
+    if (bot->getClass() == CLASS_PALADIN && botAI->IsTank(bot))
+        return false;
+
+    if (Unit* veklor = AI_VALUE2(Unit*, "find target", "emperor vek'lor"))
+        return veklor->IsInCombat() && bot->GetDistance(veklor) < 15.0f;
 
     return false;
 }

@@ -20,6 +20,9 @@ public:
         creators["searing pain"] = &RaidAq40ActionContext::warlock_searing_pain;
         creators["frostbolt"] = &RaidAq40ActionContext::mage_cast_frostbolt;
         creators["aq40 melee viscidus"] = &RaidAq40ActionContext::melee_viscidus;
+        creators["aq40 tank anchor position"] = &RaidAq40ActionContext::tank_anchor_position;
+        creators["aq40 move to room center"] = &RaidAq40ActionContext::move_to_room_center;
+        creators["aq40 move from veklor"] = &RaidAq40ActionContext::move_from_veklor;
         creators["aq40 ouro burrowed flee"] = &RaidAq40ActionContext::ouro_burrowed_flee;
         creators["aq40 cthun1 get positioned"] = &RaidAq40ActionContext::cthun1_get_positioned;
         creators["aq40 cthun2 get positioned"] = &RaidAq40ActionContext::cthun2_get_positioned;
@@ -36,6 +39,9 @@ private:
     static Action* warlock_searing_pain(PlayerbotAI* ai) { return new Aq40WarlockCastSearingPainAction(ai); }
     static Action* mage_cast_frostbolt(PlayerbotAI* ai) { return new Aq40MageCastFrostboltAction(ai); }
     static Action* melee_viscidus(PlayerbotAI* ai) { return new Aq40MeleeViscidusAction(ai); }
+    static Action* tank_anchor_position(PlayerbotAI* ai) { return new Aq40TankAnchorPositionAction(ai); }
+    static Action* move_to_room_center(PlayerbotAI* ai) { return new Aq40MoveToRoomCenterAction(ai); }
+    static Action* move_from_veklor(PlayerbotAI* ai) { return new Aq40MoveFromVeklorAction(ai); }
     static Action* ouro_burrowed_flee(PlayerbotAI* ai) { return new Aq40OuroBurrowedFleeAction(ai); }
     static Action* cthun1_get_positioned(PlayerbotAI* ai) { return new Aq40Cthun1PositionAction(ai); }
     static Action* cthun2_get_positioned(PlayerbotAI* ai) { return new Aq40Cthun2PositionAction(ai); }

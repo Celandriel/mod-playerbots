@@ -107,6 +107,37 @@ protected:
     bool IsPestControl() override { return false; }
 };
 
+class Aq40TankAnchorTrigger : public Trigger
+{
+public:
+    Aq40TankAnchorTrigger(PlayerbotAI* botAI) : Trigger(botAI, "aq40 tank anchor") {}
+    bool IsActive() override;
+};
+
+class Aq40CenterPositionTrigger : public Trigger
+{
+public:
+    Aq40CenterPositionTrigger(PlayerbotAI* botAI) : Trigger(botAI, "aq40 center position") {}
+    bool IsActive() override;
+};
+
+class Aq40EmperorPreTeleportTrigger : public Trigger
+{
+public:
+    Aq40EmperorPreTeleportTrigger(PlayerbotAI* botAI) : Trigger(botAI, "aq40 emperor pre teleport") {}
+    bool IsActive() override;
+private:
+    uint32 lastTeleportTime = 0;
+    bool fightStarted = false;
+};
+
+class Aq40NearVeklorTrigger : public Trigger
+{
+public:
+    Aq40NearVeklorTrigger(PlayerbotAI* botAI) : Trigger(botAI, "aq40 near veklor") {}
+    bool IsActive() override;
+};
+
 class Aq40OuroBurrowedTrigger : public Trigger
 {
 public:
