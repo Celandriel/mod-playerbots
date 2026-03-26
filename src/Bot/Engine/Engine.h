@@ -64,7 +64,7 @@ class Engine : public PlayerbotAIAware
 public:
     Engine(PlayerbotAI* botAI, AiObjectContext* factory);
 
-    void Init();
+    virtual void Init();
     void addStrategy(std::string const name, bool init = true);
     void addStrategies(std::string first, ...);
     void addStrategiesNoInit(std::string first, ...);
@@ -90,15 +90,8 @@ public:
     bool testMode;
 
 private:
-    bool MultiplyAndPush(std::vector<NextAction> actions, float forceRelevance, bool skipPrerequisites, Event event,
-                         const char* pushType);
-    void Reset();
-    void ProcessTriggers(bool minimal);
     void PushDefaultActions();
-    void PushAgain(ActionNode* actionNode, float relevance, Event event);
     ActionNode* CreateActionNode(std::string const name);
-    Action* InitializeAction(ActionNode* actionNode);
-    bool ListenAndExecute(Action* action, Event event);
 
     void LogAction(char const* format, ...);
     void LogValues();
@@ -106,6 +99,14 @@ private:
     ActionExecutionListeners actionExecutionListeners;
 
 protected:
+    bool MultiplyAndPush(std::vector<NextAction> actions, float forceRelevance, bool skipPrerequisites, Event event,
+                         const char* pushType);
+    void Reset();
+    void ProcessTriggers(bool minimal);
+    void PushAgain(ActionNode* actionNode, float relevance, Event event);
+    virtual Action* InitializeAction(ActionNode* actionNode);
+    virtual bool ListenAndExecute(Action* action, Event event);
+
     Queue queue;
     std::vector<TriggerNode*> triggers;
     std::vector<Multiplier*> multipliers;

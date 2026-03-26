@@ -34,3 +34,8 @@ void UsePotionsStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(
         new TriggerNode("low mana", { NextAction("mana potion", ACTION_EMERGENCY) }));
 }
+
+void UsePotionsStrategy::InitReactionTriggers(std::vector<TriggerNode*>& triggers)
+{
+    InitTriggers(triggers);
+}

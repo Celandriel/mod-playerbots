@@ -19,6 +19,7 @@
 #include "CreatureData.h"
 #include "EmoteAction.h"
 #include "Engine.h"
+#include "ReactionEngine.h"
 #include "EventProcessor.h"
 #include "ExternalEventHelper.h"
 #include "GameObjectData.h"
@@ -148,6 +149,7 @@ PlayerbotAI::PlayerbotAI(Player* bot)
     engines[BOT_STATE_COMBAT] = AiFactory::createCombatEngine(bot, this, aiObjectContext);
     engines[BOT_STATE_NON_COMBAT] = AiFactory::createNonCombatEngine(bot, this, aiObjectContext);
     engines[BOT_STATE_DEAD] = AiFactory::createDeadEngine(bot, this, aiObjectContext);
+    engines[BOT_STATE_REACTION] = reactionEngine = AiFactory::createReactionEngine(bot, this, aiObjectContext);
     if (sPlayerbotAIConfig.applyInstanceStrategies)
         ApplyInstanceStrategies(bot->GetMapId());
     currentEngine = engines[BOT_STATE_NON_COMBAT];
@@ -238,7 +240,10 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
     if (nextAICheckDelay > elapsed)
         nextAICheckDelay -= elapsed;
     else
+    {
         nextAICheckDelay = 0;
+        isWaiting = false;
+    }
 
     // Early return if bot is in invalid state
     if (!bot || !bot->GetSession() || !bot->IsInWorld() || bot->IsBeingTeleported() ||
@@ -261,114 +266,172 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
 
     AllowActivity();
 
-    if (!CanUpdateAI())
+    // Wake up if combat state changed (unless explicitly waiting or casting)
+    bool isCasting = bot->IsNonMeleeSpellCast(true);
+    if (bot->IsInCombat())
+    {
+        if (!inCombat && !isCasting && !isWaiting)
+            ResetActionDuration();
+
+        inCombat = true;
+    }
+    else
+    {
+        if (inCombat && !isCasting && !isWaiting)
+            ResetActionDuration();
+
+        inCombat = false;
+    }
+
+    // Reaction engine: runs even when main engines are paused (e.g. during eat/drink).
+    // Only update the main AI when no reaction is running and the internal delay allows it.
+    bool doMinimalReaction = minimal || !AllowActivity();
+    if (!UpdateAIReaction(elapsed, doMinimalReaction, bot->IsTaxiFlying()) && CanUpdateAI())
+    {
+        // Handle the current spell
+        Spell* currentSpell = bot->GetCurrentSpell(CURRENT_GENERIC_SPELL);
+        if (!currentSpell)
+            currentSpell = bot->GetCurrentSpell(CURRENT_CHANNELED_SPELL);
+
+        if (currentSpell)
+        {
+            SpellInfo const* spellInfo = currentSpell->GetSpellInfo();
+            if (spellInfo && currentSpell->getState() == SPELL_STATE_PREPARING)
+            {
+                Unit* spellTarget = currentSpell->m_targets.GetUnitTarget();
+                // Interrupt if target is dead or spell can't target dead units
+                if (spellTarget && !spellTarget->IsAlive() && !spellInfo->IsAllowingDeadTarget())
+                {
+                    InterruptSpell();
+                    YieldThread(GetReactDelay());
+                    return;
+                }
+
+                GameObject* goSpellTarget = currentSpell->m_targets.GetGOTarget();
+
+                if (goSpellTarget && !goSpellTarget->isSpawned())
+                {
+                    InterruptSpell();
+                    YieldThread(GetReactDelay());
+                    return;
+                }
+
+                bool isHeal = false;
+                bool isSingleTarget = true;
+
+                for (uint8 i = 0; i < 3; ++i)
+                {
+                    if (!spellInfo->Effects[i].Effect)
+                        continue;
+
+                    // Check if spell is a heal
+                    if (spellInfo->Effects[i].Effect == SPELL_EFFECT_HEAL ||
+                        spellInfo->Effects[i].Effect == SPELL_EFFECT_HEAL_MAX_HEALTH ||
+                        spellInfo->Effects[i].Effect == SPELL_EFFECT_HEAL_MECHANICAL)
+                        isHeal = true;
+
+                    // Check if spell is single-target
+                    if ((spellInfo->Effects[i].TargetA.GetTarget() &&
+                         spellInfo->Effects[i].TargetA.GetTarget() != TARGET_UNIT_TARGET_ALLY) ||
+                        (spellInfo->Effects[i].TargetB.GetTarget() &&
+                         spellInfo->Effects[i].TargetB.GetTarget() != TARGET_UNIT_TARGET_ALLY))
+                    {
+                        isSingleTarget = false;
+                    }
+                }
+
+                // Interrupt if target ally has full health (heal by other member)
+                if (isHeal && isSingleTarget && spellTarget && spellTarget->IsFullHealth())
+                {
+                    InterruptSpell();
+                    YieldThread(GetReactDelay());
+                    return;
+                }
+
+                // Ensure bot is facing target if necessary
+                if (spellTarget && !bot->HasInArc(CAST_ANGLE_IN_FRONT, spellTarget) &&
+                    (spellInfo->FacingCasterFlags & SPELL_FACING_FLAG_INFRONT))
+                {
+                    ServerFacade::instance().SetFacingTo(bot, spellTarget);
+                }
+
+                // Wait for spell cast
+                YieldThread(GetReactDelay());
+                return;
+            }
+        }
+
+        // Handle transport check delay
+        if (nextTransportCheck > elapsed)
+            nextTransportCheck -= elapsed;
+        else
+            nextTransportCheck = 0;
+
+        if (!nextTransportCheck)
+        {
+            nextTransportCheck = 1000;
+            Transport* newTransport = bot->GetMap()->GetTransportForPos(bot->GetPhaseMask(), bot->GetPositionX(),
+                                                                        bot->GetPositionY(), bot->GetPositionZ(), bot);
+
+            if (newTransport != bot->GetTransport())
+            {
+                LOG_DEBUG("playerbots", "Bot {} is on a transport", bot->GetName());
+
+                if (bot->GetTransport())
+                    bot->GetTransport()->RemovePassenger(bot, true);
+
+                if (newTransport)
+                    newTransport->AddPassenger(bot, true);
+
+                bot->StopMovingOnCurrentPos();
+            }
+        }
+
+        // Update the bot's group status
+        UpdateAIGroupMaster();
+
+        // Update internal AI
+        UpdateAIInternal(elapsed, minimal);
+        YieldThread(GetReactDelay());
+    }
+}
+
+bool PlayerbotAI::UpdateAIReaction(uint32 elapsed, bool minimal, bool isStunned)
+{
+    if (!reactionEngine)
+        return false;
+
+    bool reactionFound = false;
+    bool const reactionInProgress = reactionEngine->Update(elapsed, minimal, isStunned, reactionFound);
+
+    if (reactionFound)
+    {
+        Reaction const* reaction = reactionEngine->GetReaction();
+        if (reaction)
+        {
+            if (reaction->ShouldInterruptCast())
+                InterruptSpell();
+
+            if (reaction->ShouldInterruptMovement())
+                bot->StopMoving();
+        }
+    }
+
+    return reactionInProgress;
+}
+
+void PlayerbotAI::SetActionDuration(Action const* action)
+{
+    if (!action)
         return;
 
-    // Handle the current spell
-    Spell* currentSpell = bot->GetCurrentSpell(CURRENT_GENERIC_SPELL);
-    if (!currentSpell)
-        currentSpell = bot->GetCurrentSpell(CURRENT_CHANNELED_SPELL);
-
-    if (currentSpell)
+    if (action->IsReaction())
     {
-        const SpellInfo* spellInfo = currentSpell->GetSpellInfo();
-        if (spellInfo && currentSpell->getState() == SPELL_STATE_PREPARING)
-        {
-            Unit* spellTarget = currentSpell->m_targets.GetUnitTarget();
-            // Interrupt if target is dead or spell can't target dead units
-            if (spellTarget && !spellTarget->IsAlive() && !spellInfo->IsAllowingDeadTarget())
-            {
-                InterruptSpell();
-                YieldThread(GetReactDelay());
-                return;
-            }
-
-            GameObject* goSpellTarget = currentSpell->m_targets.GetGOTarget();
-
-            if (goSpellTarget && !goSpellTarget->isSpawned())
-            {
-                InterruptSpell();
-                YieldThread(GetReactDelay());
-                return;
-            }
-
-            bool isHeal = false;
-            bool isSingleTarget = true;
-
-            for (uint8 i = 0; i < 3; ++i)
-            {
-                if (!spellInfo->Effects[i].Effect)
-                    continue;
-
-                // Check if spell is a heal
-                if (spellInfo->Effects[i].Effect == SPELL_EFFECT_HEAL ||
-                    spellInfo->Effects[i].Effect == SPELL_EFFECT_HEAL_MAX_HEALTH ||
-                    spellInfo->Effects[i].Effect == SPELL_EFFECT_HEAL_MECHANICAL)
-                    isHeal = true;
-
-                // Check if spell is single-target
-                if ((spellInfo->Effects[i].TargetA.GetTarget() &&
-                     spellInfo->Effects[i].TargetA.GetTarget() != TARGET_UNIT_TARGET_ALLY) ||
-                    (spellInfo->Effects[i].TargetB.GetTarget() &&
-                     spellInfo->Effects[i].TargetB.GetTarget() != TARGET_UNIT_TARGET_ALLY))
-                {
-                    isSingleTarget = false;
-                }
-            }
-
-            // Interrupt if target ally has full health (heal by other member)
-            if (isHeal && isSingleTarget && spellTarget && spellTarget->IsFullHealth())
-            {
-                InterruptSpell();
-                YieldThread(GetReactDelay());
-                return;
-            }
-
-            // Ensure bot is facing target if necessary
-            if (spellTarget && !bot->HasInArc(CAST_ANGLE_IN_FRONT, spellTarget) &&
-                (spellInfo->FacingCasterFlags & SPELL_FACING_FLAG_INFRONT))
-            {
-                ServerFacade::instance().SetFacingTo(bot, spellTarget);
-            }
-
-            // Wait for spell cast
-            YieldThread(GetReactDelay());
-            return;
-        }
+        if (reactionEngine)
+            reactionEngine->SetReactionDuration(action);
     }
-
-    // Handle transport check delay
-    if (nextTransportCheck > elapsed)
-        nextTransportCheck -= elapsed;
     else
-        nextTransportCheck = 0;
-
-    if (!nextTransportCheck)
-    {
-        nextTransportCheck = 1000;
-        Transport* newTransport = bot->GetMap()->GetTransportForPos(bot->GetPhaseMask(), bot->GetPositionX(),
-                                                                    bot->GetPositionY(), bot->GetPositionZ(), bot);
-
-        if (newTransport != bot->GetTransport())
-        {
-            LOG_DEBUG("playerbots", "Bot {} is on a transport", bot->GetName());
-
-            if (bot->GetTransport())
-                bot->GetTransport()->RemovePassenger(bot, true);
-
-            if (newTransport)
-                newTransport->AddPassenger(bot, true);
-
-            bot->StopMovingOnCurrentPos();
-        }
-    }
-
-    // Update the bot's group status (moved to helper function)
-    UpdateAIGroupMaster();
-
-    // Update internal AI
-    UpdateAIInternal(elapsed, minimal);
-    YieldThread(GetReactDelay());
+        PlayerbotAIBase::SetActionDuration(action->GetDuration());
 }
 
 // Helper function for UpdateAI to check group membership and handle removal if necessary

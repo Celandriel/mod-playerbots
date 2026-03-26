@@ -24,10 +24,12 @@
 #include "Util.h"
 #include "WorldPacket.h"
 
+class Action;
 class AiObjectContext;
 class Creature;
 class Engine;
 class ExternalEventHelper;
+class ReactionEngine;
 class Gameobject;
 class Item;
 class ObjectGuid;
@@ -72,6 +74,7 @@ enum BotState
     BOT_STATE_COMBAT = 0,
     BOT_STATE_NON_COMBAT = 1,
     BOT_STATE_DEAD = 2,
+    BOT_STATE_REACTION = 3,
 
     BOT_STATE_MAX
 };
@@ -388,6 +391,9 @@ public:
 
     void UpdateAI(uint32 elapsed, bool minimal = false) override;
     void UpdateAIInternal(uint32 elapsed, bool minimal = false) override;
+    bool UpdateAIReaction(uint32 elapsed, bool minimal, bool isStunned);
+    void SetActionDuration(Action const* action);
+    ReactionEngine* GetReactionEngine() { return reactionEngine; }
 
     std::string const HandleRemoteCommand(std::string const command);
     void HandleCommand(uint32 type, std::string const text, Player* fromPlayer);
@@ -645,7 +651,9 @@ protected:
     static std::set<std::string> unsecuredCommands;
     bool allowActive[MAX_ACTIVITY_TYPE];
     time_t allowActiveCheckTimer[MAX_ACTIVITY_TYPE];
+    ReactionEngine* reactionEngine = nullptr;
     bool inCombat = false;
+    bool isWaiting = false;
     BotCheatMask cheatMask = BotCheatMask::none;
     Position jumpDestination = Position();
     uint32 nextTransportCheck = 0;
