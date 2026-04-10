@@ -144,6 +144,10 @@ AiPlayerbot.GroupInvitationPermission = 1
 # 1 = enabled (prevents bots from automatically leaving the group)
 AiPlayerbot.KeepAltsInGroup = 0
 
+# HIGHLY EXPERIMENTAL FEATURE
+# Allow alt bots to roam freely when not in group.
+AiPlayerbot.EnableAltRoaming = 0
+
 # Auto-login all player alts as altbots on player login
 AiPlayerbot.BotAutologin = 0
 

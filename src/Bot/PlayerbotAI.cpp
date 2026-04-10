@@ -389,7 +389,7 @@ void PlayerbotAI::UpdateAIGroupMaster()
     // If bot is not in group verify that for is RandomBot before clearing  master and resetting.
     if (!group)
     {
-        if (master && IsRandomBot)
+        if (master && (IsRandomBot || (botAI->IsAlt() && sPlayerbotAIConfig.enableAltRoaming)))
         {
             SetMaster(nullptr);
             Reset(true);
@@ -4362,8 +4362,6 @@ bool PlayerbotAI::HasRealPlayerMaster()
 }
 
 bool PlayerbotAI::HasActivePlayerMaster() { return master && !GET_PLAYERBOT_AI(master); }
-
-bool PlayerbotAI::IsAlt() { return HasRealPlayerMaster() && !sRandomPlayerbotMgr.IsRandomBot(bot); }
 
 Player* PlayerbotAI::GetGroupLeader()
 {

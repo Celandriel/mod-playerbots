@@ -579,6 +579,11 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
     uint32 accountId = bot->GetSession()->GetAccountId();
     bool isRandomAccount = sPlayerbotAIConfig.IsInRandomAccountList(accountId);
 
+    if (!isRandomAccount && master)
+    {
+        botAI->SetAlt(true);
+        botAI->SetAltMaster(master);
+    }
     if (isRandomAccount && sPlayerbotAIConfig.randomBotFixedLevel)
     {
         bot->SetPlayerFlag(PLAYER_FLAGS_NO_XP_GAIN);
