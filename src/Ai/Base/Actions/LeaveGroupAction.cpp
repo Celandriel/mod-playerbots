@@ -12,7 +12,7 @@
 bool LeaveGroupAction::Execute(Event event)
 {
     Player* player = event.getOwner();
-    if (player == botAI->GetMaster())
+    if (player == botAI->GetOwner())
         return Leave();
 
     return false;
@@ -29,9 +29,9 @@ bool PartyCommandAction::Execute(Event event)
 
     if (operation != PARTY_OP_LEAVE)
         return false;
-    // Only leave if master has left the party, and randombot cannot set new master.
-    Player* master = GetMaster();
-    if (master && member == master->GetName())
+    // Only leave if master/owner has left the party, and randombot cannot set new master.
+    Player* owner = botAI->GetOwner();
+    if (owner && member == owner->GetName())
     {
         if (sRandomPlayerbotMgr.IsRandomBot(bot))
         {
@@ -84,7 +84,7 @@ bool LeaveGroupAction::Leave()
     if (!botAI)
         return false;
 
-    Player* master = botAI -> GetMaster();
+    Player* master = botAI->GetMaster();
     if (master)
         botAI->TellMaster("Goodbye!", PLAYERBOT_SECURITY_TALK);
 
@@ -100,31 +100,23 @@ bool LeaveFarAwayAction::Execute(Event /*event*/)
 
 bool LeaveFarAwayAction::isUseful()
 {
-    if (bot->InBattleground())
-        return false;
-
-    if (bot->InBattlegroundQueue())
+    if (bot->InBattleground() || bot->InBattlegroundQueue())
         return false;
 
     if (!bot->GetGroup())
         return false;
 
+    // Don't leave if bot has a real player master or owner
+    if (botAI->HasRealPlayerMaster() || botAI->IsAlt())
+        return false;
+
     Player* groupLeader = botAI->GetGroupLeader();
-    Player* trueMaster = botAI->GetMaster();
     if (!groupLeader || (bot == groupLeader && !botAI->IsRealPlayer()))
         return false;
 
-    PlayerbotAI* groupLeaderBotAI = nullptr;
-    if (groupLeader)
-        groupLeaderBotAI = GET_PLAYERBOT_AI(groupLeader);
-    if (groupLeader && !groupLeaderBotAI)
-        return false;
-
-    if (trueMaster && !GET_PLAYERBOT_AI(trueMaster))
-        return false;
-
-    if (botAI->IsAlt() &&
-        (!groupLeaderBotAI || groupLeaderBotAI->IsRealPlayer()))  // Don't leave group when alt grouped with player groupLeader.
+    // Don't leave if group leader is a real player
+    PlayerbotAI* groupLeaderBotAI = GET_PLAYERBOT_AI(groupLeader);
+    if (!groupLeaderBotAI)
         return false;
 
     if (botAI->GetGrouperType() == GrouperType::SOLO)
@@ -135,7 +127,7 @@ bool LeaveFarAwayAction::isUseful()
     if (dCount > 9)
         return true;
 
-    if (dCount > 4 && !botAI->HasRealPlayerMaster())
+    if (dCount > 4)
         return true;
 
     if (bot->GetGuildId() == groupLeader->GetGuildId())
@@ -150,10 +142,9 @@ bool LeaveFarAwayAction::isUseful()
     if (abs(int32(groupLeader->GetLevel() - bot->GetLevel())) > 4)
         return true;
 
-    if (bot->GetMapId() != groupLeader->GetMapId() || bot->GetDistance2d(groupLeader) >= 2 * sPlayerbotAIConfig.rpgDistance)
-    {
+    if (bot->GetMapId() != groupLeader->GetMapId() ||
+        bot->GetDistance2d(groupLeader) >= 2 * sPlayerbotAIConfig.rpgDistance)
         return true;
-    }
 
     return false;
 }

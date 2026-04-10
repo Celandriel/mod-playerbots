@@ -33,9 +33,9 @@ namespace
         if (!ai)
             return;
 
-        if (Player* master = ai->GetMaster())
+        if (Player* owner = ai->GetOwner())
         {
-            if (PlayerbotMgr* mgr = GET_PLAYERBOT_MGR(master))
+            if (PlayerbotMgr* mgr = GET_PLAYERBOT_MGR(owner))
             {
                 mgr->LogoutPlayerBot(target->GetGUID());
                 return;

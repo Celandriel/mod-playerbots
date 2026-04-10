@@ -80,7 +80,7 @@ bool InviteNearbyToGroupAction::Execute(Event /*event*/)
                 !botAI->HasRealPlayerMaster())  // Do not invite solo players.
                 continue;
 
-            if (botAI->HasActivePlayerMaster())  // Do not invite alts of active players.
+            if (botAI->HasActivePlayerMaster() || botAI->IsAlt())  // Do not invite alts.
                 continue;
         }
 
@@ -149,7 +149,7 @@ bool InviteNearbyToGroupAction::isUseful()
             return false;
     }
 
-    if (botAI->HasActivePlayerMaster())  // Alts do not invite randomly
+    if (botAI->HasActivePlayerMaster() || botAI->IsAlt())  // Alts do not invite randomly
         return false;
 
     return true;
@@ -203,7 +203,7 @@ bool InviteGuildToGroupAction::Execute(Event /*event*/)
                 !playerAi->HasRealPlayerMaster())  // Do not invite solo players.
                 continue;
 
-            if (playerAi->HasActivePlayerMaster())  // Do not invite alts of active players.
+            if (playerAi->HasActivePlayerMaster() || playerAi->IsAlt())  // Do not invite alts.
                 continue;
 
             if (player->GetLevel() >
@@ -265,7 +265,7 @@ bool JoinGroupAction::Execute(Event event)
 
     if (bot->GetGroup())
     {
-        if (botAI->HasRealPlayerMaster())
+        if (botAI->HasRealPlayerMaster() || botAI->IsAlt())
             return false;
 
         if (!botAI->DoSpecificAction("leave", event, true))
@@ -414,7 +414,7 @@ bool LfgAction::Execute(Event event)
 
     if (bot->GetGroup())
     {
-        if (botAI->HasRealPlayerMaster())
+        if (botAI->HasRealPlayerMaster() || botAI->IsAlt())
             return false;
 
         if (!botAI->DoSpecificAction("leave", event, true))

@@ -543,6 +543,7 @@ public:
     void SetAlt(bool isAltFlag) { isAlt = isAltFlag; }
     void SetAltMaster(Player* master) { altMaster = master; }
     Player* GetAltMaster() { return altMaster; }
+    Player* GetOwner() { return master ? master : altMaster; }
     Player* GetGroupLeader();
     uint32 GetFixedBotNumber(uint32 maxNum = 100);
     GrouperType GetGrouperType();

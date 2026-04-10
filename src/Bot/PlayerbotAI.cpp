@@ -1021,8 +1021,9 @@ void PlayerbotAI::HandleCommand(uint32 type, std::string const text, Player* fro
         if (bot->GetSession()->isLogingOut())
             return;
 
-        // Verify the command came from this bot's master. Also handles nullptr
-        if (fromPlayer != master)
+        // Verify the command came from this bot's owner (master or altMaster for roaming alts)
+        Player* owner = GetOwner();
+        if (!owner || fromPlayer != owner)
         {
             if (type == CHAT_MSG_WHISPER)
             {
@@ -1033,11 +1034,11 @@ void PlayerbotAI::HandleCommand(uint32 type, std::string const text, Player* fro
             return;
         }
 
-        PlayerbotMgr* masterBotMgr = GET_PLAYERBOT_MGR(master);
+        PlayerbotMgr* masterBotMgr = GET_PLAYERBOT_MGR(owner);
         if (!masterBotMgr)
             return;
 
-        // Only respond if this bot is in master's collection (alt/addclass)
+        // Only respond if this bot is in owner's collection (alt/addclass)
         if (masterBotMgr->GetPlayerBot(bot->GetGUID()))
         {
             if (type == CHAT_MSG_WHISPER)
@@ -1053,7 +1054,7 @@ void PlayerbotAI::HandleCommand(uint32 type, std::string const text, Player* fro
         {
             std::string message = PlayerbotTextMgr::instance().GetBotTextOrDefault(
                 "bot_rndbot_no_logout", "You can't command me to logout!", {});
-            TellMaster(message);
+            TellPlayer(owner, message);
         }
     }
     else if (filtered == "logout cancel")
