@@ -606,8 +606,6 @@ public:
     void calcMapOffset();
     WorldPosition getMapOffset(uint32 mapId);
 
-    void Init();
-
     // Taxi graph (BFS-based path lookup between taxi nodes)
     void InitTaxiGraph();
     std::vector<uint32> FindTaxiPath(uint32 fromNode, uint32 toNode);

@@ -82,6 +82,12 @@ void ChatCommandHandlerStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     triggers.push_back(
         new TriggerNode("target", { NextAction("tell target", relevance) }));
     triggers.push_back(
+        new TriggerNode("pull", { NextAction("pull my target", relevance) }));
+    triggers.push_back(
+        new TriggerNode("pull back", { NextAction("pull my target", relevance) }));
+    triggers.push_back(
+        new TriggerNode("pull rti", { NextAction("pull rti target", relevance) }));
+    triggers.push_back(
         new TriggerNode("ready", { NextAction("ready check", relevance) }));
     triggers.push_back(
         new TriggerNode("naxx", {NextAction("naxx chat shortcut", relevance)}));
@@ -108,6 +114,7 @@ void ChatCommandHandlerStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     triggers.push_back(new TriggerNode("pet attack", { NextAction("pet attack", relevance) }));
     triggers.push_back(new TriggerNode("roll", { NextAction("roll", relevance) }));
     triggers.push_back(new TriggerNode("guildrpg", { NextAction("guildrpg", relevance) }));
+    triggers.push_back(new TriggerNode("focus heal", { NextAction("focus heal targets", relevance) }));
 }
 
 ChatCommandHandlerStrategy::ChatCommandHandlerStrategy(PlayerbotAI* botAI) : PassTroughStrategy(botAI)
@@ -161,6 +168,13 @@ ChatCommandHandlerStrategy::ChatCommandHandlerStrategy(PlayerbotAI* botAI) : Pas
     supported.push_back("save mana");
     supported.push_back("formation");
     supported.push_back("stance");
+    supported.push_back("cancel tree form");
+    supported.push_back("cancel travel form");
+    supported.push_back("cancel bear form");
+    supported.push_back("cancel dire bear form");
+    supported.push_back("cancel cat form");
+    supported.push_back("cancel moonkin form");
+    supported.push_back("cancel aquatic form");
     supported.push_back("sendmail");
     supported.push_back("mail");
     supported.push_back("outfit");
@@ -194,4 +208,6 @@ ChatCommandHandlerStrategy::ChatCommandHandlerStrategy(PlayerbotAI* botAI) : Pas
     supported.push_back("pet");
     supported.push_back("pet attack");
     supported.push_back("guildrpg");
+    supported.push_back("wait for attack time");
+    supported.push_back("focus heal");
 }

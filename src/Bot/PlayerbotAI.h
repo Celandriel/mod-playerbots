@@ -3,8 +3,8 @@
  * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
-#ifndef _PLAYERBOT_PLAYERbotAI_H
-#define _PLAYERBOT_PLAYERbotAI_H
+#ifndef _PLAYERBOT_PLAYERBOTAI_H
+#define _PLAYERBOT_PLAYERBOTAI_H
 
 #include <stack>
 
@@ -416,6 +416,7 @@ public:
     void ChangeStrategy(std::string const name, BotState type);
     void ClearStrategies(BotState type);
     std::vector<std::string> GetStrategies(BotState type);
+    Strategy* GetStrategy(std::string const name, BotState type);
     void ApplyInstanceStrategies(uint32 mapId, bool tellMaster = false);
     void EvaluateHealerDpsStrategy();
     bool ContainsStrategy(StrategyType type);
@@ -442,6 +443,7 @@ public:
     static bool IsAssistHealOfIndex(Player* player, uint8 index, bool ignoreDeadPlayers = false);
     static bool IsAssistRangedDpsOfIndex(Player* player, uint8 index, bool ignoreDeadPlayers = false);
     bool HasAggro(Unit* unit);
+    bool IsMovementImpaired(Unit* unit);
     static int32 GetAssistTankIndex(Player* player);
     int32 GetGroupSlotIndex(Player* player);
     int32 GetRangedIndex(Player* player);
@@ -482,6 +484,7 @@ public:
     void SpellInterrupted(uint32 spellid);
     int32 CalculateGlobalCooldown(uint32 spellid);
     void InterruptSpell();
+    void RequestSpellInterrupt();
     void RemoveAura(std::string const name);
     void RemoveShapeshift();
     void WaitForSpellCast(Spell* spell);
@@ -552,13 +555,11 @@ public:
     // Checks if the bot is summoned as alt of a player
     bool IsAlt();
     Player* GetGroupLeader();
-    // Returns a semi-random (cycling) number that is fixed for each bot.
-    uint32 GetFixedBotNumer(uint32 maxNum = 100, float cyclePerMin = 1);
+    uint32 GetFixedBotNumber(uint32 maxNum = 100);
     GrouperType GetGrouperType();
     GuilderType GetGuilderType();
     bool HasPlayerNearby(WorldPosition* pos, float range = sPlayerbotAIConfig.reactDistance);
     bool HasPlayerNearby(float range = sPlayerbotAIConfig.reactDistance);
-    bool HasManyPlayersNearby(uint32 trigerrValue = 20, float range = sPlayerbotAIConfig.sightDistance);
     bool AllowActive(ActivityType activityType);
     bool AllowActivity(ActivityType activityType = ALL_ACTIVITY, bool checkNow = false);
     uint32 AutoScaleActivity(uint32 mod);
@@ -676,6 +677,7 @@ protected:
     Position jumpDestination = Position();
     uint32 nextTransportCheck = 0;
     BotAvailabilityStatus availabilityStatus = BOT_STATUS_OFFLINE;
+    bool spellInterruptRequested = false;
 };
 
 #endif

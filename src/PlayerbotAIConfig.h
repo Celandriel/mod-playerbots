@@ -44,21 +44,21 @@ enum NewRpgStatus : int
 {
     //Initial Status
     RPG_IDLE = 0,
-    RPG_GO_GRIND = 1,
-    RPG_GO_CAMP = 2,
+    RPG_GO_GRIND,
+    RPG_GO_CAMP,
     // Exploring nearby
-    RPG_WANDER_RANDOM = 3,
-    RPG_WANDER_NPC = 4,
+    RPG_WANDER_RANDOM,
+    RPG_WANDER_NPC,
     // Do Quest (based on quest status)
-    RPG_DO_QUEST = 5,
+    RPG_DO_QUEST,
     // Travel
-    RPG_TRAVEL_FLIGHT = 6,
+    RPG_TRAVEL_FLIGHT,
     // Initial status
-    RPG_REST = 7,
-    RPG_STATUS_END = 8,
-    RPG_MOVE_FAR = 9,
-    RPG_OUTDOOR_PVP = 10,
-    RPG_DUNGEON_PVE = 11
+    RPG_REST,
+    RPG_OUTDOOR_PVP,
+    RPG_MOVE_FAR,
+    RPG_DUNGEON_PVE,
+    RPG_STATUS_END
 };
 
 #define MAX_SPECNO 20
@@ -153,6 +153,7 @@ public:
 
     // Professions
     bool enableFishingWithMaster;
+    uint32 classMatchingProfessionChance;
     float fishingDistanceFromMaster, fishingDistance, endFishingWithMaster;
 
     // chat
@@ -342,6 +343,7 @@ public:
     bool disableDeathKnightLogin;
     bool limitTalentsExpansion;
     uint32 botActiveAlone;
+    uint32 BotActiveAloneDurationSeconds;
     uint32 BotActiveAloneForceWhenInRadius;
     bool BotActiveAloneForceWhenInZone;
     bool BotActiveAloneForceWhenInMap;
@@ -354,7 +356,10 @@ public:
     uint32 botActiveAloneSmartScaleWhenMaxLevel;
 
     bool freeMethodLoot;
-    int32 lootRollLevel;
+    int32 lootNeedRollLevel;
+    bool lootGreedRollLevel;
+    bool lootRollRecipe;
+    bool lootRollDisenchant;
     std::string autoPickReward;
     bool autoEquipUpgradeLoot;
     float equipUpgradeThreshold;

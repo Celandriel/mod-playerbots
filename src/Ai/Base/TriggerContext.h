@@ -17,10 +17,12 @@
 #include "NewRpgStrategy.h"
 #include "NewRpgTriggers.h"
 #include "PvpTriggers.h"
+#include "PullTriggers.h"
 #include "RpgTriggers.h"
 #include "RtiTriggers.h"
 #include "StuckTriggers.h"
 #include "TravelTriggers.h"
+#include "WaitForAttackTriggers.h"
 
 class PlayerbotAI;
 
@@ -60,6 +62,9 @@ public:
         creators["party member almost full health"] = &TriggerContext::PartyMemberAlmostFullHealth;
 
         creators["generic boost"] = &TriggerContext::generic_boost;
+        creators["loss of control"] = &TriggerContext::loss_of_control;
+        creators["fear charm sleep"] = &TriggerContext::fear_charm_sleep;
+        creators["fear sleep sap"] = &TriggerContext::fear_sleep_sap;
 
         creators["protect party member"] = &TriggerContext::protect_party_member;
 
@@ -104,7 +109,8 @@ public:
         creators["enemy within melee"] = &TriggerContext::enemy_within_melee;
         creators["party member to heal out of spell range"] = &TriggerContext::party_member_to_heal_out_of_spell_range;
 
-        creators["combo points available"] = &TriggerContext::ComboPointsAvailable;
+        creators["combo points 5 available"] = &TriggerContext::ComboPoints5Available;
+        creators["combo points 4 available"] = &TriggerContext::ComboPoints4Available;
         creators["combo points 3 available"] = &TriggerContext::ComboPoints3Available;
         creators["target with combo points almost dead"] = &TriggerContext::target_with_combo_points_almost_dead;
         creators["combo points not full"] = &TriggerContext::ComboPointsNotFull;
@@ -125,6 +131,9 @@ public:
         creators["has attackers"] = &TriggerContext::has_attackers;
         creators["no possible targets"] = &TriggerContext::no_possible_targets;
         creators["possible adds"] = &TriggerContext::possible_adds;
+        creators["pull start"] = &TriggerContext::pull_start;
+        creators["pull end"] = &TriggerContext::pull_end;
+        creators["return to pull position"] = &TriggerContext::return_to_pull_position;
 
         creators["no drink"] = &TriggerContext::no_drink;
         creators["no food"] = &TriggerContext::no_food;
@@ -235,12 +244,10 @@ public:
         creators["new pet"] = &TriggerContext::new_pet;
 
         creators["guild rpg pvp task"] = &TriggerContext::guild_rpg_pvp_task;
-        creators["guild rpg pve task"] = &TriggerContext::guild_rpg_pve_task;
         creators["guild rpg prof task"] = &TriggerContext::guild_rpg_prof_task;
         creators["guild rpg roleplay task"] = &TriggerContext::guild_rpg_roleplay_task;
-    }
+        creators["wait for attack safe distance"] = &TriggerContext::wait_for_attack_safe_distance;
 
-private:
     static Trigger* give_food(PlayerbotAI* botAI) { return new GiveFoodTrigger(botAI); }
     static Trigger* give_water(PlayerbotAI* botAI) { return new GiveWaterTrigger(botAI); }
     static Trigger* no_rti(PlayerbotAI* botAI) { return new NoRtiTrigger(botAI); }
@@ -282,6 +289,9 @@ private:
     static Trigger* swimming(PlayerbotAI* botAI) { return new IsSwimmingTrigger(botAI); }
     static Trigger* no_possible_targets(PlayerbotAI* botAI) { return new NoPossibleTargetsTrigger(botAI); }
     static Trigger* possible_adds(PlayerbotAI* botAI) { return new PossibleAddsTrigger(botAI); }
+    static Trigger* pull_start(PlayerbotAI* botAI) { return new PullStartTrigger(botAI); }
+    static Trigger* pull_end(PlayerbotAI* botAI) { return new PullEndTrigger(botAI); }
+    static Trigger* return_to_pull_position(PlayerbotAI* botAI) { return new ReturnToPullPositionTrigger(botAI); }
     static Trigger* can_loot(PlayerbotAI* botAI) { return new CanLootTrigger(botAI); }
     static Trigger* far_from_loot_target(PlayerbotAI* botAI) { return new FarFromCurrentLootTrigger(botAI); }
     static Trigger* far_from_master(PlayerbotAI* botAI) { return new FarFromMasterTrigger(botAI); }
@@ -347,7 +357,8 @@ private:
     {
         return new PartyMemberToHealOutOfSpellRangeTrigger(botAI);
     }
-    static Trigger* ComboPointsAvailable(PlayerbotAI* botAI) { return new ComboPointsAvailableTrigger(botAI); }
+    static Trigger* ComboPoints5Available(PlayerbotAI* botAI) { return new ComboPointsAvailableTrigger(botAI, 5); }
+    static Trigger* ComboPoints4Available(PlayerbotAI* botAI) { return new ComboPointsAvailableTrigger(botAI, 4); }
     static Trigger* ComboPoints3Available(PlayerbotAI* botAI) { return new ComboPointsAvailableTrigger(botAI, 3); }
     static Trigger* target_with_combo_points_almost_dead(PlayerbotAI* ai)
     {
@@ -370,6 +381,9 @@ private:
         return new PartyMemberAlmostFullHealthTrigger(botAI);
     }
     static Trigger* generic_boost(PlayerbotAI* botAI) { return new GenericBoostTrigger(botAI); }
+    static Trigger* loss_of_control(PlayerbotAI* botAI) { return new LossOfControlTrigger(botAI); }
+    static Trigger* fear_charm_sleep(PlayerbotAI* botAI) { return new FearCharmSleepTrigger(botAI); }
+    static Trigger* fear_sleep_sap(PlayerbotAI* botAI) { return new FearSleepSapTrigger(botAI); }
     static Trigger* PartyMemberCriticalHealth(PlayerbotAI* botAI)
     {
         return new PartyMemberCriticalHealthTrigger(botAI);
@@ -448,6 +462,7 @@ private:
     static Trigger* guild_rpg_roleplay_task(PlayerbotAI* botAI) { return new GuildRpgTaskTrigger(botAI, GuildType::ROLEPLAY); }
 
 
+    static Trigger* wait_for_attack_safe_distance(PlayerbotAI* ai) { return new WaitForAttackSafeDistanceTrigger(ai); }
 };
 
 #endif

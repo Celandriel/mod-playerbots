@@ -52,7 +52,7 @@ struct NewRpgInfo
     struct TravelFlight
     {
         ObjectGuid fromFlightMaster{};
-        std::vector<uint32> path {};
+        std::vector<uint32> path;
         bool inFlight{false};
     };
     // RPG_REST
@@ -63,7 +63,7 @@ struct NewRpgInfo
     // RPG_ZONE_PVP
     struct OutdoorPvP
     {
-        OPvPCapturePoint* capturePoint{nullptr};
+        ObjectGuid::LowType capturePointSpawnId{0};
     };
     // RPG_DUNGEON_PVE
     struct DungeonPve
@@ -74,7 +74,8 @@ struct NewRpgInfo
     // RPG_MOVE_FAR
     struct MoveFar
     {
-    };
+    // RPG_OUTDOOR_PVP
+
     struct Idle
     {
     };
@@ -114,7 +115,7 @@ struct NewRpgInfo
     void ChangeToWanderRandom();
     void ChangeToDoQuest(uint32 questId, const Quest* quest);
     void ChangeToTravelFlight(ObjectGuid fromFlightMaster, std::vector<uint32> path);
-    void ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint);
+    void ChangeToOutdoorPvp(ObjectGuid::LowType capturePointSpawnId = 0);
     void ChangeToDungeonPve(uint32 mapId, const std::string& dungeonName);
     void ChangeToMoveFar();
     void ChangeToRest();

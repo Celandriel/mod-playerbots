@@ -53,6 +53,14 @@ void NewRpgInfo::ChangeToMoveFar()
     data = MoveFar{};
 }
 
+void NewRpgInfo::ChangeToOutdoorPvp(ObjectGuid::LowType capturePointSpawnId)
+{
+    startT = getMSTime();
+    OutdoorPvP pvp;
+    pvp.capturePointSpawnId = capturePointSpawnId;
+    data = pvp;
+}
+
 void NewRpgInfo::ChangeToRest()
 {
     startT = getMSTime();
@@ -176,20 +184,17 @@ std::string NewRpgInfo::ToString()
         {
             out << "TRAVEL_FLIGHT";
             out << "\nfromFlightMaster: " << arg.fromFlightMaster.GetEntry();
-            if (!arg.path.empty())
-            {
-                out << "\nfromNode: " << arg.path[0];
-                out << "\ntoNode: " << arg.path[arg.path.size() - 1];
-            }
+            out << "\nfromNode: " << arg.path[0];
+            out << "\ntoNode: " << arg.path[arg.path.size() - 1];
             out << "\ninFlight: " << arg.inFlight;
         }
         else if constexpr (std::is_same_v<T, OutdoorPvP>)
         {
             out << "OUTDOOR_PVP";
-            if (!arg.capturePoint)
+            if (!arg.capturePointSpawnId)
                 out << "\nNo capture point assigned.";
             else
-                out << "\nobjectiveEntry: " << arg.capturePoint->_capturePoint->GetName();
+                out << "\ncapturePointSpawnId: " << arg.capturePointSpawnId;
         }
         else if constexpr (std::is_same_v<T, DungeonPve>)
         {
@@ -202,6 +207,8 @@ std::string NewRpgInfo::ToString()
             out << "MOVE_FAR";
             out << "\nhasTravelPath: " << (HasTravelPath() ? "yes" : "no");
         }
+        else
+            out << "UNKNOWN";
     }, data);
     return out.str();
 }
