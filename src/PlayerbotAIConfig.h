@@ -278,6 +278,7 @@ public:
     std::string randomBotAccountPrefix;
     uint32 randomBotAccountCount;
     bool randomBotRandomPassword;
+    bool deleteRandomBotCharacters;
     bool deleteRandomBotAccounts;
     uint32 randomBotGuildCount, randomBotGuildSizeMax;
     bool deleteRandomBotGuilds;

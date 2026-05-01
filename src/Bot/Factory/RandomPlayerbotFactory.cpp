@@ -447,25 +447,30 @@ void RandomPlayerbotFactory::CreateRandomBots()
 {
     /* multi-thread here is meaningless? since the async db operations */
 
-    if (sPlayerbotAIConfig.deleteRandomBotAccounts)
+    if (sPlayerbotAIConfig.deleteRandomBotCharacters || sPlayerbotAIConfig.deleteRandomBotAccounts)
     {
-        std::vector<uint32> botAccounts;
-        std::vector<uint32> botFriends;
-
-        // Calculates the total number of required accounts.
-        uint32 totalAccountCount = CalculateTotalAccountCount();
-
-        for (uint32 accountNumber = 0; accountNumber < totalAccountCount; ++accountNumber)
+        if (sPlayerbotAIConfig.deleteRandomBotAccounts)
         {
-            std::ostringstream out;
-            out << sPlayerbotAIConfig.randomBotAccountPrefix << accountNumber;
-            std::string const accountName = out.str();
+            // Collect bot account ids (legacy bookkeeping retained alongside the dangerous path).
+            std::vector<uint32> botAccounts;
+            std::vector<uint32> botFriends;
+            uint32 totalAccountCount = CalculateTotalAccountCount();
+            for (uint32 accountNumber = 0; accountNumber < totalAccountCount; ++accountNumber)
+            {
+                std::ostringstream out;
+                out << sPlayerbotAIConfig.randomBotAccountPrefix << accountNumber;
+                std::string const accountName = out.str();
 
-            if (uint32 accountId = AccountMgr::GetId(accountName))
-                botAccounts.push_back(accountId);
+                if (uint32 accountId = AccountMgr::GetId(accountName))
+                    botAccounts.push_back(accountId);
+            }
+
+            LOG_INFO("playerbots", "Deleting all random bot characters and accounts...");
         }
-
-        LOG_INFO("playerbots", "Deleting all random bot characters and accounts...");
+        else
+        {
+            LOG_INFO("playerbots", "Deleting all random bot characters (accounts will be kept)...");
+        }
 
         // First execute all the cleanup SQL commands
         // Clear playerbots_random_bots and playerbots_account_type
@@ -545,19 +550,22 @@ void RandomPlayerbotFactory::CreateRandomBots()
         CharacterDatabase.Execute("DELETE FROM petition_sign WHERE ownerguid NOT IN (SELECT guid FROM characters) OR playerguid NOT IN (SELECT guid FROM characters)");
 
         // Finally, delete the bot accounts themselves
-        LOG_INFO("playerbots", "Deleting random bot accounts...");
-        QueryResult results = LoginDatabase.Query("SELECT id FROM account WHERE username LIKE '{}%%'",
-                                             sPlayerbotAIConfig.randomBotAccountPrefix.c_str());
-        int32 deletion_count = 0;
-        if (results)
+        if (sPlayerbotAIConfig.deleteRandomBotAccounts)
         {
-            do
+            LOG_INFO("playerbots", "Deleting random bot accounts...");
+            QueryResult results = LoginDatabase.Query("SELECT id FROM account WHERE username LIKE '{}%%'",
+                                                 sPlayerbotAIConfig.randomBotAccountPrefix.c_str());
+            int32 deletion_count = 0;
+            if (results)
             {
-                Field* fields = results->Fetch();
-                uint32 accId = fields[0].Get<uint32>();
-                LOG_DEBUG("playerbots", "Deleting account accID: {}({})...", accId, ++deletion_count);
-                AccountMgr::DeleteAccount(accId);
-            } while (results->NextRow());
+                do
+                {
+                    Field* fields = results->Fetch();
+                    uint32 accId = fields[0].Get<uint32>();
+                    LOG_DEBUG("playerbots", "Deleting account accID: {}({})...", accId, ++deletion_count);
+                    AccountMgr::DeleteAccount(accId);
+                } while (results->NextRow());
+            }
         }
 
         uint32 timer = getMSTime();
@@ -579,8 +587,14 @@ void RandomPlayerbotFactory::CreateRandomBots()
         CharacterDatabase.Execute("FLUSH TABLES");
         PlayerbotsDatabase.Execute("FLUSH TABLES");
 
-        LOG_INFO("playerbots", ">> Random bot accounts and data deleted in {} ms", GetMSTimeDiffToNow(timer));
-        LOG_INFO("playerbots", "Please reset the AiPlayerbot.DeleteRandomBotAccounts to 0 and restart the server...");
+        if (sPlayerbotAIConfig.deleteRandomBotAccounts)
+            LOG_INFO("playerbots", ">> Random bot accounts and data deleted in {} ms", GetMSTimeDiffToNow(timer));
+        else
+            LOG_INFO("playerbots", ">> Random bot character data deleted in {} ms", GetMSTimeDiffToNow(timer));
+
+        LOG_INFO("playerbots",
+                 "Please reset AiPlayerbot.DeleteRandomBotCharacters and AiPlayerbot.DeleteRandomBotAccounts to 0 "
+                 "and restart the server...");
         World::StopNow(SHUTDOWN_EXIT_CODE);
         return;
     }

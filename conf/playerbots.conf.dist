@@ -97,9 +97,16 @@ AiPlayerbot.MaxRandomBots = 500
 # Default: 0 (automatic)
 AiPlayerbot.RandomBotAccountCount = 0
 
-# Delete all randombot accounts
-# To apply this, set the number to 1 and run the Worldserver. Once deletion is complete, if you would
-# like to recreate randombots, set the number back to 0 and rerun the Worldserver.
+# Delete all randombot characters
+# To apply this, set the value to 1 and run the Worldserver. Once deletion is complete, set it back
+# to 0 and rerun the Worldserver to recreate randombots.
+# Default: 0
+AiPlayerbot.DeleteRandomBotCharacters = 0
+
+# Delete all randombot accounts (DANGEROUS)
+# In addition to the character cleanup above, deletes every auth account. Do not use if you
+# are sharing auth server with multiple realms with bots.
+# Default: 0
 AiPlayerbot.DeleteRandomBotAccounts = 0
 
 # Disable randombots when no real players are logged in
