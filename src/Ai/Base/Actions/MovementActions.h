@@ -94,8 +94,8 @@ protected:
     // graph (cross-map / >sightDistance) or live mmap probe, regression
     // guard preferring cached path when no better, fall back to a
     // single-point path on dest. Stateless — does not dispatch.
-    TravelPath ResolveMovePath(WorldPosition const& startPos,
-                               WorldPosition const& endPos,
+    TravelPath ResolveMovePath(WorldPosition startPos,
+                               WorldPosition endPos,
                                LastMovement& lastMove);
 
     // Dispatches the head-of-path special segment (portal interact /

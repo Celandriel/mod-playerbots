@@ -3067,8 +3067,8 @@ bool MoveAwayFromPlayerWithDebuffAction::isPossible()
 }
 
 
-TravelPath MovementAction::ResolveMovePath(WorldPosition const& startPos,
-                                           WorldPosition const& endPos,
+TravelPath MovementAction::ResolveMovePath(WorldPosition startPos,
+                                           WorldPosition endPos,
                                            LastMovement& lastMove)
 {
     float const totalDistance = startPos.distance(endPos);
@@ -3098,8 +3098,7 @@ TravelPath MovementAction::ResolveMovePath(WorldPosition const& startPos,
     }
     else
     {
-        WorldPosition mutableStart = startPos;
-        std::vector<WorldPosition> probe = mutableStart.getPathTo(endPos, bot);
+        std::vector<WorldPosition> probe = startPos.getPathTo(endPos, bot);
         out.addPath(probe);
     }
 
