@@ -1435,12 +1435,13 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
                 // group members — a taxi/transport edge the leader
                 // can afford but a member can't would split the group.
                 startStub->currentGold = AI_VALUE2(uint32, "free money for", (uint32)NeedMoneyFor::travel);
+                bool const isLeader = botAI->GetGroupLeader() == bot;
                 for (ObjectGuid guid : AI_VALUE(GuidVector, "group members"))
                 {
                     Player* player = ObjectAccessor::FindPlayer(guid);
                     if (!player)
                         continue;
-                    if (!botAI->IsGroupLeader() && player != bot)
+                    if (!isLeader && player != bot)
                         continue;
                     if (!botAI->IsSafe(player))
                     {
