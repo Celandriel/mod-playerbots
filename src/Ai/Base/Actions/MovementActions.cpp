@@ -219,7 +219,10 @@ bool MovementAction::MoveNear(WorldObject* target, float distance, MovementPrior
     if (!target)
         return false;
 
-    distance += target->GetCombatReach();
+    // Reference uses bounding radius (collision footprint), not combat
+    // reach (which is wider for big mobs). Bounding radius lands the bot
+    // at the requested standoff from the model edge, not arbitrarily far.
+    distance += target->GetObjectSize();
 
     float followAngle = GetFollowAngle();
 
@@ -340,7 +343,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
         float distance = bot->GetExactDist(x, y, z);
         if (distance > 0.01f)
         {
-            if (bot->IsSitState())
+            if (!bot->IsStandState())
                 bot->SetStandState(UNIT_STAND_STATE_STAND);
 
             // if (bot->IsNonMeleeSpellCast(true))
@@ -368,7 +371,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
         float distance = bot->GetExactDist(x, y, z);
         if (distance > 0.01f)
         {
-            if (bot->IsSitState())
+            if (!bot->IsStandState())
                 bot->SetStandState(UNIT_STAND_STATE_STAND);
 
             DoMovePoint(bot, x, y, z, generatePath, backwards);
@@ -1206,10 +1209,22 @@ void MovementAction::UpdateMovementState()
 
 bool MovementAction::Follow(Unit* target, float distance, float angle)
 {
-    UpdateMovementState();
-
     if (!target)
         return false;
+
+    // Unsafe target (cross-faction / phased / leaving) — fall through to
+    // a generic MoveTo so the bot at least heads in their direction
+    // instead of refusing to move.
+    if (!botAI->IsSafe(target))
+        return MoveTo(target, distance);
+
+    // Subtract the target's hitbox so we end up at the requested
+    // standoff from its edge, not from its centre.
+    distance = distance <= target->GetObjectSize()
+        ? 0.0f
+        : distance - target->GetObjectSize();
+
+    UpdateMovementState();
 
     if (!bot->InBattleground() && ServerFacade::instance().IsDistanceLessOrEqualThan(ServerFacade::instance().GetDistance2d(bot, target),
                                                                            sPlayerbotAIConfig.followDistance))
@@ -1356,7 +1371,7 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
 
     bot->HandleEmoteCommand(0);
 
-    if (bot->IsSitState())
+    if (!bot->IsStandState())
         bot->SetStandState(UNIT_STAND_STATE_STAND);
 
     if (bot->IsNonMeleeSpellCast(true))
@@ -1401,6 +1416,10 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance)
     }
 
     UpdateMovementState();
+
+    // Drop any looping emote (sit/dance/etc.) before the chase, matching
+    // the reference pre-dispatch normalization.
+    bot->ClearEmoteState();
 
     if (!bot->IsStandState())
         bot->SetStandState(UNIT_STAND_STATE_STAND);
@@ -3424,7 +3443,7 @@ bool MovementAction::BoardTransport(Transport* transport)
     // MovePoint without pathfinding (transport is a moving object)
     if (MotionMaster* mm = bot->GetMotionMaster())
     {
-        if (bot->IsSitState())
+        if (!bot->IsStandState())
             bot->SetStandState(UNIT_STAND_STATE_STAND);
 
         mm->MovePoint(0, destX, destY, destZ, FORCED_MOVEMENT_NONE, 0.0f, 0.0f, false, false);
