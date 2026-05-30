@@ -95,9 +95,10 @@ enum class TravelNodePathType : uint8
     areaTrigger = 2,
     transport = 3,
     flightPath = 4,
-    // value 5 (teleportSpell) reserved — no generator emits it and no
-    // consumer handles it. Re-add when a teleport-spell edge generator
-    // / executor handler returns.
+    // Teleport-spell edges (hearthstone, mage portals). Generated at A*
+    // search start via PortalNode injection; consumed by
+    // HandleSpecialMovement's NODE_TELEPORT case.
+    teleportSpell = 5,
     staticPortal = 6
 };
 
