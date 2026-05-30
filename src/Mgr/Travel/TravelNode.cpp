@@ -1714,12 +1714,15 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, [[maybe_unused]] uin
     TravelPath path;
 
     // AC-side workaround that reference doesn't have: if a 40-step mmap
-    // probe from bot to destination either reaches close (<30y) or makes
-    // meaningful progress (>50% AND >30y absolute), prefer that direct
-    // path over the graph. Restored because removing it broke
-    // destinations that the graph's K=5 endNode pick can't reach but
-    // raw mmap CAN (caves with interior navmesh that A* misses because
-    // the cave-interior node fails the strict 1y endPath validation).
+    // probe from bot to destination either reaches close to dest OR
+    // makes any meaningful forward progress (>30y absolute), prefer
+    // that direct path over the graph. The graph's K=5 endNode pick +
+    // strict 1y endPath validation rejects destinations that are
+    // slightly off-mesh (cave shelves, alcoves), so without this the
+    // bot falls to a single-point MoveTo fallback and wiggles in place.
+    // Loosened from "50% AND >30y" to just ">30y" so a partial probe
+    // toward the cave entrance gets accepted; the next tick's
+    // re-resolve from the new bot position can extend further.
     if (botPos.GetMapId() == destination.GetMapId())
     {
         std::vector<WorldPosition> probe = destination.getPathFromPath({botPos}, bot, 40);
@@ -1730,7 +1733,7 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, [[maybe_unused]] uin
             float const probeProgress = totalDist - probeEndToDest;
 
             bool const closeEnough = probeEndToDest < 30.0f;
-            bool const meaningfulProgress = probeProgress > totalDist * 0.5f && probeProgress > 30.0f;
+            bool const meaningfulProgress = probeProgress > 30.0f;
 
             if (closeEnough || meaningfulProgress)
             {
@@ -1792,14 +1795,19 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, [[maybe_unused]] uin
             continue;
         WorldPosition endNodePos = *e->getPosition();
 
-        // Validate endNode -> destination is pathable within 1y.
+        // Validate endNode -> destination is pathable. Reference uses 1y
+        // strict tolerance, but that rejects valid cave-interior nodes
+        // when the destination (quest GO, mob, item) is slightly off the
+        // navmesh (small shelf, alcove). Use INTERACTION_DISTANCE so any
+        // endNode whose mmap can reach close enough for the bot to
+        // interact with the destination is accepted.
         std::vector<WorldPosition> endProbe;
         bool endPathOk = false;
         if (endNodePos.GetMapId() == destination.GetMapId())
         {
             Unit* pathBot = (bot && bot->GetMapId() == destination.GetMapId()) ? bot : nullptr;
             endProbe = endNodePos.getPathTo(destination, pathBot);
-            endPathOk = destination.isPathTo(endProbe, 1.0f);
+            endPathOk = destination.isPathTo(endProbe, INTERACTION_DISTANCE);
         }
         else
         {
