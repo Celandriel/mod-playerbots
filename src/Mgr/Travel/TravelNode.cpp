@@ -967,7 +967,10 @@ void TravelPath::ClipPath(PlayerbotAI* ai, Unit* mover, bool ignoreEnemyTargets)
     GuidVector targets;
     Player* bot = ai ? ai->GetBot() : nullptr;
     if (bot && ai->GetState() != BOT_STATE_COMBAT && !bot->isDead() && !ignoreEnemyTargets)
+    {
+        AiObjectContext* context = ai->GetAiObjectContext();
         targets = AI_VALUE(GuidVector, "possible targets");
+    }
 
     auto endP = fullPath.end();
     auto prevP = fullPath.begin();
