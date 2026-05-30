@@ -7,6 +7,7 @@
 #include "ObjectGuid.h"
 #include "ObjectMgr.h"
 #include "QuestDef.h"
+#include "OutdoorPvP.h"
 #include "Strategy.h"
 #include "Timer.h"
 #include "TravelMgr.h"
@@ -71,12 +72,27 @@ struct NewRpgInfo
     struct OutdoorPvP
     {
         ObjectGuid::LowType capturePointSpawnId{0};
+        OPvPCapturePoint* capturePoint{nullptr};
+    };
+    // RPG_DUNGEON_PVE
+    struct DungeonPve
+    {
+        uint32 mapId{0};
+        std::string dungeonName;
+    };
+    // RPG_MOVE_FAR
+    struct MoveFar
+    {
     };
     struct Idle
     {
     };
 
     uint32 startT{0};  // start timestamp of the current status
+
+    // Full travel path followed while in the RPG_MOVE_FAR status.
+    TravelPath travelPath{};
+    bool HasTravelPath() const { return !travelPath.empty(); }
 
     using RpgData = std::variant<
         Idle,
@@ -87,7 +103,9 @@ struct NewRpgInfo
         DoQuest,
         Rest,
         TravelFlight,
-        OutdoorPvP
+        OutdoorPvP,
+        DungeonPve,
+        MoveFar
     >;
     RpgData data;
 
@@ -100,6 +118,9 @@ struct NewRpgInfo
     void ChangeToDoQuest(uint32 questId, const Quest* quest);
     void ChangeToTravelFlight(uint32 flightMasterEntry, WorldPosition flightMasterPos, std::vector<uint32> path);
     void ChangeToOutdoorPvp(ObjectGuid::LowType capturePointSpawnId = 0);
+    void ChangeToOutdoorPvp(OPvPCapturePoint* capturePoint);
+    void ChangeToDungeonPve(uint32 mapId, const std::string& dungeonName);
+    void ChangeToMoveFar();
     void ChangeToRest();
     void ChangeToIdle();
     bool CanChangeTo(NewRpgStatus status);

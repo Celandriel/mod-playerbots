@@ -625,3 +625,14 @@ bool NewRpgTravelFlightAction::Execute(Event /*event*/)
     }
     return true;
 }
+
+bool NewRpgMoveFarAction::Execute(Event /*event*/)
+{
+    NewRpgInfo& info = botAI->rpgInfo;
+    if (!info.HasTravelPath())
+    {
+        info.ChangeToIdle();
+        return true;
+    }
+    return FollowTravelPath();
+}

@@ -342,7 +342,7 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, WorldPosi
 
     // Compute full travel path using the travel node system
     WorldPosition currentPos(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
-    TravelPath travelPath = sTravelNodeMap.getFullPath(currentPos, targetPos, bot);
+    TravelPath travelPath = sTravelNodeMap.GetFullPath(currentPos, bot->GetZoneId(), targetPos, bot);
 
     if (travelPath.empty())
     {
@@ -351,7 +351,7 @@ bool GuildRpgBaseAction::PreparationMovementToRpgLocation(Event event, WorldPosi
         return true;
     }
 
-    LOG_DEBUG("playerbots", "[Guild RPG] Bot {} starting travel path ({} waypoints)", bot->GetName(), travelPath.getPath().size());
+    LOG_DEBUG("playerbots", "[Guild RPG] Bot {} starting travel path ({} waypoints)", bot->GetName(), travelPath.GetPath().size());
     botAI->rpgInfo.travelPath = std::move(travelPath);
     botAI->rpgInfo.ChangeToMoveFar();
     return true;

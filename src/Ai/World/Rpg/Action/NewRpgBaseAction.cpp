@@ -45,6 +45,127 @@
 #include "TravelMgr.h"
 
 
+bool NewRpgBaseAction::FollowTravelPath()
+{
+    NewRpgInfo& info = botAI->rpgInfo;
+    if (!info.HasTravelPath())
+        return false;
+
+    // Still moving on a previous spline — wait
+    if (!bot->movespline->Finalized())
+        return true;
+
+    std::vector<PathNodePoint> fullPath = info.travelPath.GetPath();
+    WorldPosition currentPos(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
+
+    // Find closest point on path to current position
+    float minDist = std::numeric_limits<float>::max();
+    size_t startIdx = 0;
+    for (size_t i = 0; i < fullPath.size(); ++i)
+    {
+        if (fullPath[i].point.GetMapId() != bot->GetMapId())
+            continue;
+        float dist = fullPath[i].point.distance(currentPos);
+        if (dist < minDist)
+        {
+            minDist = dist;
+            startIdx = i;
+        }
+    }
+
+    // Collect walk points from startIdx until we hit a non-walk node or end
+    Movement::PointsArray walkPoints;
+    walkPoints.push_back(G3D::Vector3(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ()));
+
+    size_t nextIdx = startIdx;
+    for (size_t i = startIdx; i < fullPath.size(); ++i)
+    {
+        const PathNodePoint& p = fullPath[i];
+        if (p.point.GetMapId() != bot->GetMapId())
+            break;
+        if (p.type != PathNodeType::NODE_PATH && p.type != PathNodeType::NODE_NODE &&
+            p.type != PathNodeType::NODE_PREPATH)
+        {
+            nextIdx = i;
+            break;
+        }
+        walkPoints.push_back(G3D::Vector3(p.point.GetPositionX(), p.point.GetPositionY(), p.point.GetPositionZ()));
+        nextIdx = i + 1;
+    }
+
+    // If we collected walk points, send them to the motion master as a spline
+    if (walkPoints.size() > 1)
+    {
+        MotionMaster* mm = bot->GetMotionMaster();
+        mm->Clear();
+        mm->MoveSplinePath(&walkPoints, FORCED_MOVEMENT_RUN);
+        return true;
+    }
+
+    // No walk points — check what's at the current position
+    if (nextIdx < fullPath.size() && fullPath[nextIdx].type == PathNodeType::NODE_FLIGHTPATH)
+    {
+        // Need to be within interaction distance of the flight master to take off
+        if (minDist > INTERACTION_DISTANCE)
+        {
+            MoveFarTo(fullPath[nextIdx].point);
+            return true;
+        }
+
+        // Find departure and arrival flight path points
+        WorldPosition departurePos = fullPath[nextIdx].point;
+        WorldPosition arrivalPos;
+        for (size_t i = nextIdx + 1; i < fullPath.size(); ++i)
+        {
+            if (fullPath[i].type == PathNodeType::NODE_FLIGHTPATH)
+            {
+                arrivalPos = fullPath[i].point;
+                break;
+            }
+        }
+
+        if (arrivalPos == WorldPosition())
+        {
+            info.travelPath.clear();
+            return false;
+        }
+
+        auto const* fmInfo = sTravelMgr.GetNearestFlightMasterInfo(bot);
+        if (!fmInfo)
+        {
+            info.travelPath.clear();
+            return false;
+        }
+
+        uint32 fromNode = sObjectMgr->GetNearestTaxiNode(
+            departurePos.GetPositionX(), departurePos.GetPositionY(), departurePos.GetPositionZ(),
+            departurePos.GetMapId(), bot->GetTeamId());
+        uint32 toNode = sObjectMgr->GetNearestTaxiNode(
+            arrivalPos.GetPositionX(), arrivalPos.GetPositionY(), arrivalPos.GetPositionZ(),
+            arrivalPos.GetMapId(), bot->GetTeamId());
+
+        if (!fromNode || !toNode)
+        {
+            info.travelPath.clear();
+            return false;
+        }
+
+        std::vector<uint32> taxiPath = sTravelNodeMap.FindTaxiPath(fromNode, toNode);
+        if (taxiPath.empty())
+        {
+            info.travelPath.clear();
+            return false;
+        }
+
+        info.ChangeToTravelFlight(fmInfo->templateEntry, fmInfo->pos, std::move(taxiPath));
+        return true;
+    }
+
+    // Path exhausted or unsupported node type
+    info.travelPath.clear();
+    return false;
+}
+
 bool NewRpgBaseAction::MoveFarTo(WorldPosition dest)
 {
     if (dest == WorldPosition())
