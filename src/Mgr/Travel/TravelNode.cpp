@@ -1712,6 +1712,35 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, [[maybe_unused]] uin
 {
     TravelPath path;
 
+    // AC-side workaround that reference doesn't have: if a 40-step mmap
+    // probe from bot to destination either reaches close (<30y) or makes
+    // meaningful progress (>50% AND >30y absolute), prefer that direct
+    // path over the graph. Restored because removing it broke
+    // destinations that the graph's K=5 endNode pick can't reach but
+    // raw mmap CAN (caves with interior navmesh that A* misses because
+    // the cave-interior node fails the strict 1y endPath validation).
+    if (botPos.GetMapId() == destination.GetMapId())
+    {
+        std::vector<WorldPosition> probe = destination.getPathFromPath({botPos}, bot, 40);
+        if (probe.size() >= 2)
+        {
+            float const totalDist = botPos.distance(destination);
+            float const probeEndToDest = destination.distance(probe.back());
+            float const probeProgress = totalDist - probeEndToDest;
+
+            bool const closeEnough = probeEndToDest < 30.0f;
+            bool const meaningfulProgress = probeProgress > totalDist * 0.5f && probeProgress > 30.0f;
+
+            if (closeEnough || meaningfulProgress)
+            {
+                path.addPoint(botPos, PathNodeType::NODE_PREPATH);
+                for (size_t i = 1; i < probe.size(); ++i)
+                    path.addPoint(probe[i], PathNodeType::NODE_PATH);
+                return path;
+            }
+        }
+    }
+
     std::shared_lock<std::shared_timed_mutex> guard(m_nMapMtx);
 
     // Mirror reference: if the bot is mid-transport, the first valid
