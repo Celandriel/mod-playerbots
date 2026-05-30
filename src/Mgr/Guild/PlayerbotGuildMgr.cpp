@@ -275,15 +275,10 @@ void PlayerbotGuildMgr::OnGuildUpdate(Guild* guild)
 
 void PlayerbotGuildMgr::ResetGuildCache()
 {
-    for (auto it = _guildCache.begin(); it != _guildCache.end();)
-    {
-        GuildCache& cached = it->second;
+    _guildCache.clear();
 
-        cached.type = GuildType::NONE;
-        cached.memberCount = 0;
-        cached.faction = 2;
-        cached.status = 0;
-    }
+    for (auto& entry : _guildData)
+        entry.second.isAvailable = true;
 }
 void PlayerbotGuildMgr::LoadGuildNames()
 {

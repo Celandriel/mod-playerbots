@@ -1,24 +1,50 @@
 #include "RaidBwlTriggers.h"
 
-#include "SharedDefines.h"
+#include "Playerbots.h"
+#include "RaidBwlHelpers.h"
+
+using namespace BlackwingLairHelpers;
+
+// General
 
 bool BwlSuppressionDeviceTrigger::IsActive()
 {
     GuidVector gos = AI_VALUE(GuidVector, "nearest game objects");
-    for (GuidVector::iterator i = gos.begin(); i != gos.end(); i++)
+    for (auto i = gos.begin(); i != gos.end(); ++i)
     {
-        GameObject* go = botAI->GetGameObject(*i);
-        if (!go)
+        const GameObject* go = botAI->GetGameObject(*i);
+        if (IsActiveSuppressionDeviceInRange(go, bot))
         {
-            continue;
+            return true;
         }
-        if (go->GetEntry() != 179784 || go->GetDistance(bot) >= 15.0f || go->GetGoState() != GO_STATE_READY)
-        {
-            continue;
-        }
-        return true;
     }
     return false;
 }
 
-bool BwlAfflictionBronzeTrigger::IsActive() { return bot->HasAura(23170); }
+// Chromaggus
+
+bool BwlAfflictionBronzeTrigger::IsActive()
+{
+    return bot->HasAura(SPELL_BROOD_AFFLICTION_BRONZE);
+}
+
+bool BwlWildMagicTrigger::IsActive()
+{
+    return bot->getClass() == CLASS_MAGE && bot->HasAura(SPELL_WILD_MAGIC);
+}
+
+bool BwlNefarianFearWardTrigger::IsActive()
+{
+    if (bot->getClass() != CLASS_PRIEST)
+        return false;
+
+    Unit* nefarian = AI_VALUE2(Unit*, "find target", "nefarian");
+    if (!nefarian || !nefarian->IsInCombat())
+        return false;
+
+    Unit* victim = nefarian->GetVictim();
+    if (!victim)
+        return false;
+
+    return !botAI->HasAura("fear ward", victim);
+}

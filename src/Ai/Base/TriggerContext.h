@@ -52,6 +52,7 @@ public:
 
         creators["low mana"] = &TriggerContext::LowMana;
         creators["medium mana"] = &TriggerContext::MediumMana;
+        creators["low energy"] = &TriggerContext::LowEnergy;
         creators["high mana"] = &TriggerContext::HighMana;
         creators["almost full mana"] = &TriggerContext::AlmostFullMana;
         creators["enough mana"] = &TriggerContext::EnoughMana;
@@ -60,6 +61,7 @@ public:
         creators["party member low health"] = &TriggerContext::PartyMemberLowHealth;
         creators["party member medium health"] = &TriggerContext::PartyMemberMediumHealth;
         creators["party member almost full health"] = &TriggerContext::PartyMemberAlmostFullHealth;
+        creators["healer low mana"] = &TriggerContext::HealerLowMana;
 
         creators["generic boost"] = &TriggerContext::generic_boost;
         creators["loss of control"] = &TriggerContext::loss_of_control;
@@ -317,6 +319,7 @@ public:
     static Trigger* TargetCriticalHealth(PlayerbotAI* botAI) { return new TargetCriticalHealthTrigger(botAI); }
     static Trigger* LowMana(PlayerbotAI* botAI) { return new LowManaTrigger(botAI); }
     static Trigger* MediumMana(PlayerbotAI* botAI) { return new MediumManaTrigger(botAI); }
+    static Trigger* LowEnergy(PlayerbotAI* botAI) { return new LowEnergyTrigger(botAI); }
     static Trigger* HighMana(PlayerbotAI* botAI) { return new HighManaTrigger(botAI); }
     static Trigger* AlmostFullMana(PlayerbotAI* botAI) { return new AlmostFullManaTrigger(botAI); }
     static Trigger* EnoughMana(PlayerbotAI* botAI) { return new EnoughManaTrigger(botAI); }
@@ -388,6 +391,7 @@ public:
     {
         return new PartyMemberCriticalHealthTrigger(botAI);
     }
+    static Trigger* HealerLowMana(PlayerbotAI* botAI) { return new HealerLowManaTrigger(botAI); }
     static Trigger* protect_party_member(PlayerbotAI* botAI) { return new ProtectPartyMemberTrigger(botAI); }
     static Trigger* no_pet(PlayerbotAI* botAI) { return new NoPetTrigger(botAI); }
     static Trigger* has_pet(PlayerbotAI* botAI) { return new HasPetTrigger(botAI); }

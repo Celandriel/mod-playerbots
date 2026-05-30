@@ -2,11 +2,8 @@
 #define _PLAYERBOT_RAIDBWLACTIONS_H
 
 #include "Action.h"
-#include "AttackAction.h"
-#include "GenericActions.h"
-#include "MovementActions.h"
-#include "PlayerbotAI.h"
-#include "Playerbots.h"
+
+// General
 
 class BwlOnyxiaScaleCloakAuraCheckAction : public Action
 {
@@ -23,10 +20,19 @@ public:
     bool Execute(Event event) override;
 };
 
+// Chromaggus
+
 class BwlUseHourglassSandAction : public Action
 {
 public:
     BwlUseHourglassSandAction(PlayerbotAI* botAI) : Action(botAI, "bwl use hourglass sand") {}
+    bool Execute(Event event) override;
+};
+
+class BwlNefarianFearWardAction : public Action
+{
+public:
+    BwlNefarianFearWardAction(PlayerbotAI* botAI) : Action(botAI, "bwl nefarian fear ward") {}
     bool Execute(Event event) override;
 };
 

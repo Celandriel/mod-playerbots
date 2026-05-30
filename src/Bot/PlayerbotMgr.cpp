@@ -22,12 +22,14 @@
 #include "GuildMgr.h"
 #include "ObjectAccessor.h"
 #include "ObjectGuid.h"
+#include "ObjectMgr.h"
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotRepository.h"
 #include "PlayerbotFactory.h"
 #include "PlayerbotGuildMgr.h"
 #include "PlayerbotOperations.h"
 #include "PlayerbotSecurity.h"
+#include "PlayerbotTextMgr.h"
 #include "PlayerbotWorldThreadProcessor.h"
 #include "Playerbots.h"
 #include "PlayerbotGuildMgr.h"
@@ -300,11 +302,6 @@ void PlayerbotHolder::LogoutAllBots()
         if (!botAI || botAI->IsRealPlayer())
             continue;
 
-        // If bot is mid-countdown, cancel the timer so LogoutPlayerBot proceeds immediately.
-        WorldSession* session = bot->GetSession();
-        if (session && session->isLogingOut())
-            session->SetLogoutStartTime(0);
-
         LogoutPlayerBot(bot->GetGUID());
     }
 }
@@ -326,7 +323,8 @@ void PlayerbotMgr::CancelLogout()
         {
             WorldPackets::Character::LogoutCancel data = WorldPacket(CMSG_LOGOUT_CANCEL);
             bot->GetSession()->HandleLogoutCancelOpcode(data);
-            botAI->TellMaster("Logout cancelled!");
+            botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                "logout_cancel", "Logout cancelled!", {}));
         }
     }
 
@@ -367,50 +365,36 @@ void PlayerbotHolder::LogoutPlayerBot(ObjectGuid guid)
         WorldSession* botWorldSessionPtr = bot->GetSession();
         WorldSession* masterWorldSessionPtr = nullptr;
 
-        // If already in timed logout countdown, complete it once the 20-second timer expires.
         if (botWorldSessionPtr->isLogingOut())
-        {
-            if (botWorldSessionPtr->ShouldLogOut(time(nullptr)))
-            {
-                std::string message = PlayerbotTextMgr::instance().GetBotTextOrDefault(
-                    "goodbye", "Goodbye!", {});
-                botAI->TellMaster(message);
-                RemoveFromPlayerbotsMap(guid);
-                botWorldSessionPtr->LogoutPlayer(true);
-                delete botWorldSessionPtr;
-            }
             return;
-        }
 
         Player* master = botAI->GetMaster();
         if (master)
             masterWorldSessionPtr = master->GetSession();
 
-        // Instant logout checking:
-        bool logout =
-            bot->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING) ||
-            bot->HasUnitState(UNIT_STATE_IN_FLIGHT) ||
-            (masterWorldSessionPtr && !masterWorldSessionPtr->GetPlayer()) ||
-            // Master's socket is already gone (EXIT GAME -> EXIT NOW is the most typical cause).
-            // Force instant logout. Without this, the bot restarts its 20-second countdown and fires LogoutPlayer() 20 seconds
-            // after the master's Player object has been deleted, causing the bot's logout to crash on the now deleted master.
-            (masterWorldSessionPtr && masterWorldSessionPtr->IsSocketClosed()) ||
-            (masterWorldSessionPtr && masterWorldSessionPtr->ShouldLogOut(time(nullptr))) ||
-            // If the bot's master has security clearance for `InstantLogout` in worldserver.conf, so does the bot.
-            (master &&
-                (master->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING) ||
-                 master->HasUnitState(UNIT_STATE_IN_FLIGHT) ||
-                 (masterWorldSessionPtr &&
-                  masterWorldSessionPtr->GetSecurity() >= (AccountTypes)sWorld->getIntConfig(CONFIG_INSTANT_LOGOUT))));
+        // TODO: Review whether or not to implement timed logout.
+        // Unused block. Useful only for timed logout.
+/*
+        // check for instant logout
+        bool logout = botWorldSessionPtr->ShouldLogOut(time(nullptr));
 
-        if (!logout)
-        {
-            // Start the 20-second logout countdown. CancelLogout() can interrupt this.
-            WorldPackets::Character::LogoutRequest data = WorldPacket(CMSG_LOGOUT_REQUEST);
-            botWorldSessionPtr->HandleLogoutRequestOpcode(data);
-            return;
-        }
+        if (masterWorldSessionPtr && masterWorldSessionPtr->ShouldLogOut(time(nullptr)))
+            logout = true;
 
+        if (masterWorldSessionPtr && !masterWorldSessionPtr->GetPlayer())
+            logout = true;
+
+        if (bot->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING) || bot->HasUnitState(UNIT_STATE_IN_FLIGHT) ||
+            botWorldSessionPtr->GetSecurity() >= (AccountTypes)sWorld->getIntConfig(CONFIG_INSTANT_LOGOUT))
+            logout = true;
+
+        if (master &&
+            (master->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING) || master->HasUnitState(UNIT_STATE_IN_FLIGHT) ||
+             (masterWorldSessionPtr &&
+              masterWorldSessionPtr->GetSecurity() >= (AccountTypes)sWorld->getIntConfig(CONFIG_INSTANT_LOGOUT))))
+            logout = true;
+*/
+        // Instant logout (the only option right now)
         {
             std::string message = PlayerbotTextMgr::instance().GetBotTextOrDefault(
                 "goodbye", "Goodbye!", {});
@@ -431,7 +415,8 @@ void PlayerbotHolder::DisablePlayerBot(ObjectGuid guid)
         {
             return;
         }
-        botAI->TellMaster("Goodbye!");
+        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+            "goodbye", "Goodbye!", {}));
         bot->StopMoving();
         bot->GetMotionMaster()->Clear();
 
@@ -498,12 +483,6 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
     }
 
     Player* master = botAI->GetMaster();
-    if (master)
-    {
-        ObjectGuid masterGuid = master->GetGUID();
-        if (master->GetGroup() && !master->GetGroup()->IsLeader(masterGuid))
-            master->GetGroup()->ChangeLeader(masterGuid);
-    }
 
     Group* group = bot->GetGroup();
     if (group)
@@ -564,7 +543,8 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
     // set delay on login
     botAI->SetNextCheckDelay(urand(2000, 4000));
 
-    botAI->TellMaster("Hello!", PLAYERBOT_SECURITY_TALK);
+    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+        "hello", "Hello!", {}), PLAYERBOT_SECURITY_TALK);
 
     // Queue group operations for world thread
     if (master && master->GetGroup() && !group)
@@ -774,7 +754,10 @@ std::string const PlayerbotHolder::ProcessBotCommand(std::string const cmd, Obje
     bool addClassBot = sRandomPlayerbotMgr.IsAddclassBot(guid.GetCounter());
 
     if (!addClassBot)
-        return "ERROR: You can not use this command on non-addclass bot.";
+    {
+        if (!(cmd == "refresh=raid" && sPlayerbotAIConfig.resetInstanceIdForAltBots))
+            return "ERROR: You can only use this command on addclass bots.";
+    }
 
     if (!admin)
     {
@@ -960,7 +943,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
 
     if (!strcmp(cmd, "initself"))
     {
-        if (master->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+        if (master->CanBeGameMaster())
         {
             // OnBotLogin(master);
             PlayerbotFactory factory(master, master->GetLevel(), ITEM_QUALITY_EPIC);
@@ -979,7 +962,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
     {
         if (!strcmp(cmd, "initself=uncommon"))
         {
-            if (master->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+            if (master->CanBeGameMaster())
             {
                 // OnBotLogin(master);
                 PlayerbotFactory factory(master, master->GetLevel(), ITEM_QUALITY_UNCOMMON);
@@ -995,7 +978,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         }
         if (!strcmp(cmd, "initself=rare"))
         {
-            if (master->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+            if (master->CanBeGameMaster())
             {
                 // OnBotLogin(master);
                 PlayerbotFactory factory(master, master->GetLevel(), ITEM_QUALITY_RARE);
@@ -1011,7 +994,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         }
         if (!strcmp(cmd, "initself=epic"))
         {
-            if (master->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+            if (master->CanBeGameMaster())
             {
                 // OnBotLogin(master);
                 PlayerbotFactory factory(master, master->GetLevel(), ITEM_QUALITY_EPIC);
@@ -1027,7 +1010,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         }
         if (!strcmp(cmd, "initself=legendary"))
         {
-            if (master->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+            if (master->CanBeGameMaster())
             {
                 // OnBotLogin(master);
                 PlayerbotFactory factory(master, master->GetLevel(), ITEM_QUALITY_LEGENDARY);
@@ -1044,7 +1027,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         int32 gs;
         if (sscanf(cmd, "initself=%d", &gs) != -1)
         {
-            if (master->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+            if (master->CanBeGameMaster())
             {
                 // OnBotLogin(master);
                 PlayerbotFactory factory(master, master->GetLevel(), ITEM_QUALITY_LEGENDARY, gs);
@@ -1068,7 +1051,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
 
     if (!strcmp(cmd, "reload"))
     {
-        if (master->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+        if (master->CanBeGameMaster())
         {
             sPlayerbotAIConfig.Initialize();
             messages.push_back("Config reloaded.");
@@ -1100,7 +1083,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         }
         else if (sPlayerbotAIConfig.selfBotLevel == 0)
             messages.push_back("Self-bot is disabled");
-        else if (sPlayerbotAIConfig.selfBotLevel == 1 && master->GetSession()->GetSecurity() < SEC_GAMEMASTER)
+        else if (sPlayerbotAIConfig.selfBotLevel == 1 && !master->CanBeGameMaster())
             messages.push_back("You do not have permission to enable player botAI");
         else
         {
@@ -1120,7 +1103,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
 
     if (!strcmp(cmd, "addclass"))
     {
-        if (sPlayerbotAIConfig.addClassCommand == 0 && master->GetSession()->GetSecurity() < SEC_GAMEMASTER)
+        if (sPlayerbotAIConfig.addClassCommand == 0 && !master->CanBeGameMaster())
         {
             messages.push_back("You do not have permission to create bot by addclass command");
             return messages;
@@ -1283,7 +1266,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
     std::vector<std::string> chars = split(charnameStr, ',');
     for (std::vector<std::string>::iterator i = chars.begin(); i != chars.end(); i++)
     {
-        std::string const s = *i;
+        std::string s = *i;
 
         if (!strcmp(cmd, "addaccount"))
         {
@@ -1292,7 +1275,13 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
             if (!accountId)
             {
                 // If not found, try to get account ID from character name
-                ObjectGuid charGuid = sCharacterCache->GetCharacterGuidByName(s);
+                std::string charName = s;
+                if (!normalizePlayerName(charName))
+                {
+                    messages.push_back("Neither account nor character '" + s + "' found");
+                    continue;
+                }
+                ObjectGuid charGuid = sCharacterCache->GetCharacterGuidByName(charName);
                 if (!charGuid)
                 {
                     messages.push_back("Neither account nor character '" + s + "' found");
@@ -1320,6 +1309,11 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         else
         {
             // For regular add command, only add the specific character
+            if (!normalizePlayerName(s))
+            {
+                messages.push_back("Character '" + *i + "' not found");
+                continue;
+            }
             ObjectGuid charGuid = sCharacterCache->GetCharacterGuidByName(s);
             if (!charGuid)
             {
@@ -1345,7 +1339,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
         else if (master && member != master->GetGUID())
         {
             out << ProcessBotCommand(cmdStr, member, master->GetGUID(),
-                                     master->GetSession()->GetSecurity() >= SEC_GAMEMASTER,
+                                     master->CanBeGameMaster(),
                                      master->GetSession()->GetAccountId(), master->GetGuildId());
         }
         else if (!master)
@@ -1519,15 +1513,6 @@ void PlayerbotMgr::UpdateAIInternal(uint32 elapsed, bool /*minimal*/)
 {
     SetNextCheckDelay(sPlayerbotAIConfig.reactDelay);
     CheckTellErrors(elapsed);
-
-    // Complete timed logouts for added bots once the 20-second countdown has elapsed.
-    std::vector<ObjectGuid> expiredLogouts;
-    for (auto const& [botGuid, bot] : playerBots)
-        if (bot && bot->GetSession() && bot->GetSession()->ShouldLogOut(time(nullptr)))
-            expiredLogouts.push_back(botGuid);
-
-    for (ObjectGuid const& guid : expiredLogouts)
-        LogoutPlayerBot(guid);
 }
 
 void PlayerbotMgr::HandleCommand(uint32 type, std::string const text)
@@ -1592,6 +1577,24 @@ void PlayerbotMgr::HandleMasterIncomingPacket(WorldPacket const& packet)
         // if master is logging out, log out all bots
         case CMSG_LOGOUT_REQUEST:
         {
+            Player* master = GetMaster();
+            if (master)
+            {
+                // Replicate the AFK logout prevention checks from WorldSession::HandleLogoutRequestOpcode
+                // so bots are not logged out when the master's own logout is going to be prevented.
+                AreaTableEntry const* areaEntry = sAreaTableStore.LookupEntry(master->GetAreaId());
+                bool preventAfkSanctuaryLogout = sWorld->getIntConfig(CONFIG_AFK_PREVENT_LOGOUT) == 1
+                                                 && master->isAFK() && areaEntry && areaEntry->IsSanctuary();
+
+                bool preventAfkLogout = sWorld->getIntConfig(CONFIG_AFK_PREVENT_LOGOUT) == 2
+                                        && master->isAFK();
+
+                if (preventAfkSanctuaryLogout || preventAfkLogout)
+                {
+                    break;
+                }
+            }
+
             LogoutAllBots();
             break;
         }
@@ -1671,7 +1674,7 @@ void PlayerbotMgr::OnPlayerLogin(Player* player)
 
     // For bot texts (DB-driven), prefer the database locale with a safe fallback.
     LocaleConstant usedLocale = databaseLocale;
-    if (usedLocale >= MAX_LOCALES)
+    if (usedLocale >= TOTAL_LOCALES)
         usedLocale = LOCALE_enUS; // fallback
 
     // set locale priority for bot texts
@@ -1717,7 +1720,7 @@ void PlayerbotMgr::TellError(std::string const botName, std::string const text)
     errors[text] = names;
 }
 
-void PlayerbotMgr::CheckTellErrors(uint32 elapsed)
+void PlayerbotMgr::CheckTellErrors(uint32 /*elapsed*/)
 {
     time_t now = time(nullptr);
     if ((now - lastErrorTell) < sPlayerbotAIConfig.errorDelay / 1000)
