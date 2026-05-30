@@ -1413,6 +1413,8 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
 
     std::vector<TravelNodeStub*> open, closed;
 
+    std::vector<TravelNode*> portNodes;  // synthetic teleport/portal edges
+
     if (bot)
     {
         PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
@@ -1425,20 +1427,95 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
                 AiObjectContext* context = botAI->GetAiObjectContext();
                 startStub->currentGold = AI_VALUE2(uint32, "free money for", (uint32)NeedMoneyFor::travel);
             }
+
+            // Hearthstone (item 6948 / spell 8690): inject a synthetic
+            // teleport edge from start to the node nearest the bot's
+            // home bind, so A* can pick hearthing over walking.
+            if (bot->IsAlive() && bot->HasItemCount(6948, 1))
+            {
+                WorldPosition homePos = AI_VALUE(WorldPosition, "home bind");
+                std::vector<WorldPosition> dummy;
+                TravelNode* homeNode = sTravelNodeMap.getNode(homePos, dummy, nullptr, 50.0f);
+                if (homeNode && homeNode != start)
+                {
+                    PortalNode* portNode = new PortalNode(start);
+                    portNode->SetPortal(start, homeNode, 8690);
+
+                    TravelNodeStub* hsStub = &m_stubs.insert(std::make_pair(
+                        static_cast<TravelNode*>(portNode), TravelNodeStub(portNode))).first->second;
+
+                    // Cost: ~10 minutes minus death count (cap at 2 min min)
+                    // so a recently-died bot prefers the hearth.
+                    uint32 deathCount = AI_VALUE(uint32, "death count");
+                    hsStub->costFromStart = std::max<uint32>(2, (10 - std::min<uint32>(8, deathCount))) * MINUTE;
+                    hsStub->heuristic = hsStub->dataNode->fDist(goal) / botSpeed;
+                    hsStub->totalCost = hsStub->costFromStart + hsStub->heuristic;
+
+                    open.push_back(hsStub);
+                    hsStub->open = true;
+                    portNodes.push_back(portNode);
+                }
+            }
+
+            // Mage teleport spells: 3561 Stormwind, 3562 Ironforge, 3563 Undercity,
+            // 3565 Darnassus, 3566 Thunder Bluff, 3567 Orgrimmar, 18960 Moonglade.
+            // Inject one synthetic teleport edge per known + ready spell.
+            static const uint32 teleSpells[] = {3561, 3562, 3563, 3565, 3566, 3567, 18960};
+            for (uint32 spellId : teleSpells)
+            {
+                if (!bot->IsAlive() || bot->IsInCombat())
+                    break;
+                if (!bot->HasSpell(spellId))
+                    continue;
+                if (bot->HasSpellCooldown(spellId))
+                    continue;
+
+                SpellTargetPosition const* stp =
+                    sSpellMgr->GetSpellTargetPosition(spellId, EFFECT_0);
+                if (!stp)
+                    continue;
+
+                WorldPosition telePos(stp->target_mapId, stp->target_X,
+                                      stp->target_Y, stp->target_Z, 0.0f);
+                std::vector<WorldPosition> dummy;
+                TravelNode* destNode = sTravelNodeMap.getNode(telePos, dummy, nullptr, 10.0f);
+                if (!destNode || destNode == start)
+                    continue;
+
+                PortalNode* portNode = new PortalNode(start);
+                portNode->SetPortal(start, destNode, spellId);
+
+                TravelNodeStub* tsStub = &m_stubs.insert(std::make_pair(
+                    static_cast<TravelNode*>(portNode), TravelNodeStub(portNode))).first->second;
+
+                tsStub->costFromStart = MINUTE;  // cheaper than ~1-min walk
+                tsStub->heuristic = tsStub->dataNode->fDist(goal) / botSpeed;
+                tsStub->totalCost = tsStub->costFromStart + tsStub->heuristic;
+
+                open.push_back(tsStub);
+                tsStub->open = true;
+                portNodes.push_back(portNode);
+            }
         }
         else
             startStub->currentGold = bot->GetMoney();
     }
 
-    if (!start->hasRouteTo(goal))
+    if (open.empty() && !start->hasRouteTo(goal))
+    {
+        for (auto* p : portNodes)
+            delete p;
         return TravelNodeRoute();
+    }
 
     // Min-heap: smallest f at front
     auto heapComp = [](TravelNodeStub* i, TravelNodeStub* j) { return i->totalCost > j->totalCost; };
 
     open.push_back(startStub);
-    std::push_heap(open.begin(), open.end(), heapComp);
     startStub->open = true;
+    // Heapify all of open in one pass — covers both startStub and any
+    // PortalNode stubs injected above.
+    std::make_heap(open.begin(), open.end(), heapComp);
 
     constexpr uint32 MAX_A_STAR_EXPLORED = 500;
     uint32 nodesExplored = 0;
@@ -1446,7 +1523,11 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
     while (!open.empty())
     {
         if (++nodesExplored > MAX_A_STAR_EXPLORED)
+        {
+            for (auto* p : portNodes)
+                delete p;
             return TravelNodeRoute();
+        }
 
         std::pop_heap(open.begin(), open.end(), heapComp);
         currentNode = open.back();
@@ -1471,7 +1552,11 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
 
             reverse(path.begin(), path.end());
 
-            return TravelNodeRoute(path);
+            // Successful route: hand off ownership of any synthetic
+            // PortalNodes injected at the head. Caller (GetFullPath)
+            // is expected to call cleanTempNodes() when done with the
+            // route — see the call site for the lifecycle.
+            return TravelNodeRoute(path, portNodes);
         }
 
         for (auto const& link : *currentNode->dataNode->getLinks())  // for each successor n' of n
@@ -1510,6 +1595,9 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
         }
     }
 
+    // A* exhausted open without reaching goal. Clean up synthetic nodes.
+    for (auto* p : portNodes)
+        delete p;
     return TravelNodeRoute();
 }
 
@@ -1718,6 +1806,11 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, uint32 botZoneId,
         pathToEnd = {destination};
 
     path = route.BuildPath(pathToStart, pathToEnd, nullptr);
+
+    // Release any synthetic PortalNodes the A* injected (hearthstone /
+    // mage teleports). They served their purpose in route assembly and
+    // their points are now baked into `path`.
+    route.cleanTempNodes();
 
     return path;
 }

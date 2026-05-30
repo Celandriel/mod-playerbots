@@ -437,6 +437,26 @@ protected:
     // uint32 transportId = 0;
 };
 
+// Synthetic A* node injected at search start to represent a teleport-spell
+// (hearthstone, mage portal, etc.) as an alternative travel edge. Owned
+// by GetNodeRoute caller; deleted after the route is built.
+class PortalNode : public TravelNode
+{
+public:
+    PortalNode(TravelNode* baseNode) : TravelNode(baseNode) {}
+
+    void SetPortal(TravelNode* baseNode, TravelNode* endNode, uint32 portalSpell)
+    {
+        nodeName = baseNode->getName();
+        point = *baseNode->getPosition();
+        paths.clear();
+        links.clear();
+        TravelNodePath path(0.1f, 0.1f, (uint8)TravelNodePathType::teleportSpell,
+                            portalSpell, true);
+        setPathTo(endNode, path);
+    }
+};
+
 // Route step type
 enum class PathNodeType : uint8
 {
@@ -580,6 +600,13 @@ public:
     {
         nodes = nodes1;
     }
+    TravelNodeRoute(std::vector<TravelNode*> nodes1,
+                    std::vector<TravelNode*> const& tempNodes_)
+    {
+        nodes = nodes1;
+        if (!tempNodes_.empty())
+            addTempNodes(tempNodes_);
+    }
 
     bool isEmpty() { return nodes.empty(); }
 
@@ -590,6 +617,19 @@ public:
     float getTotalDistance();
 
     std::vector<TravelNode*> getNodes() { return nodes; }
+
+    // Take ownership of synthetic A* nodes (PortalNode etc.). Must call
+    // cleanTempNodes() to delete them when the route is no longer needed.
+    void addTempNodes(std::vector<TravelNode*> const& tempNodes_)
+    {
+        tempNodes.insert(tempNodes.end(), tempNodes_.begin(), tempNodes_.end());
+    }
+    void cleanTempNodes()
+    {
+        for (auto* n : tempNodes)
+            delete n;
+        tempNodes.clear();
+    }
 
     TravelPath BuildPath(
         std::vector<WorldPosition> pathToStart = {},
@@ -604,6 +644,7 @@ private:
         return std::find(nodes.begin(), nodes.end(), node);
     }
     std::vector<TravelNode*> nodes;
+    std::vector<TravelNode*> tempNodes;  // owned synthetic nodes (PortalNode etc.)
 };
 
 // A node container to aid A* calculations with nodes.
