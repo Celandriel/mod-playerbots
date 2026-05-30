@@ -11,21 +11,20 @@
 
 bool LootAvailableTrigger::IsActive()
 {
-    bool distanceCheck = false;
-    if (botAI->HasStrategy("stay", BOT_STATE_NON_COMBAT))
-    {
-        distanceCheck =
-            ServerFacade::instance().IsDistanceLessOrEqualThan(AI_VALUE2(float, "distance", "loot target"), CONTACT_DISTANCE);
-    }
-    else
-    {
-        distanceCheck = ServerFacade::instance().IsDistanceLessOrEqualThan(AI_VALUE2(float, "distance", "loot target"),
-                                                                 INTERACTION_DISTANCE - 2.0f);
-    }
+    // Strategy is non-combat-only — the engine state separation is the
+    // safety net. Don't gate on hostiles-in-sight: that locked out
+    // looting in zones with continuous respawns (e.g. cave farms).
+    // If a new enemy aggros mid-loot the combat engine takes over, loot
+    // resumes on the next non-combat window.
+    if (!AI_VALUE(bool, "has available loot"))
+        return false;
 
-    // if loot target if empty, always pass distance check
-    return AI_VALUE(bool, "has available loot") &&
-        (distanceCheck || AI_VALUE(GuidVector, "all targets").empty());
+    // "stay" strategy is restrictive: only loot if corpse is at our feet.
+    if (botAI->HasStrategy("stay", BOT_STATE_NON_COMBAT))
+        return ServerFacade::instance().IsDistanceLessOrEqualThan(
+            AI_VALUE2(float, "distance", "loot target"), CONTACT_DISTANCE);
+
+    return true;
 }
 
 bool FarFromCurrentLootTrigger::IsActive()

@@ -19,6 +19,7 @@
 #include "PathGenerator.h"
 #include "Player.h"
 #include "PlayerbotAI.h"
+#include "Playerbots.h"
 #include "QuestDef.h"
 #include "Random.h"
 #include "SharedDefines.h"
@@ -120,34 +121,12 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
             }
             break;
         }
-        case RPG_TRAVEL_FLIGHT:
-        {
-            auto& data = std::get<NewRpgInfo::TravelFlight>(info.data);
-            if (data.inFlight && !bot->IsInFlight())
-            {
-                // flight arrival — resume travel path if remaining, otherwise idle
-                if (info.HasTravelPath())
-                    info.ChangeToMoveFar();
-                else
-                    info.ChangeToIdle();
-                return true;
-            }
-            break;
-        }
+        // RPG_TRAVEL_FLIGHT arrival is handled inside NewRpgTravelFlightAction
+        // so the flight action owns both take-off and landing transitions.
         case RPG_REST:
         {
             // REST -> IDLE
             if (info.HasStatusPersisted(statusRestDuration))
-            {
-                info.ChangeToIdle();
-                return true;
-            }
-            break;
-        }
-        case RPG_MOVE_FAR:
-        {
-            // MOVE_FAR -> IDLE when travel path is exhausted
-            if (!info.HasTravelPath())
             {
                 info.ChangeToIdle();
                 return true;
@@ -314,6 +293,9 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
             data.lastReachPOI = 0;
             data.pos = WorldPosition();
             data.objectiveIdx = 0;
+            data.pursuedLootGO.Clear();
+            data.pursuedUseGO.Clear();
+            data.pursuedUseTarget.Clear();
         }
     }
     if (data.pos == WorldPosition())
@@ -342,15 +324,34 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
         data.lastReachPOI = 0;
         data.pos = pos;
         data.objectiveIdx = objectiveIdx;
+        data.pursuedLootGO.Clear();
+        data.pursuedUseGO.Clear();
+        data.pursuedUseTarget.Clear();
     }
 
     if (bot->GetDistance(data.pos) > 10.0f && !data.lastReachPOI)
     {
+        // Yield to attack-anything ONLY if a mob needed by this exact
+        // quest+objective is right next to us. The broad variant (any
+        // quest in the log) yielded for every nearby mob and derailed
+        // turn-ins / cross-zone travel through other quests' clusters.
+        if (HasNearbyQuestMobForObjective(15.0f, data.questId, data.objectiveIdx))
+            return false;
+
+        // Note: previously yielded ~10%/tick when any hostile was
+        // within 25y. That overrode the do-quest multiplier in
+        // practice (combined with bots getting aggroed on the way,
+        // which ALSO bypasses the multiplier via combat engine) and
+        // bots ended up grinding their way to POIs instead of
+        // travelling. Quest-mob exception above is kept so we don't
+        // walk past a quest target while gathering. Anything else
+        // hostile is the multiplier's job to throttle — and bots
+        // that DO get aggroed switch to combat engine where the
+        // class strategy handles it.
+
         if (MoveFarTo(data.pos))
             return true;
-        // Long-range sampler couldn't land a candidate — nudge the
-        // bot a short distance so the next tick retries from a
-        // different position instead of sitting idle.
+        // sampler found nothing — nudge so next tick tries a new pos
         return MoveRandomNear(10.0f);
     }
     // Now we are near the quest objective
@@ -395,14 +396,111 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
         data.lastReachPOI = 0;
         data.pos = WorldPosition();
         data.objectiveIdx = 0;
+        data.pursuedLootGO.Clear();
+        data.pursuedUseGO.Clear();
+        data.pursuedUseTarget.Clear();
         return true;
     }
 
-    // At the POI: keep the bot actively placed but avoid large
-    // random 20yd hops that look like pacing back and forth. A small
-    // ~8yd wander reads as the bot looking around while grind/loot
-    // strategies do their work.
-    return MoveRandomNear(8.0f);
+    // at POI: drive toward specific objectives first
+    if (TryUseQuestItem(data.pursuedUseGO, data.pursuedUseTarget))
+        return true;
+    if (TryLootQuestGO(data.pursuedLootGO))
+        return true;
+    if (TryUseQuestGO(data.pursuedUseGO))
+        return true;
+
+    // gather quests: roam for spawns. kill quests: yield to grind.
+    Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+    if (quest)
+    {
+        int32 obj = data.objectiveIdx;
+        bool isGatherObjective = false;
+        if (obj < QUEST_OBJECTIVES_COUNT)
+        {
+            int32 entry = quest->RequiredNpcOrGo[obj];
+            if (entry < 0)  // GO objective
+                isGatherObjective = true;
+            if (entry == 0 && obj < QUEST_ITEM_OBJECTIVES_COUNT && quest->RequiredItemId[obj])
+                isGatherObjective = true;
+        }
+        else if (obj < QUEST_OBJECTIVES_COUNT + QUEST_ITEM_OBJECTIVES_COUNT)
+        {
+            isGatherObjective = true;
+        }
+        // source-item quest: need to find the target to use it on
+        if (quest->GetSrcItemId())
+            isGatherObjective = true;
+
+        if (isGatherObjective)
+            return MoveRandomNear(20.0f);
+    }
+
+    // Kill-quest scout: at POI for 30s+ with no quest mob in sight
+    // means this cluster is empty. Switch to a different POI candidate
+    // (>50y away) if one exists; otherwise roam in place.
+    constexpr uint32 scoutTimeoutMs = 30 * 1000;
+    if (data.lastReachPOI && GetMSTimeDiffToNow(data.lastReachPOI) >= scoutTimeoutMs &&
+        !HasNearbyQuestMob(30.0f))
+    {
+        std::vector<POIInfo> poiInfo;
+        if (GetQuestPOIPosAndObjectiveIdx(questId, poiInfo))
+        {
+            std::vector<size_t> alternatives;
+            for (size_t i = 0; i < poiInfo.size(); ++i)
+            {
+                float dx = poiInfo[i].pos.x - data.pos.GetPositionX();
+                float dy = poiInfo[i].pos.y - data.pos.GetPositionY();
+                if (dx * dx + dy * dy > 50.0f * 50.0f)
+                    alternatives.push_back(i);
+            }
+            if (!alternatives.empty())
+            {
+                size_t pickIdx = alternatives[urand(0, alternatives.size() - 1)];
+                G3D::Vector2 newPoi = poiInfo[pickIdx].pos;
+                float dz = std::max(bot->GetMap()->GetHeight(newPoi.x, newPoi.y, MAX_HEIGHT),
+                                    bot->GetMap()->GetWaterLevel(newPoi.x, newPoi.y));
+                if (dz != INVALID_HEIGHT && dz != VMAP_INVALID_HEIGHT_VALUE)
+                {
+                    data.pos = WorldPosition(bot->GetMapId(), newPoi.x, newPoi.y, dz);
+                    data.objectiveIdx = poiInfo[pickIdx].objectiveIdx;
+                    data.lastReachPOI = 0;
+                    data.pursuedLootGO.Clear();
+                    data.pursuedUseGO.Clear();
+                    data.pursuedUseTarget.Clear();
+                    return true;
+                }
+            }
+        }
+        return MoveRandomNear(20.0f);
+    }
+
+    // kill quest: walk toward the marker before handing off to grind.
+    // lastReachPOI trips at ~10y so without this the bot fights on the
+    // edge and never reaches the dense cluster. Skip if a quest mob is
+    // in sight (might be the target) or a hostile is mid-pull.
+    if (bot->GetDistance(data.pos) > 5.0f)
+    {
+        if (HasNearbyQuestMob(30.0f))
+            return false;
+
+        GuidVector nearby = AI_VALUE(GuidVector, "possible targets");
+        bool hostileClose = false;
+        for (ObjectGuid guid : nearby)
+        {
+            Unit* u = botAI->GetUnit(guid);
+            if (u && u->IsAlive() && bot->GetDistance(u) < 15.0f)
+            {
+                hostileClose = true;
+                break;
+            }
+        }
+        if (!hostileClose)
+            return MoveFarTo(data.pos);
+    }
+
+    // yield to grind
+    return false;
 }
 
 bool NewRpgDoQuestAction::DoCompletedQuest(NewRpgInfo::DoQuest& data)
@@ -436,6 +534,15 @@ bool NewRpgDoQuestAction::DoCompletedQuest(NewRpgInfo::DoQuest& data)
         data.lastReachPOI = 0;
         data.pos = pos;
         data.objectiveIdx = -1;
+
+        // Drop the spline + lastPath that DoIncompleteQuest committed
+        // to the now-completed objective. Without this, MoveFarTo on
+        // the next tick hits the bot->isMoving() / lastPath-reuse
+        // early-exits at the top of MoveFarTo and rides the stale
+        // path instead of replanning toward the turn-in POI. (This
+        // is what `.playerbot bot self` masks by recreating the AI.)
+        bot->GetMotionMaster()->Clear();
+        AI_VALUE(LastMovement&, "last movement").clear();
     }
 
     if (data.pos == WorldPosition())
@@ -466,7 +573,9 @@ bool NewRpgDoQuestAction::DoCompletedQuest(NewRpgInfo::DoQuest& data)
         botAI->rpgInfo.ChangeToIdle();
         return true;
     }
-    return false;
+    // waiting for SearchQuestGiverAndAcceptOrReward to pick up the NPC;
+    // wander instead of false so we don't fall through to grind
+    return MoveRandomNear(15.0f);
 }
 
 bool NewRpgTravelFlightAction::Execute(Event /*event*/)
@@ -477,6 +586,22 @@ bool NewRpgTravelFlightAction::Execute(Event /*event*/)
         return false;
 
     auto& data = *dataPtr;
+
+    // Arrival: we had boarded a flight (data.inFlight) and we're no longer in
+    // it → we just landed. Special-case Rut'theran: walk to the portal GO so
+    // it teleports the bot into Darnassus, flipping the zone to AREA_DARNASSUS
+    // so this branch falls through to ChangeToIdle on the next tick.
+    if (data.inFlight && !bot->IsInFlight())
+    {
+        if (bot->GetZoneId() == AREA_TELDRASSIL)
+        {
+            static WorldPosition const rutTheranPortalEntrance(1, 8799.41f, 969.787f, 26.2409f, 0.0f);
+            return MoveFarTo(rutTheranPortalEntrance);
+        }
+        info.ChangeToIdle();
+        return true;
+    }
+
     if (bot->IsInFlight())
     {
         data.inFlight = true;
@@ -492,32 +617,11 @@ bool NewRpgTravelFlightAction::Execute(Event /*event*/)
         info.ChangeToIdle();
         return true;
     }
-    if (bot->GetDistance(flightMaster) > INTERACTION_DISTANCE)
-        return MoveFarTo(flightMaster);
 
-    std::vector<uint32> nodes = data.path;
-
-    botAI->RemoveShapeshift();
-    if (bot->IsMounted())
-        bot->Dismount();
-
-    if (!bot->ActivateTaxiPathTo(nodes, flightMaster, 0))
+    if (!TakeFlight(data.path, flightMaster))
     {
-        LOG_DEBUG("playerbots", "[New RPG] {} active taxi path {} (from {} to {}) failed", bot->GetName(),
-                  flightMaster->GetEntry(), nodes[0], nodes[nodes.size() - 1]);
         info.ChangeToIdle();
         return true;
     }
     return true;
-}
-
-bool NewRpgMoveFarAction::Execute(Event /*event*/)
-{
-    NewRpgInfo& info = botAI->rpgInfo;
-    if (!info.HasTravelPath())
-    {
-        info.ChangeToIdle();
-        return true;
-    }
-    return FollowTravelPath();
 }

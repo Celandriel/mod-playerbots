@@ -33,7 +33,7 @@ protected:
     bool MoveWorldObjectTo(ObjectGuid guid, float distance = INTERACTION_DISTANCE);
     bool MoveRandomNear(float moveStep = 50.0f, MovementPriority priority = MovementPriority::MOVEMENT_NORMAL, WorldObject* center = nullptr);
     bool ForceToWait(uint32 duration, MovementPriority priority = MovementPriority::MOVEMENT_NORMAL);
-    bool FollowTravelPath();
+    bool TakeFlight(std::vector<uint32> const& taxiNodes, Creature* flightMaster);
 
     /* QUEST RELATED CHECK */
     ObjectGuid ChooseNpcOrGameObjectToInteract(bool questgiverOnly = false, float distanceLimit = 0.0f);
@@ -51,6 +51,29 @@ protected:
     bool TurnInQuest(Quest const* quest, ObjectGuid guid);
     bool OrganizeQuestLog();
 
+    /* QUEST PROGRESSION HELPERS (at POI) */
+    // Walk to a GO that drops a needed quest item. The loot strategy
+    // opens and loots it once in range.
+    bool TryLootQuestGO(ObjectGuid& pursuedGO, float searchRange = 60.0f);
+
+    // Walk to / use a GO that is itself the objective (rune, lever,
+    // altar, coffin — RequiredNpcOrGo with a negative entry).
+    bool TryUseQuestGO(ObjectGuid& pursuedGO, float searchRange = 60.0f);
+
+    // Fire a quest item's OnUse spell at the right target: a spell-focus
+    // GO (moonwell), a required creature, or the bot itself.
+    bool TryUseQuestItem(ObjectGuid& pursuedGO, ObjectGuid& pursuedTarget, float searchRange = 60.0f);
+
+    // True when a quest-relevant mob is within range — used during
+    // travel so we yield to attack-anything instead of running past.
+    bool HasNearbyQuestMob(float range = 20.0f);
+
+    // Narrower variant: only yields for mobs needed by the SPECIFIC
+    // quest+objective the bot is currently working on. Without this,
+    // do-quest yields for any quest in the log, derailing turn-ins
+    // and cross-zone travel through other quests' mob clusters.
+    bool HasNearbyQuestMobForObjective(float range, uint32 questId, int32 objectiveIdx);
+
 protected:
     bool GetQuestPOIPosAndObjectiveIdx(uint32 questId, std::vector<POIInfo>& poiInfo, bool toComplete = false);
     static WorldPosition SelectRandomGrindPos(Player* bot);
@@ -59,17 +82,15 @@ protected:
     bool RandomChangeStatus(std::vector<NewRpgStatus> candidateStatus);
     bool CheckRpgStatusAvailable(NewRpgStatus status);
 
-protected:
-    /* FOR MOVE FAR */
-    const float pathFinderDis = 70.0f;
-    // Time without real progress toward dest before MoveFarTo
-    // falls back to teleport recovery. Kept short enough that a
-    // bot truly oscillating around an unreachable destination
-    // (mmap returning non-progressing partial paths, or NOPATH +
-    // cone fallback wandering) doesn't spin for 5 minutes before
-    // the teleport fires, but long enough that a genuine long
-    // walk that is slowly making progress never triggers it.
-    const uint32 stuckTime = 90 * 1000;
+private:
+    // Centralized dispatch helper. Applies underwater fixup, ClipPath
+    // (truncate at first hostile in attack range with LOS, level+5 cap),
+    // inactive-bot teleport (with self-bot carve-out), masterWalking
+    // mode, pre-dispatch state cleanup, then dispatches via
+    // MoveSplinePath and schedules via WaitForReach formula.
+    bool DispatchPathPoints(WorldPosition const& dest,
+                            Movement::PointsArray& points,
+                            char const* label);
 };
 
 #endif

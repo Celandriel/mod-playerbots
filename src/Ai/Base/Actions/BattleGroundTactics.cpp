@@ -173,7 +173,7 @@ std::vector<uint32> const vFlagsIC = {GO_HORDE_BANNER,
                                       GO_HORDE_BANNER_GRAVEYARD_H,
                                       GO_HORDE_BANNER_GRAVEYARD_H_CONT};
 
-// BG Waypoints (vmangos)
+// BG Waypoints
 
 // Horde Flag Room to Horde Graveyard
 BattleBotPath vPath_WSG_HordeFlagRoom_to_HordeGraveyard = {

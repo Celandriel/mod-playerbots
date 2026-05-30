@@ -1,5 +1,8 @@
 #include "NewRpgBaseAction.h"
 
+#include <limits>
+#include <sstream>
+
 #include "BroadcastHelper.h"
 #include "ChatHelper.h"
 #include "Creature.h"
@@ -8,6 +11,13 @@
 #include "GossipDef.h"
 #include "GridTerrainData.h"
 #include "IVMapMgr.h"
+#include "Item.h"
+#include "ItemTemplate.h"
+#include "LootMgr.h"
+#include "Map.h"
+#include "ModelIgnoreFlags.h"
+#include "MotionMaster.h"
+#include "MoveSplineInitArgs.h"
 #include "NewRpgInfo.h"
 #include "NewRpgStrategy.h"
 #include "Object.h"
@@ -27,384 +37,266 @@
 #include "Random.h"
 #include "RandomPlayerbotMgr.h"
 #include "SharedDefines.h"
+#include "Spell.h"
+#include "SpellInfo.h"
+#include "SpellMgr.h"
 #include "StatsWeightCalculator.h"
 #include "Timer.h"
 #include "TravelMgr.h"
-#include "TravelNode.h"
 
-bool NewRpgBaseAction::FollowTravelPath()
-{
-    NewRpgInfo& info = botAI->rpgInfo;
-    if (!info.HasTravelPath())
-        return false;
-
-    // Still moving on a previous spline — wait
-    if (!bot->movespline->Finalized())
-        return true;
-
-    std::vector<PathNodePoint> fullPath = info.travelPath.getPath();
-    WorldPosition currentPos(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
-
-    // Find closest point on path to current position
-    float minDist = std::numeric_limits<float>::max();
-    size_t startIdx = 0;
-    for (size_t i = 0; i < fullPath.size(); ++i)
-    {
-        if (fullPath[i].point.GetMapId() != bot->GetMapId())
-            continue;
-        float dist = fullPath[i].point.distance(currentPos);
-        if (dist < minDist)
-        {
-            minDist = dist;
-            startIdx = i;
-        }
-    }
-
-    // Collect walk points from startIdx until we hit a non-walk node or end
-    Movement::PointsArray walkPoints;
-    walkPoints.push_back(G3D::Vector3(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ()));
-
-    size_t nextIdx = startIdx;
-    for (size_t i = startIdx; i < fullPath.size(); ++i)
-    {
-        const PathNodePoint& p = fullPath[i];
-        if (p.point.GetMapId() != bot->GetMapId())
-            break;
-        if (p.type != NODE_PATH && p.type != NODE_NODE && p.type != NODE_PREPATH)
-        {
-            nextIdx = i;
-            break;
-        }
-        walkPoints.push_back(G3D::Vector3(p.point.GetPositionX(), p.point.GetPositionY(), p.point.GetPositionZ()));
-        nextIdx = i + 1;
-    }
-
-    // If we collected walk points, send them to the motion master as a spline
-    if (walkPoints.size() > 1)
-    {
-        MotionMaster* mm = bot->GetMotionMaster();
-        mm->Clear();
-        mm->MoveSplinePath(&walkPoints, FORCED_MOVEMENT_RUN);
-        return true;
-    }
-
-    // No walk points — check what's at the current position
-    if (nextIdx < fullPath.size() && fullPath[nextIdx].type == NODE_FLIGHTPATH)
-    {
-        // Need to be within interaction distance of the flight master to take off
-        if (minDist > INTERACTION_DISTANCE)
-        {
-            MoveFarTo(fullPath[nextIdx].point);
-            return true;
-        }
-
-        // Find departure and arrival flight path points
-        WorldPosition departurePos = fullPath[nextIdx].point;
-        WorldPosition arrivalPos;
-        for (size_t i = nextIdx + 1; i < fullPath.size(); ++i)
-        {
-            if (fullPath[i].type == NODE_FLIGHTPATH)
-            {
-                arrivalPos = fullPath[i].point;
-                break;
-            }
-        }
-
-        if (arrivalPos == WorldPosition())
-        {
-            info.travelPath.clear();
-            return false;
-        }
-
-        ObjectGuid flightMasterGuid = sTravelMgr.GetNearestFlightMasterGuid(bot);
-        if (!flightMasterGuid)
-        {
-            info.travelPath.clear();
-            return false;
-        }
-
-        uint32 fromNode = sObjectMgr->GetNearestTaxiNode(
-            departurePos.GetPositionX(), departurePos.GetPositionY(), departurePos.GetPositionZ(),
-            departurePos.GetMapId(), bot->GetTeamId());
-        uint32 toNode = sObjectMgr->GetNearestTaxiNode(
-            arrivalPos.GetPositionX(), arrivalPos.GetPositionY(), arrivalPos.GetPositionZ(),
-            arrivalPos.GetMapId(), bot->GetTeamId());
-
-        if (!fromNode || !toNode)
-        {
-            info.travelPath.clear();
-            return false;
-        }
-
-        std::vector<uint32> taxiPath = sTravelNodeMap.FindTaxiPath(fromNode, toNode);
-        if (taxiPath.empty())
-        {
-            info.travelPath.clear();
-            return false;
-        }
-
-        info.ChangeToTravelFlight(flightMasterGuid, std::move(taxiPath));
-        return true;
-    }
-
-    // Path exhausted or unsupported node type
-    info.travelPath.clear();
-    return false;
-}
 
 bool NewRpgBaseAction::MoveFarTo(WorldPosition dest)
 {
     if (dest == WorldPosition())
-        return false;
-
-    if (dest != botAI->rpgInfo.moveFarPos)
     {
-        // clear stuck information if it's a new dest
-        botAI->rpgInfo.SetMoveFarTo(dest);
-    }
-
-    // performance optimization
-    if (IsWaitingForLastMove(MovementPriority::MOVEMENT_NORMAL))
-    {
+        EmitDebugMove("MoveFar", "empty-dest", 0.0f, 0.0f, 0.0f);
         return false;
     }
 
-    // Let previously committed movement finish before recomputing.
-    //
-    // MoveTo internally caps its stored delay at maxWaitForMove
-    // (default 5s), but a long path (200+ yd routed around a
-    // mountain) takes 30+ seconds to walk. After 5s
-    // IsWaitingForLastMove returns false and MoveFarTo re-enters.
-    // Without this gate, DoMovePoint would call mm->Clear() and
-    // reissue MovePoint from the new bot position — and from a new
-    // position mmap's partial-path endpoint often differs, so the
-    // bot gets clobbered mid-walk and ends up oscillating (e.g.
-    // cave entrance -> inside cave -> cave entrance -> mountain
-    // base -> cave entrance...) around an unreachable destination.
-    //
-    // If the bot is still actively walking toward its last
-    // committed point on the same map, just let the current spline
-    // finish. The stuck counter below continues to track real
-    // progress toward dest and triggers teleport recovery if the
-    // committed paths genuinely aren't closing the gap.
+    UpdateMovementState();
+
+    if (!IsMovingAllowed())
     {
-        LastMovement& lastMove = AI_VALUE(LastMovement&, "last movement");
-        if (bot->isMoving() && lastMove.lastMoveToMapId == bot->GetMapId())
+        EmitDebugMove("MoveFar", "cant-move",
+                      dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ());
+        return false;
+    }
+
+    // Resume a transport ride if we're still on the same boat as last tick.
+    if (WaitForTransport())
+        return true;
+
+    WorldPosition botPos(bot);
+    LastMovement& lastMove = AI_VALUE(LastMovement&, "last movement");
+
+    // Short-stop: at destination — stop and clear the cached path.
+    {
+        float const totalDistance = botPos.distance(dest);
+        if (totalDistance < sPlayerbotAIConfig.targetPosRecalcDistance)
         {
-            float remaining = bot->GetExactDist(lastMove.lastMoveToX, lastMove.lastMoveToY, lastMove.lastMoveToZ);
-            if (remaining > 10.0f)
-                return true;
+            if (!lastMove.lastPath.empty() &&
+                lastMove.lastPath.getBack().distance(dest) <= totalDistance)
+                lastMove.clear();
+            bot->StopMoving();
+            EmitDebugMove("MoveFar", "arrived",
+                          dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ());
+            return false;
         }
     }
 
-    // stuck check
-    float disToDest = bot->GetDistance(dest);
-    // Require a meaningful improvement (5yd) to reset the stuck counter.
-    // The old 1yd threshold was small enough that bots oscillating back
-    // and forth around an obstacle would keep "making progress" forever
-    // and never trigger the teleport recovery below.
-    if (disToDest + 5.0f < botAI->rpgInfo.nearestMoveFarDis)
+    // Per-tick re-resolve: rebuild the TravelPath from the bot's current
+    // position every tick (10% reuse short-circuits via the cached
+    // lastPath). Recovers naturally from knockback, off-route drift,
+    // destination changes, and blocked waypoints.
+    TravelPath path = ResolveMovePath(botPos, dest, lastMove);
+    lastMove.setPath(path);
+
+    if (path.empty())
     {
-        botAI->rpgInfo.nearestMoveFarDis = disToDest;
-        botAI->rpgInfo.stuckTs = getMSTime();
-        botAI->rpgInfo.stuckAttempts = 0;
-    }
-    else if (++botAI->rpgInfo.stuckAttempts >= 5 && GetMSTimeDiffToNow(botAI->rpgInfo.stuckTs) >= stuckTime)
-    {
-        // No meaningful progress toward dest for `stuckTime`: fall
-        // back to teleporting directly so the bot can get on with
-        // its RPG objective instead of oscillating indefinitely.
-        botAI->rpgInfo.stuckTs = getMSTime();
-        botAI->rpgInfo.stuckAttempts = 0;
-        const AreaTableEntry* entry = sAreaTableStore.LookupEntry(bot->GetZoneId());
-        std::string zone_name = PlayerbotAI::GetLocalizedAreaName(entry);
-        LOG_DEBUG(
-            "playerbots",
-            "[New RPG] Teleport {} from ({},{},{},{}) to ({},{},{},{}) as it stuck when moving far - Zone: {} ({})",
-            bot->GetName(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ(), bot->GetMapId(),
-            dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ(), dest.GetMapId(), bot->GetZoneId(),
-            zone_name);
-        bot->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TELEPORTED | AURA_INTERRUPT_FLAG_CHANGE_MAP);
-        return bot->TeleportTo(dest);
+        EmitDebugMove("MoveFar", "no-path",
+                      dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ());
+        return false;
     }
 
-    float dis = bot->GetExactDist(dest);
-    if (dis < pathFinderDis)
+    // Trim leading waypoints behind the bot, bridge with mmap probe if
+    // the new head requires it. May empty the path (collapsed) — let
+    // the next tick rebuild from a fresh start.
+    path.makeShortCut(botPos, sPlayerbotAIConfig.reactDistance, bot);
+    if (path.empty())
+        return true;
+
+    // Special head segment (portal / area-trigger / transport / flight)?
+    // UpcommingSpecialMovement cuts the path so the head is the special;
+    // HandleSpecialMovement dispatches the matching action.
+    bool const onTransport = bot->GetTransport() != nullptr;
+    if (path.UpcommingSpecialMovement(botPos,
+                                      sPlayerbotAIConfig.reactDistance,
+                                      onTransport))
     {
-        return MoveTo(dest.GetMapId(), dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ(), false, false,
-                      false, true);
+        if (HandleSpecialMovement(path))
+            return true;
+        // Special handler declined (e.g. AREA_TRIGGER with entry → caller
+        // dispatches the walk into the trigger volume). Fall through.
     }
 
-    const uint32 typeOk = PATHFIND_NORMAL | PATHFIND_INCOMPLETE | PATHFIND_FARFROMPOLY;
+    // Transport guard: bot is on a transport but no special movement
+    // applies this tick — don't dispatch a walk spline (would fight the
+    // transport's own movement).
+    if (onTransport)
+        return false;
 
-    // Primary strategy: ask mmap for a route to the TRUE destination.
-    // If mmap can reach it directly (PATHFIND_NORMAL) or partially
-    // (PATHFIND_INCOMPLETE — destinations beyond the smooth-path cap
-    // of ~296 yards, or where local geometry blocks the final step),
-    // walk to the furthest reachable waypoint mmap computed. This
-    // lets bots follow the real route around obstacles (mountains,
-    // cave walls, cliffs) instead of trying to cut straight through.
-    // The spline system walks the whole returned path smoothly, so
-    // subsequent ticks early-out via IsWaitingForLastMove and no
-    // further PathGenerator calls fire until the bot arrives.
+    // ClipPath — truncate at first hostile creature in range / non-walkable
+    // hop / drifted past reactDistance / > 125 sqDist jump.
+    path.ClipPath(botAI, bot, false);
+    if (path.empty())
+        return false;
+
+    // Walk dispatch.
+    std::vector<WorldPosition> const& pts = path.getPointPath();
+    Movement::PointsArray points;
+    points.reserve(pts.size());
+    for (auto const& wp : pts)
+        points.emplace_back(wp.GetPositionX(), wp.GetPositionY(), wp.GetPositionZ());
+
+    if (points.size() < 2)
     {
-        PathGenerator path(bot);
-        path.CalculatePath(dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ());
-        PathType type = path.GetPathType();
-        bool canReach = !(type & (~typeOk));
-        if (canReach)
+        // Single-point fallback path (cmangos pattern: ResolveMovePath
+        // emits a single dest point if nothing else worked). Hand it
+        // to the engine's MovePoint via MoveTo.
+        EmitDebugMove("MoveFar", "single-point",
+                      dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ());
+        return MoveTo(dest.GetMapId(), dest.GetPositionX(),
+                      dest.GetPositionY(), dest.GetPositionZ(),
+                      false, false, false, false);
+    }
+
+    if (!bot->IsMounted() && !bot->IsInCombat() &&
+        bot->IsOutdoors() && bot->IsAlive())
+        botAI->DoSpecificAction("check mount state", Event(), true);
+
+    return DispatchPathPoints(dest, points, "walk");
+}
+
+bool NewRpgBaseAction::DispatchPathPoints(WorldPosition const& dest,
+                                          Movement::PointsArray& points,
+                                          char const* label)
+{
+    if (points.size() < 2)
+        return false;
+
+    // MoveFarTo runs makeShortCut + setPath upstream now, so no need
+    // for the local prefix-trim or lastMove.setPath here.
+
+    for (auto& pt : points)
+        bot->UpdateAllowedPositionZ(pt.x, pt.y, pt.z);
+
+    // ClipPath now runs at MoveFarTo level on the TravelPath before the
+    // points array is built. No per-dispatch clip here.
+
+    if (points.size() < 2)
+        return false;
+
+    G3D::Vector3 const& last = points.back();
+
+    float totalDist = 0.f;
+    for (size_t i = 1; i < points.size(); ++i)
+        totalDist += (points[i] - points[i - 1]).length();
+
+    LastMovement& lastMove = AI_VALUE(LastMovement&, "last movement");
+
+    // Skip cosmetic walking for random bots with no nearby player —
+    // teleport to the path tail and schedule a cooldown instead.
+    if (sRandomPlayerbotMgr.IsRandomBot(bot))
+    {
+        WorldPosition tail(dest.GetMapId(), last.x, last.y, last.z);
+        time_t now = time(nullptr);
+        if (totalDist > sPlayerbotAIConfig.reactDistance &&
+            lastMove.nextTeleport <= now &&
+            !botAI->HasPlayerNearby(&tail))
         {
-            const G3D::Vector3& endPos = path.GetActualEndPosition();
-            // Only commit if the mmap endpoint actually makes progress
-            // toward the destination. For pathological INCOMPLETE
-            // results (e.g. disconnected polys that still report
-            // INCOMPLETE) the endpoint can land right under the bot;
-            // fall through to cone sampling in that case.
-            float endDistToDest = dest.GetExactDist(endPos.x, endPos.y, endPos.z);
-            if (endDistToDest + 5.0f < disToDest)
-            {
-                return MoveTo(bot->GetMapId(), endPos.x, endPos.y, endPos.z, false, false, false, true);
-            }
+            float speed = std::max(bot->GetSpeed(MOVE_RUN), 0.1f);
+            lastMove.nextTeleport = now + (time_t)(totalDist / speed);
+
+            EmitDebugMove("MoveFar", "teleport",
+                          tail.GetPositionX(), tail.GetPositionY(), tail.GetPositionZ());
+
+            WorldPosition botPos(bot);
+            return bot->TeleportTo(dest.GetMapId(),
+                                   tail.GetPositionX(), tail.GetPositionY(),
+                                   tail.GetPositionZ(),
+                                   botPos.getAngleTo(tail));
         }
     }
 
-    // Fallback: mmap couldn't route to the destination. Sample the
-    // forward cone for a reachable stepping stone so the bot keeps
-    // moving and can try again from a new vantage point. Cap at 2
-    // samples — we already spent one PathGenerator call above and at
-    // 3000 bots every extra CalculatePath matters.
-    float minDelta = M_PI;
-    const float x = bot->GetPositionX();
-    const float y = bot->GetPositionY();
-    const float z = bot->GetPositionZ();
-    const float baseAngle = bot->GetAngle(&dest);
-    float rx, ry, rz;
-    bool found = false;
-    for (int attempt = 0; attempt < 2; ++attempt)
+    // Match master's walk pace when they're walking and within 5y.
+    ForcedMovement moveMode = FORCED_MOVEMENT_RUN;
+    if (Player* master = botAI->GetMaster())
     {
-        float delta = (rand_norm() - 0.5f) * static_cast<float>(M_PI);  // ±π/2, forward cone
-        float sampleDis = (0.5f + rand_norm() * 0.5f) * pathFinderDis;
-        float angle = baseAngle + delta;
-        float dx = x + cos(angle) * sampleDis;
-        float dy = y + sin(angle) * sampleDis;
-        float dz = z + 0.5f;
-        PathGenerator path(bot);
-        path.CalculatePath(dx, dy, dz);
-        PathType type = path.GetPathType();
-        bool canReach = !(type & (~typeOk));
-
-        if (canReach && fabs(delta) <= minDelta)
+        if (bot->IsFriendlyTo(master) && master->IsWalking() &&
+            bot->GetExactDist2d(master) < 5.0f)
         {
-            found = true;
-            const G3D::Vector3& endPos = path.GetActualEndPosition();
-            rx = endPos.x;
-            ry = endPos.y;
-            rz = endPos.z;
-            minDelta = fabs(delta);
+            moveMode = FORCED_MOVEMENT_WALK;
         }
     }
-    if (found)
-    {
-        return MoveTo(bot->GetMapId(), rx, ry, rz, false, false, false, true);
-    }
-    return false;
+
+    // Clear emote/sit/cast so the spline can begin cleanly.
+    bot->ClearEmoteState();
+    if (!bot->IsStandState())
+        bot->SetStandState(UNIT_STAND_STATE_STAND);
+    if (bot->IsNonMeleeSpellCast(true))
+        bot->InterruptNonMeleeSpells(true);
+
+    bot->GetMotionMaster()->Clear();
+    bot->GetMotionMaster()->MoveSplinePath(&points, moveMode);
+
+    EmitDebugMove("MoveFar", label, last.x, last.y, last.z);
+
+    // WaitForReach: leave ~10y headroom on long paths.
+    float waitDist = totalDist > sPlayerbotAIConfig.reactDistance
+                         ? std::max(totalDist - 10.0f, 0.0f) : totalDist;
+    UnitMoveType const speedType = (moveMode == FORCED_MOVEMENT_WALK) ? MOVE_WALK : MOVE_RUN;
+    float speed = std::max(bot->GetSpeed(speedType), 0.1f);
+    float duration = 1000.0f * (waitDist / speed) + sPlayerbotAIConfig.reactDelay;
+    duration = std::min(duration, (float)sPlayerbotAIConfig.maxWaitForMove);
+    if (duration < 0.0f)
+        duration = 0.0f;
+
+    lastMove.Set(bot->GetMapId(), last.x, last.y, last.z,
+                 bot->GetOrientation(), (uint32)duration,
+                 MovementPriority::MOVEMENT_NORMAL);
+
+    return true;
 }
 
 bool NewRpgBaseAction::MoveWorldObjectTo(ObjectGuid guid, float distance)
 {
-    if (IsWaitingForLastMove(MovementPriority::MOVEMENT_NORMAL))
-        return false;
-
     WorldObject* object = botAI->GetWorldObject(guid);
     if (!object)
         return false;
-    float x = object->GetPositionX();
-    float y = object->GetPositionY();
-    float z = object->GetPositionZ();
-    float mapId = object->GetMapId();
-    float angle = 0.f;
 
-    if (!object->ToUnit() || !object->ToUnit()->isMoving())
-        angle = object->GetAngle(bot) + (M_PI * irand(-25, 25) / 100.0);  // Closest 45 degrees towards the target
-    else
-        angle = object->GetOrientation() +
-                (M_PI * irand(-25, 25) / 100.0);  // 45 degrees infront of target (leading it's movement)
+    Map* map = bot->GetMap();
+    if (!map)
+        return false;
 
-    float rnd = rand_norm();
-    x += cos(angle) * distance * rnd;
-    y += sin(angle) * distance * rnd;
-    if (!object->GetMap()->CheckCollisionAndGetValidCoords(object, object->GetPositionX(), object->GetPositionY(),
-                                                           object->GetPositionZ(), x, y, z))
+    // 8 angles around the target starting at the bot's preferred follow
+    // angle (group-aware spread). For each angle, ask the engine for a
+    // valid nearby ground point at the requested distance — that snaps
+    // to terrain/collision. LOS check ignores M2 models so long-distance
+    // NPCs through forested terrain still pass; the mmap probe in
+    // MoveFarTo is the authoritative reachability check.
+    float const followAngle = GetFollowAngle();
+    float const searchSize = bot->GetObjectSize();
+
+    for (float step = 0.0f; step < 2.0f * static_cast<float>(M_PI);
+         step += static_cast<float>(M_PI) / 4.0f)
     {
-        x = object->GetPositionX();
-        y = object->GetPositionY();
-        z = object->GetPositionZ();
+        float const angle = followAngle + step;
+        float x = object->GetPositionX();
+        float y = object->GetPositionY();
+        float z = object->GetPositionZ();
+        object->GetNearPoint(bot, x, y, z, searchSize, distance, angle);
+
+        if (!bot->IsWithinLOS(x, y, z + bot->GetCollisionHeight(),
+                              VMAP::ModelIgnoreFlags::M2))
+            continue;
+
+        return MoveFarTo(WorldPosition(object->GetMapId(), x, y, z));
     }
-    return MoveTo(mapId, x, y, z, false, false, false, true);
+
+    return false;
 }
 
 bool NewRpgBaseAction::MoveRandomNear(float moveStep, MovementPriority priority, WorldObject* center)
 {
-    if (IsWaitingForLastMove(priority))
-    {
-        LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: waiting for last move", bot->GetName());
-        return false;
+    float const distance = (0.4f + rand_norm() * 0.6f) * moveStep;
+    float const angle = (float)rand_norm() * 2 * static_cast<float>(M_PI);
+    float const dx = bot->GetPositionX() + distance * cos(angle);
+    float const dy = bot->GetPositionY() + distance * sin(angle);
+    float const dz = bot->GetPositionZ();
 
-    Map* map = bot->GetMap();
-    const float x = center ? center->GetPositionX() : bot->GetPositionX();
-    const float y = center ? center->GetPositionY() : bot->GetPositionY();
-    const float z = center ? center->GetPositionZ() : bot->GetPositionZ();
-    // Previously: attempts = 1. A single random sample often landed in
-    // water / blocked geometry / unreachable poly, the function returned
-    // false, and the caller had no fallback — bot stood still. Retry a
-    // handful of times with a fresh distance each loop so a bad roll
-    // doesn't lock the bot in place.
-    for (int attempt = 0; attempt < 8; ++attempt)
-    {
-        float distance = (0.4f + rand_norm() * 0.6f) * moveStep;
-        float angle = (float)rand_norm() * 2 * static_cast<float>(M_PI);
-        float dx = x + distance * cos(angle);
-        float dy = y + distance * sin(angle);
-        float dz = z;
-
-        PathGenerator path(bot);
-        path.CalculatePath(dx, dy, dz);
-        PathType type = path.GetPathType();
-        uint32 typeOk = PATHFIND_NORMAL | PATHFIND_INCOMPLETE | PATHFIND_FARFROMPOLY;
-        bool canReach = !(type & (~typeOk));
-
-        if (!canReach)
-        {
-            LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: path type {} not reachable (from {:.1f},{:.1f},{:.1f} to {:.1f},{:.1f},{:.1f})",
-                bot->GetName(), type, x, y, z, dx, dy, dz);
-            continue;
-        }
-
-        if (!map->CanReachPositionAndGetValidCoords(bot, dx, dy, dz))
-        {
-            LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: CanReachPositionAndGetValidCoords failed (to {:.1f},{:.1f},{:.1f})",
-                bot->GetName(), dx, dy, dz);
-            continue;
-        }
-
-        if (map->IsInWater(bot->GetPhaseMask(), dx, dy, dz, bot->GetCollisionHeight()))
-        {
-            LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: target is in water ({:.1f},{:.1f},{:.1f})",
-                bot->GetName(), dx, dy, dz);
-            continue;
-        }
-
-        bool moved = MoveTo(bot->GetMapId(), dx, dy, dz, false, false, false, true, priority);
-        if (moved)
-            return true;
-
-        LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: MoveTo failed (to {:.1f},{:.1f},{:.1f})",
-            bot->GetName(), dx, dy, dz);
-    }
-
-    LOG_DEBUG("playerbots", "[NEW RPG] Bot {} MoveRandomNear: all attempts exhausted (moveStep={:.1f}, center={})",
-        bot->GetName(), moveStep, center ? center->GetName() : "self");
-    return false;
+    bool moved = MoveTo(bot->GetMapId(), dx, dy, dz, false, false, false, true, priority);
+    EmitDebugMove("MoveRandomNear", moved ? "mmap" : "fail", dx, dy, dz);
+    return moved;
 }
 
 bool NewRpgBaseAction::ForceToWait(uint32 duration, MovementPriority priority)
@@ -412,6 +304,29 @@ bool NewRpgBaseAction::ForceToWait(uint32 duration, MovementPriority priority)
     AI_VALUE(LastMovement&, "last movement")
         .Set(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ(), bot->GetOrientation(),
              duration, priority);
+    return true;
+}
+
+bool NewRpgBaseAction::TakeFlight(std::vector<uint32> const& taxiNodes, Creature* flightMaster)
+{
+    if (taxiNodes.size() < 2 || !flightMaster || !flightMaster->IsAlive())
+        return false;
+
+    botAI->RemoveShapeshift();
+    if (bot->IsMounted())
+        bot->Dismount();
+
+    if (!bot->ActivateTaxiPathTo(taxiNodes, flightMaster, 0))
+    {
+        LOG_DEBUG("playerbots", "[New RPG] Bot {} flight ({} nodes, {} to {}) failed",
+                  bot->GetName(), taxiNodes.size(), taxiNodes.front(), taxiNodes.back());
+        return false;
+    }
+
+    LOG_DEBUG("playerbots", "[New RPG] Bot {} taking flight ({} nodes, {} to {})",
+              bot->GetName(), taxiNodes.size(), taxiNodes.front(), taxiNodes.back());
+    EmitDebugMove("Flight:taxi", "taxi", flightMaster->GetPositionX(), flightMaster->GetPositionY(),
+                  flightMaster->GetPositionZ());
     return true;
 }
 
@@ -826,6 +741,576 @@ bool NewRpgBaseAction::SearchQuestGiverAndAcceptOrReward()
     return false;
 }
 
+static bool BotNeedsItemForQuest(Player* bot, uint32 itemId)
+{
+    for (uint16 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 questId = bot->GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+        if (bot->GetQuestStatus(questId) != QUEST_STATUS_INCOMPLETE)
+            continue;
+        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+        if (!quest)
+            continue;
+        QuestStatusData const& qs = bot->getQuestStatusMap().at(questId);
+        for (int i = 0; i < QUEST_ITEM_OBJECTIVES_COUNT; ++i)
+        {
+            if (!quest->RequiredItemCount[i])
+                continue;
+            if (qs.ItemCount[i] >= quest->RequiredItemCount[i])
+                continue;
+            if (quest->RequiredItemId[i] == itemId)
+                return true;
+        }
+    }
+    return false;
+}
+
+bool NewRpgBaseAction::TryLootQuestGO(ObjectGuid& pursuedGO, float searchRange)
+{
+    if (!bot->IsAlive() || bot->IsBeingTeleported() || bot->IsInFlight() ||
+        bot->GetVehicle() || bot->GetTransport())
+        return false;
+
+    // valid = spawned, selectable, holds a quest item we still need.
+    // INTERACT_COND is fine — ConditionMgr already gates on quest state.
+    auto isValidTarget = [&](GameObject* go) -> bool
+    {
+        if (!go || !go->IsInWorld() || !go->isSpawned())
+            return false;
+        if (!(go->GetPhaseMask() & bot->GetPhaseMask()))
+            return false;
+        if (go->HasGameObjectFlag(GO_FLAG_NOT_SELECTABLE))
+            return false;
+        GameObjectTemplate const* info = go->GetGOInfo();
+        if (!info)
+            return false;
+
+        // per-player quest drops via gameobject_questitem (Webwood Eggs…)
+        if (GameObjectQuestItemList const* items =
+                sObjectMgr->GetGameObjectQuestItemList(go->GetEntry()))
+        {
+            for (size_t i = 0; i < MAX_GAMEOBJECT_QUEST_ITEMS && i < items->size(); ++i)
+            {
+                uint32 itemId = uint32((*items)[i]);
+                if (!itemId)
+                    continue;
+                if (BotNeedsItemForQuest(bot, itemId))
+                    return true;
+            }
+        }
+
+        // standard loot template (chests, fishing holes)
+        if (uint32 lootId = info->GetLootId())
+        {
+            if (LootTemplates_Gameobject.HaveQuestLootForPlayer(lootId, bot))
+                return true;
+        }
+        return false;
+    };
+
+    // 2.5y sits inside the 3.5y loot gate with headroom
+    const float lootRange = 2.5f;
+
+    // stick with the committed target — re-picking nearest every tick
+    // causes zig-zag walks in dense spawn clusters
+    if (pursuedGO)
+    {
+        GameObject* existing = botAI->GetGameObject(pursuedGO);
+        if (existing && isValidTarget(existing) &&
+            bot->GetDistance(existing) <= searchRange)
+        {
+            if (bot->GetDistance(existing) > lootRange)
+                return MoveWorldObjectTo(existing->GetGUID(), lootRange);
+            // in range — loot strategy opens it
+            return true;
+        }
+        pursuedGO.Clear();
+    }
+
+    GuidVector possibleGameObjects = AI_VALUE(GuidVector, "possible new rpg game objects");
+    if (possibleGameObjects.empty())
+        return false;
+
+    GameObject* best = nullptr;
+    float bestDist = searchRange;
+    for (ObjectGuid guid : possibleGameObjects)
+    {
+        GameObject* go = botAI->GetGameObject(guid);
+        if (!isValidTarget(go))
+            continue;
+        float d = bot->GetDistance(go);
+        if (d >= bestDist)
+            continue;
+        best = go;
+        bestDist = d;
+    }
+    if (!best)
+        return false;
+
+    // commit
+    pursuedGO = best->GetGUID();
+
+    if (bot->GetDistance(best) > lootRange)
+        return MoveWorldObjectTo(best->GetGUID(), lootRange);
+
+    // in range — consume the tick so we don't fall through to wander
+    return true;
+}
+
+bool NewRpgBaseAction::TryUseQuestGO(ObjectGuid& pursuedGO, float searchRange)
+{
+    if (!bot->IsAlive() || bot->IsBeingTeleported() || bot->IsInFlight() ||
+        bot->GetVehicle() || bot->GetTransport())
+        return false;
+
+    std::unordered_set<uint32> neededGoEntries;
+    for (uint16 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 questId = bot->GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+        if (bot->GetQuestStatus(questId) != QUEST_STATUS_INCOMPLETE)
+            continue;
+        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+        if (!quest)
+            continue;
+        QuestStatusData const& qs = bot->getQuestStatusMap().at(questId);
+        for (int i = 0; i < QUEST_OBJECTIVES_COUNT; ++i)
+        {
+            int32 entry = quest->RequiredNpcOrGo[i];
+            if (entry >= 0)
+                continue;
+            if (qs.CreatureOrGOCount[i] >= quest->RequiredNpcOrGoCount[i])
+                continue;
+            neededGoEntries.insert(uint32(-entry));
+        }
+    }
+    if (neededGoEntries.empty())
+        return false;
+
+    auto isValidTarget = [&](GameObject* go) -> bool
+    {
+        if (!go || !go->IsInWorld() || !go->isSpawned())
+            return false;
+        if (!(go->GetPhaseMask() & bot->GetPhaseMask()))
+            return false;
+        if (go->HasGameObjectFlag(GO_FLAG_NOT_SELECTABLE))
+            return false;
+        return neededGoEntries.count(go->GetEntry()) > 0;
+    };
+
+    // commitment first
+    if (pursuedGO)
+    {
+        GameObject* existing = botAI->GetGameObject(pursuedGO);
+        if (existing && isValidTarget(existing) &&
+            bot->GetDistance(existing) <= searchRange)
+        {
+            if (bot->GetDistance(existing) > INTERACTION_DISTANCE)
+                return MoveWorldObjectTo(existing->GetGUID(), INTERACTION_DISTANCE);
+            existing->Use(bot);
+            ForceToWait(2000);
+            pursuedGO.Clear();
+            return true;
+        }
+        pursuedGO.Clear();
+    }
+
+    GuidVector possibleGameObjects = AI_VALUE(GuidVector, "possible new rpg game objects");
+    GameObject* best = nullptr;
+    float bestDist = searchRange;
+    for (ObjectGuid guid : possibleGameObjects)
+    {
+        GameObject* go = botAI->GetGameObject(guid);
+        if (!isValidTarget(go))
+            continue;
+        float d = bot->GetDistance(go);
+        if (d >= bestDist)
+            continue;
+        best = go;
+        bestDist = d;
+    }
+    if (!best)
+        return false;
+
+    pursuedGO = best->GetGUID();
+
+    if (bot->GetDistance(best) > INTERACTION_DISTANCE)
+        return MoveWorldObjectTo(best->GetGUID(), INTERACTION_DISTANCE);
+
+    best->Use(bot);
+    ForceToWait(2000);
+    pursuedGO.Clear();
+    return true;
+}
+
+bool NewRpgBaseAction::TryUseQuestItem(ObjectGuid& pursuedGO, ObjectGuid& pursuedTarget, float searchRange)
+{
+    if (!bot->IsAlive() || bot->IsBeingTeleported() || bot->IsInFlight() ||
+        bot->GetVehicle() || bot->GetTransport())
+        return false;
+
+    std::unordered_set<uint32> candidateItemEntries;
+    // src items (the quest gave the bot a single item to use); branch C
+    // (self/area cast) is only safe to fire on these — auto-firing every
+    // ItemDrop on self can burn kill-credit sentinels and trigger
+    // unintended scripted side effects.
+    std::unordered_set<uint32> srcItemEntries;
+    std::unordered_set<uint32> neededCreatureEntries;
+    for (uint16 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 questId = bot->GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+        if (bot->GetQuestStatus(questId) != QUEST_STATUS_INCOMPLETE)
+            continue;
+        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+        if (!quest)
+            continue;
+        if (uint32 src = quest->GetSrcItemId())
+        {
+            candidateItemEntries.insert(src);
+            srcItemEntries.insert(src);
+        }
+        // handed out by the quest (brands, flares, nets, standards)
+        for (int i = 0; i < QUEST_SOURCE_ITEM_IDS_COUNT; ++i)
+        {
+            if (uint32 drop = quest->ItemDrop[i])
+                candidateItemEntries.insert(drop);
+        }
+        QuestStatusData const& qs = bot->getQuestStatusMap().at(questId);
+        for (int i = 0; i < QUEST_OBJECTIVES_COUNT; ++i)
+        {
+            int32 entry = quest->RequiredNpcOrGo[i];
+            if (entry <= 0)
+                continue;
+            if (qs.CreatureOrGOCount[i] >= quest->RequiredNpcOrGoCount[i])
+                continue;
+            neededCreatureEntries.insert(uint32(entry));
+        }
+    }
+    if (candidateItemEntries.empty())
+        return false;
+
+    for (uint32 itemEntry : candidateItemEntries)
+    {
+        Item* item = bot->GetItemByEntry(itemEntry);
+        if (!item)
+            continue;
+        ItemTemplate const* proto = item->GetTemplate();
+        if (!proto)
+            continue;
+        uint32 useSpellId = 0;
+        for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+        {
+            if (proto->Spells[i].SpellTrigger != ITEM_SPELLTRIGGER_ON_USE)
+                continue;
+            if (proto->Spells[i].SpellId <= 0)
+                continue;
+            useSpellId = proto->Spells[i].SpellId;
+            break;
+        }
+        if (!useSpellId)
+            continue;
+        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(useSpellId);
+        if (!spellInfo)
+            continue;
+
+        // A: spell needs a focus GO (moonwell / lectern / anvil)
+        if (uint32 focusId = spellInfo->RequiresSpellFocus)
+        {
+            auto focusRadius = [](GameObject* go) -> float
+            {
+                GameObjectTemplate const* info = go->GetGOInfo();
+                // half radius so we end up inside, not on the rim
+                return std::max<float>(1.0f, float(info->spellFocus.dist) * 0.5f);
+            };
+            auto isValidFocus = [&](GameObject* go) -> bool
+            {
+                if (!go || !go->IsInWorld() || !go->isSpawned())
+                    return false;
+                if (!(go->GetPhaseMask() & bot->GetPhaseMask()))
+                    return false;
+                if (go->HasGameObjectFlag(GO_FLAG_NOT_SELECTABLE))
+                    return false;
+                GameObjectTemplate const* info = go->GetGOInfo();
+                if (!info || info->type != GAMEOBJECT_TYPE_SPELL_FOCUS)
+                    return false;
+                return info->spellFocus.focusId == focusId;
+            };
+
+            // commitment first
+            if (pursuedGO)
+            {
+                GameObject* existing = botAI->GetGameObject(pursuedGO);
+                if (existing && isValidFocus(existing) &&
+                    bot->GetDistance(existing) <= searchRange)
+                {
+                    float radius = focusRadius(existing);
+                    if (bot->GetDistance(existing) > radius)
+                        return MoveWorldObjectTo(existing->GetGUID(), radius);
+                    SpellCastTargets targets;
+                    bot->CastItemUseSpell(item, targets, 1, 0);
+                    ForceToWait(2000);
+                    pursuedGO.Clear();
+                    return true;
+                }
+                pursuedGO.Clear();
+            }
+
+            GuidVector possibleGameObjects = AI_VALUE(GuidVector, "possible new rpg game objects");
+            GameObject* best = nullptr;
+            float bestDist = searchRange;
+            float bestRadius = INTERACTION_DISTANCE;
+            for (ObjectGuid guid : possibleGameObjects)
+            {
+                GameObject* go = botAI->GetGameObject(guid);
+                if (!isValidFocus(go))
+                    continue;
+                float d = bot->GetDistance(go);
+                if (d >= bestDist)
+                    continue;
+                best = go;
+                bestDist = d;
+                bestRadius = focusRadius(go);
+            }
+            if (best)
+            {
+                pursuedGO = best->GetGUID();
+                if (bot->GetDistance(best) > bestRadius)
+                    return MoveWorldObjectTo(best->GetGUID(), bestRadius);
+                SpellCastTargets targets;
+                bot->CastItemUseSpell(item, targets, 1, 0);
+                ForceToWait(2000);
+                pursuedGO.Clear();
+                return true;
+            }
+            continue;
+        }
+
+        // B: spell needs a unit target — walk to the required creature
+        if (spellInfo->NeedsExplicitUnitTarget() && !neededCreatureEntries.empty())
+        {
+            auto isValidCreature = [&](Creature* c) -> bool
+            {
+                if (!c || !c->IsInWorld() || !c->IsAlive())
+                    return false;
+                if (!(c->GetPhaseMask() & bot->GetPhaseMask()))
+                    return false;
+                return neededCreatureEntries.count(c->GetEntry()) > 0;
+            };
+
+            // commitment first
+            if (pursuedTarget)
+            {
+                Creature* existing = botAI->GetCreature(pursuedTarget);
+                if (existing && isValidCreature(existing) &&
+                    bot->GetDistance(existing) <= searchRange)
+                {
+                    if (bot->GetDistance(existing) > INTERACTION_DISTANCE)
+                        return MoveWorldObjectTo(existing->GetGUID(), INTERACTION_DISTANCE);
+                    SpellCastTargets targets;
+                    targets.SetUnitTarget(existing);
+                    bot->CastItemUseSpell(item, targets, 1, 0);
+                    ForceToWait(2000);
+                    pursuedTarget.Clear();
+                    return true;
+                }
+                pursuedTarget.Clear();
+            }
+
+            GuidVector possibleTargets = AI_VALUE(GuidVector, "possible new rpg targets");
+            Creature* best = nullptr;
+            float bestDist = searchRange;
+            for (ObjectGuid guid : possibleTargets)
+            {
+                Creature* c = botAI->GetCreature(guid);
+                if (!isValidCreature(c))
+                    continue;
+                float d = bot->GetDistance(c);
+                if (d >= bestDist)
+                    continue;
+                best = c;
+                bestDist = d;
+            }
+            if (best)
+            {
+                pursuedTarget = best->GetGUID();
+                if (bot->GetDistance(best) > INTERACTION_DISTANCE)
+                    return MoveWorldObjectTo(best->GetGUID(), INTERACTION_DISTANCE);
+                SpellCastTargets targets;
+                targets.SetUnitTarget(best);
+                bot->CastItemUseSpell(item, targets, 1, 0);
+                ForceToWait(2000);
+                pursuedTarget.Clear();
+                return true;
+            }
+            continue;
+        }
+
+        // C: self / area — fire at bot's position. Restrict to GetSrcItemId
+        // items (the single item the quest hands the bot for self-use, e.g.
+        // a potion). ItemDrop entries can be kill-credit sentinels or
+        // scripted items that should never be auto-used on self.
+        if (!srcItemEntries.count(itemEntry))
+            continue;
+        SpellCastTargets targets;
+        if (spellInfo->IsTargetingArea())
+            targets.SetDst(*bot);
+        else
+            targets.SetUnitTarget(bot);
+        bot->CastItemUseSpell(item, targets, 1, 0);
+        ForceToWait(2000);
+        return true;
+    }
+
+    return false;
+}
+
+bool NewRpgBaseAction::HasNearbyQuestMob(float range)
+{
+    // kill objectives + mobs that drop required quest items
+    std::unordered_set<uint32> neededCreatureEntries;
+    std::unordered_set<uint32> neededItemIds;
+    for (uint16 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 questId = bot->GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+        if (bot->GetQuestStatus(questId) != QUEST_STATUS_INCOMPLETE)
+            continue;
+        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+        if (!quest)
+            continue;
+        QuestStatusData const& qs = bot->getQuestStatusMap().at(questId);
+        for (int i = 0; i < QUEST_OBJECTIVES_COUNT; ++i)
+        {
+            int32 entry = quest->RequiredNpcOrGo[i];
+            if (entry <= 0)
+                continue;
+            if (qs.CreatureOrGOCount[i] >= quest->RequiredNpcOrGoCount[i])
+                continue;
+            neededCreatureEntries.insert(uint32(entry));
+        }
+        for (int i = 0; i < QUEST_ITEM_OBJECTIVES_COUNT; ++i)
+        {
+            if (!quest->RequiredItemCount[i])
+                continue;
+            if (qs.ItemCount[i] >= quest->RequiredItemCount[i])
+                continue;
+            if (quest->RequiredItemId[i])
+                neededItemIds.insert(quest->RequiredItemId[i]);
+        }
+    }
+    if (neededCreatureEntries.empty() && neededItemIds.empty())
+        return false;
+
+    GuidVector possibleTargets = AI_VALUE(GuidVector, "possible targets");
+    for (ObjectGuid guid : possibleTargets)
+    {
+        Creature* c = botAI->GetCreature(guid);
+        if (!c || !c->IsInWorld() || !c->IsAlive())
+            continue;
+        if (!(c->GetPhaseMask() & bot->GetPhaseMask()))
+            continue;
+        if (bot->GetDistance(c) > range)
+            continue;
+
+        // direct kill objective
+        if (neededCreatureEntries.count(c->GetEntry()))
+            return true;
+
+        // drops a required quest item — HaveQuestLootForPlayer
+        // already filters by what this player still needs
+        if (!neededItemIds.empty())
+        {
+            CreatureTemplate const* tmpl = c->GetCreatureTemplate();
+            if (tmpl && tmpl->lootid &&
+                LootTemplates_Creature.HaveQuestLootForPlayer(tmpl->lootid, bot))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool NewRpgBaseAction::HasNearbyQuestMobForObjective(float range, uint32 questId, int32 objectiveIdx)
+{
+    if (!questId)
+        return false;
+
+    Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+    if (!quest)
+        return false;
+
+    // Turn-in path: completed quest has no remaining mob objective.
+    if (bot->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE)
+        return false;
+
+    QuestStatusData const& qs = bot->getQuestStatusMap().at(questId);
+
+    uint32 neededCreatureEntry = 0;
+    uint32 neededItemId = 0;
+
+    if (objectiveIdx >= 0 && objectiveIdx < QUEST_OBJECTIVES_COUNT)
+    {
+        int32 entry = quest->RequiredNpcOrGo[objectiveIdx];
+        if (entry > 0 &&
+            qs.CreatureOrGOCount[objectiveIdx] < quest->RequiredNpcOrGoCount[objectiveIdx])
+        {
+            neededCreatureEntry = uint32(entry);
+        }
+        // Item objective sometimes lives in the same slot range.
+        if (objectiveIdx < QUEST_ITEM_OBJECTIVES_COUNT &&
+            quest->RequiredItemId[objectiveIdx] &&
+            qs.ItemCount[objectiveIdx] < quest->RequiredItemCount[objectiveIdx])
+        {
+            neededItemId = quest->RequiredItemId[objectiveIdx];
+        }
+    }
+    else if (objectiveIdx >= QUEST_OBJECTIVES_COUNT &&
+             objectiveIdx < QUEST_OBJECTIVES_COUNT + QUEST_ITEM_OBJECTIVES_COUNT)
+    {
+        int32 itemSlot = objectiveIdx - QUEST_OBJECTIVES_COUNT;
+        if (quest->RequiredItemId[itemSlot] &&
+            qs.ItemCount[itemSlot] < quest->RequiredItemCount[itemSlot])
+        {
+            neededItemId = quest->RequiredItemId[itemSlot];
+        }
+    }
+
+    if (!neededCreatureEntry && !neededItemId)
+        return false;
+
+    GuidVector possibleTargets = AI_VALUE(GuidVector, "possible targets");
+    for (ObjectGuid guid : possibleTargets)
+    {
+        Creature* c = botAI->GetCreature(guid);
+        if (!c || !c->IsInWorld() || !c->IsAlive())
+            continue;
+        if (!(c->GetPhaseMask() & bot->GetPhaseMask()))
+            continue;
+        if (bot->GetDistance(c) > range)
+            continue;
+
+        if (neededCreatureEntry && c->GetEntry() == neededCreatureEntry)
+            return true;
+
+        if (neededItemId)
+        {
+            CreatureTemplate const* tmpl = c->GetCreatureTemplate();
+            if (tmpl && tmpl->lootid &&
+                LootTemplates_Creature.HaveQuestLootForPlayer(tmpl->lootid, bot))
+                return true;
+        }
+    }
+    return false;
+}
+
+
 ObjectGuid NewRpgBaseAction::ChooseNpcOrGameObjectToInteract(bool questgiverOnly, float distanceLimit)
 {
     GuidVector possibleTargets = AI_VALUE(GuidVector, "possible new rpg targets");
@@ -1132,6 +1617,10 @@ WorldPosition NewRpgBaseAction::SelectRandomGrindPos(Player* bot)
         uint32 idx = urand(0, lo_prepared_locs.size() - 1);
         dest = lo_prepared_locs[idx];
     }
+
+    if (!dest.IsValid())
+        return dest;
+
     LOG_DEBUG("playerbots", "[New RPG] Bot {} select random grind pos Map:{} X:{} Y:{} Z:{} ({}+{} available in {})",
               bot->GetName(), dest.GetMapId(), dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ(),
               hi_prepared_locs.size(), lo_prepared_locs.size() - hi_prepared_locs.size(), locs.size());
@@ -1175,6 +1664,10 @@ WorldPosition NewRpgBaseAction::SelectRandomCampPos(Player* bot)
         uint32 idx = urand(0, prepared_locs.size() - 1);
         dest = prepared_locs[idx];
     }
+
+    if (!dest.IsValid())
+        return dest;
+
     LOG_DEBUG("playerbots", "[New RPG] Bot {} select random inn keeper pos Map:{} X:{} Y:{} Z:{} ({} available in {})",
               bot->GetName(), dest.GetMapId(), dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ(),
               prepared_locs.size(), locs.size());
@@ -1194,7 +1687,6 @@ bool NewRpgBaseAction::SelectRandomFlightTaxiNode(uint32& flightMasterEntry, Wor
     flightMasterEntry = info->templateEntry;
     flightMasterPos = info->pos;
     path = availablePaths[urand(0, availablePaths.size() - 1)];
-    //TODO: If selected node in other map, teleport?
     LOG_DEBUG("playerbots", "[New RPG] Bot {} select random flight taxi node from:{} (node {}) to:{} ({} available)",
               bot->GetName(), flightMasterEntry, path[0], path[path.size() - 1], availablePaths.size());
     return true;
@@ -1215,7 +1707,6 @@ bool NewRpgBaseAction::RandomChangeStatus(std::vector<NewRpgStatus> candidateSta
             probSum += sPlayerbotAIConfig.RpgStatusProbWeight[status];
         }
     }
-    // Safety check. Default to "rest" if all RPG weights = 0
     if (availableStatus.empty() || probSum == 0)
     {
         botAI->rpgInfo.ChangeToRest();

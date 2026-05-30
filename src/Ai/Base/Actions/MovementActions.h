@@ -10,6 +10,7 @@
 
 #include "Action.h"
 #include "LastMovementValue.h"
+#include "PathGenerator.h"
 #include "PlayerbotAIConfig.h"
 
 class Player;
@@ -22,12 +23,33 @@ class Position;
 #define ANGLE_90_DEG M_PI_2
 #define ANGLE_120_DEG (2.f * static_cast<float>(M_PI) / 3.f)
 
+// Default acceptable path types for GeneratePath
+constexpr uint32 DEFAULT_PATH_ACCEPT_MASK = PATHFIND_NORMAL | PATHFIND_INCOMPLETE;
+constexpr uint32 RELAXED_PATH_ACCEPT_MASK = PATHFIND_NORMAL | PATHFIND_INCOMPLETE | PATHFIND_FARFROMPOLY;
+
+struct PathResult
+{
+    Movement::PointsArray points;
+    G3D::Vector3 actualEnd;
+    G3D::Vector3 end;
+    PathType pathType;
+    bool reachable;
+};
+
 class MovementAction : public Action
 {
 public:
     MovementAction(PlayerbotAI* botAI, std::string const name);
 
 protected:
+    // Emit a one-line trace describing the imminent movement. No-op
+    // unless the bot has the "debug move" non-combat strategy.
+    // Subclasses (e.g. NewRpgBaseAction) may override to append richer
+    // context such as RPG status and target name. Optional `extra`
+    // is appended verbatim (use it to attach hop labels like
+    // "node:Stormwind innkeeper" or fallback reasons).
+    virtual void EmitDebugMove(char const* method, char const* generator, float x, float y, float z, char const* extra = nullptr);
+
     bool JumpTo(uint32 mapId, float x, float y, float z, MovementPriority priority = MovementPriority::MOVEMENT_NORMAL);
     bool MoveNear(uint32 mapId, float x, float y, float z, float distance = sPlayerbotAIConfig.contactDistance,
                   MovementPriority priority = MovementPriority::MOVEMENT_NORMAL);
@@ -50,7 +72,6 @@ protected:
     void SetNextMovementDelay(float delayMillis);
     bool IsMovingAllowed(WorldObject* target);
     bool IsDuplicateMove(float x, float y, float z);
-    bool IsWaitingForLastMove(MovementPriority priority);
     bool IsMovingAllowed();
     bool Flee(Unit* target);
     void ClearIdleState();
@@ -66,6 +87,42 @@ protected:
     bool FleePosition(Position pos, float radius, uint32 minInterval = 1000);
     bool CheckLastFlee(float curAngle, std::list<FleeInfo>& infoList);
 
+    PathResult GeneratePath(float x, float y, float z, uint32 acceptMask = DEFAULT_PATH_ACCEPT_MASK, bool forceDestination = false);
+
+    // Returns a unified TravelPath for the move. Mirror of the reference
+    // ResolveMovePath shape: 10% lastPath reuse short-circuit, choose
+    // graph (cross-map / >sightDistance) or live mmap probe, regression
+    // guard preferring cached path when no better, fall back to a
+    // single-point path on dest. Stateless — does not dispatch.
+    TravelPath ResolveMovePath(WorldPosition const& startPos,
+                               WorldPosition const& endPos,
+                               LastMovement& lastMove);
+
+    // Dispatches the head-of-path special segment (portal interact /
+    // area-trigger marker / transport boarding / flight master taxi).
+    // Caller is expected to first call TravelPath::UpcommingSpecialMovement
+    // which cuts the path so the head is the special segment. Returns
+    // true if a movement-consuming action was dispatched this tick.
+    // Returns false for AREA_TRIGGER-with-entry (caller still dispatches
+    // the walk into the trigger volume).
+    bool HandleSpecialMovement(TravelPath& path);
+
+    // Top-of-MoveFarTo gate that keeps a bot riding a transport across
+    // ticks. Returns true if the bot is still on the transport we last
+    // boarded (caller should skip the rest of MoveFarTo this tick).
+    // Clears lastTransportEntry and returns false if the bot has
+    // disembarked or is no longer on the expected transport.
+    bool WaitForTransport();
+
+    // Transport boarding helpers (shared by FollowAction and travel plan)
+    static Transport* GetTransportForPosTolerant(Map* map, WorldObject* ref,
+        uint32 phaseMask, float x, float y, float z);
+    static bool FindBoardingPointOnTransport(Map* map, Transport* transport,
+        WorldObject* ref, float refX, float refY, float refZ,
+        float botX, float botY, float botZ,
+        float& outX, float& outY, float& outZ);
+    bool BoardTransport(Transport* transport);
+
 protected:
     struct CheckAngle
     {
@@ -74,10 +131,6 @@ protected:
     };
 
 private:
-    // float SearchBestGroundZForPath(float x, float y, float z, bool generatePath, float range = 20.0f, bool
-    // normal_only = false, float step = 8.0f);
-    const Movement::PointsArray SearchForBestPath(float x, float y, float z, float& modified_z, int maxSearchCount = 5,
-                                                  bool normal_only = false, float step = 8.0f);
     bool wasMovementRestricted = false;
     void DoMovePoint(Unit* unit, float x, float y, float z, bool generatePath, bool backwards);
 };

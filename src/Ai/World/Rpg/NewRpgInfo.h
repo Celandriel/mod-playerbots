@@ -1,10 +1,11 @@
 #ifndef _PLAYERBOT_NEWRPGINFO_H
 #define _PLAYERBOT_NEWRPGINFO_H
 
+#include <deque>
+
 #include "Define.h"
 #include "ObjectGuid.h"
 #include "ObjectMgr.h"
-#include "OutdoorPvP.h"
 #include "QuestDef.h"
 #include "Strategy.h"
 #include "Timer.h"
@@ -47,6 +48,11 @@ struct NewRpgInfo
         int32 objectiveIdx{0};
         WorldPosition pos{};
         uint32 lastReachPOI{0};
+        // committed target per objective type. stops zig-zagging in
+        // dense spawn clusters when "nearest" would flip each tick.
+        ObjectGuid pursuedLootGO{};      // GOs we loot (lilies, eggs)
+        ObjectGuid pursuedUseGO{};       // GOs we click or focus on
+        ObjectGuid pursuedUseTarget{};   // creature we apply an item to
     };
     // RPG_TRAVEL_FLIGHT
     struct TravelFlight
@@ -61,37 +67,16 @@ struct NewRpgInfo
     {
         Rest() = default;
     };
-    // RPG_ZONE_PVP
+    // RPG_OUTDOOR_PVP
     struct OutdoorPvP
     {
         ObjectGuid::LowType capturePointSpawnId{0};
     };
-    // RPG_DUNGEON_PVE
-    struct DungeonPve
-    {
-        uint32 mapId{0};
-        std::string dungeonName;
-    };
-    // RPG_MOVE_FAR
-    struct MoveFar
-    {
-    // RPG_OUTDOOR_PVP
-
     struct Idle
     {
     };
 
     uint32 startT{0};  // start timestamp of the current status
-
-    // MOVE_FAR
-    float nearestMoveFarDis{FLT_MAX};
-    uint32 stuckTs{0};
-    uint32 stuckAttempts{0};
-    WorldPosition moveFarPos;
-    // END MOVE_FAR
-
-    TravelPath travelPath{};
-    bool HasTravelPath() const { return !travelPath.empty(); }
 
     using RpgData = std::variant<
         Idle,
@@ -102,9 +87,7 @@ struct NewRpgInfo
         DoQuest,
         Rest,
         TravelFlight,
-        OutdoorPvP,
-        DungeonPve,
-        MoveFar
+        OutdoorPvP
     >;
     RpgData data;
 
@@ -117,13 +100,10 @@ struct NewRpgInfo
     void ChangeToDoQuest(uint32 questId, const Quest* quest);
     void ChangeToTravelFlight(uint32 flightMasterEntry, WorldPosition flightMasterPos, std::vector<uint32> path);
     void ChangeToOutdoorPvp(ObjectGuid::LowType capturePointSpawnId = 0);
-    void ChangeToDungeonPve(uint32 mapId, const std::string& dungeonName);
-    void ChangeToMoveFar();
     void ChangeToRest();
     void ChangeToIdle();
     bool CanChangeTo(NewRpgStatus status);
     void Reset();
-    void SetMoveFarTo(WorldPosition pos);
     std::string ToString();
 };
 

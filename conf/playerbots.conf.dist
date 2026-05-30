@@ -336,10 +336,6 @@ AiPlayerbot.MaxWaitForMove = 5000
 #          2 - MoveSplinePath disabled everywhere
 AiPlayerbot.DisableMoveSplinePath = 0
 
-# Max search time for movement (higher for better movement on slopes)
-# Default: 3
-AiPlayerbot.MaxMovementSearchTime = 3
-
 # Action expiration time
 AiPlayerbot.ExpireActionTime = 5000
 
@@ -1027,6 +1023,12 @@ AiPlayerbot.RestrictedHealerDPSMaps = "33,34,36,43,47,48,70,90,109,129,209,229,2
 # This option will override AiPlayerbot.AutoDoQuests, RandomBotTeleLowerLevel, and RandomBotTeleHigherLevel
 # Default: 1 (enabled)
 AiPlayerbot.EnableNewRpgStrategy = 1
+
+# Use pre-computed travel node paths for long-distance movement (>300 yards).
+# When enabled, bots use the travel node graph (A*, flight paths, transports)
+# instead of repeated mmap hops. Experimental.
+# Default: 0 (disabled)
+AiPlayerbot.EnableTravelNodes = 0
 
 # Control probability weights for RPG status of bots. Takes effect only when the status meets its premise.​
 # Sum of weights need not be 100. Set to 0 to disable the status.
