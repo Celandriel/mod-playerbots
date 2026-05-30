@@ -3161,8 +3161,26 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
             if (!cur.entry)
                 return false;
 
+            // Validate the GO template is actually a teleport spellcaster.
+            // Rejects mis-labeled portal entries before we waste a CMSG.
+            GameObjectTemplate const* goInfo = sObjectMgr->GetGameObjectTemplate(cur.entry);
+            if (!goInfo || (goInfo->type != GAMEOBJECT_TYPE_SPELLCASTER &&
+                            goInfo->type != GAMEOBJECT_TYPE_GOOBER))
+                return false;
+
+            uint32 const spellId = goInfo->spellcaster.spellId;
+            SpellInfo const* spellInfo = SpellMgr::instance()->GetSpellInfo(spellId);
+            if (!spellInfo || !spellInfo->HasEffect(SPELL_EFFECT_TELEPORT_UNITS))
+                return false;
+
+            // Mounted handling: refuse the interact while flying high
+            // (the dismount would drop the bot). Otherwise dismount.
             if (bot->IsMounted())
+            {
+                if (bot->IsFlying())
+                    return false;
                 bot->Dismount();
+            }
             botAI->RemoveShapeshift();
 
             GuidVector nearGOs = AI_VALUE(GuidVector, "nearest game objects");
@@ -3193,6 +3211,8 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
                 return false;
             }
             // No entry: direct teleport to next-point destination.
+            // Reference uses the next point's stored orientation (the
+            // baked exit facing), not the bot's current facing.
             if (hasNext)
             {
                 PathNodePoint const& dst = path[1];
@@ -3200,7 +3220,7 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
                                        dst.point.GetPositionX(),
                                        dst.point.GetPositionY(),
                                        dst.point.GetPositionZ(),
-                                       bot->GetOrientation());
+                                       dst.point.GetOrientation());
             }
             return false;
         }
@@ -3248,19 +3268,23 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
             Map* map = bot->GetMap();
             if (!map)
                 return false;
+
+            // Always consume the tick (return true) + throttle 1s,
+            // matching reference. Prevents per-tick board retries
+            // while we wait for the transport to actually receive us.
             Transport* transport = GetTransportForPosTolerant(
                 map, bot, bot->GetPhaseMask(),
                 next.point.GetPositionX(),
                 next.point.GetPositionY(),
                 next.point.GetPositionZ());
-            if (!transport || transport->GetEntry() != next.entry)
-                return false;
-            if (BoardTransport(transport))
+            if (transport && transport->GetEntry() == next.entry)
             {
-                AI_VALUE(LastMovement&, "last movement").lastTransportEntry = next.entry;
-                return true;
+                if (BoardTransport(transport))
+                    AI_VALUE(LastMovement&, "last movement").lastTransportEntry = next.entry;
             }
-            return false;
+
+            WaitForReach(1000.0f);
+            return true;
         }
 
         case PathNodeType::NODE_FLIGHTPATH:
@@ -3309,26 +3333,36 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
             // Can't cast while flying — let the bot land first.
             bool const canCastNow = !bot->IsFlying();
 
-            // Hearthstone (item 8690) — fire if available and not flying high.
-            if (next.entry == 8690)
+            if (next.entry == 8690)  // Hearthstone
             {
                 if (canCastNow)
-                    return botAI->DoSpecificAction("hearthstone",
-                                                   Event("move action"), true);
-                return false;
+                {
+                    bool const ok = botAI->DoSpecificAction("hearthstone",
+                                                            Event("move action"), true);
+                    if (ok)
+                        return true;
+                }
+            }
+            else if (canCastNow)
+            {
+                // Mage city portal / similar spell — dismount, drop
+                // shapeshift, queue cast. We don't gate on reagents (no
+                // "has reagents for" value on AC); the server-side cast
+                // attempt will fail cleanly if reagents are missing.
+                if (bot->IsMounted())
+                    bot->Dismount();
+                botAI->RemoveShapeshift();
+                if (botAI->DoSpecificAction(
+                        "cast",
+                        Event("rpg action", std::to_string(next.entry)), true))
+                    return true;
             }
 
-            // Other teleport spells: dismount, drop shapeshift, queue cast.
-            // Skipped while flying high — caller's next-tick walk handles
-            // the descent.
-            if (!canCastNow)
-                return false;
-            if (bot->IsMounted())
-                bot->Dismount();
-            botAI->RemoveShapeshift();
-            return botAI->DoSpecificAction(
-                "cast",
-                Event("rpg action", std::to_string(next.entry)), true);
+            // Cast didn't happen or failed — clear the cached path so
+            // the next tick re-resolves cleanly instead of retrying the
+            // same teleport edge that just failed.
+            AI_VALUE(LastMovement&, "last movement").setPath(TravelPath());
+            return false;
         }
 
         default:
