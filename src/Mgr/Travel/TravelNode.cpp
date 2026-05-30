@@ -1429,7 +1429,31 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
             if (botAI->HasCheat(BotCheatMask::gold))
                 startStub->currentGold = 10000000;
             else
+            {
+                // Group-gold accounting (reference parity): A* must
+                // budget against the MIN travel-money across all safe
+                // group members — a taxi/transport edge the leader
+                // can afford but a member can't would split the group.
                 startStub->currentGold = AI_VALUE2(uint32, "free money for", (uint32)NeedMoneyFor::travel);
+                for (ObjectGuid guid : AI_VALUE(GuidVector, "group members"))
+                {
+                    Player* player = ObjectAccessor::FindPlayer(guid);
+                    if (!player)
+                        continue;
+                    if (!botAI->IsGroupLeader() && player != bot)
+                        continue;
+                    if (!botAI->IsSafe(player))
+                    {
+                        startStub->currentGold = 0;
+                        continue;
+                    }
+                    if (!GET_PLAYERBOT_AI(player))
+                        continue;
+                    startStub->currentGold = std::min(
+                        startStub->currentGold,
+                        PAI_VALUE2(uint32, "free money for", (uint32)NeedMoneyFor::travel));
+                }
+            }
 
             // Hearthstone (item 6948 / spell 8690): inject a synthetic
             // teleport edge from start to the node nearest the bot's
@@ -1447,10 +1471,13 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
                     TravelNodeStub* hsStub = &m_stubs.insert(std::make_pair(
                         static_cast<TravelNode*>(portNode), TravelNodeStub(portNode))).first->second;
 
-                    // Cost: ~10 minutes minus death count (cap at 2 min min)
-                    // so a recently-died bot prefers the hearth.
-                    uint32 deathCount = AI_VALUE(uint32, "death count");
-                    hsStub->costFromStart = std::max<uint32>(2, (10 - std::min<uint32>(8, deathCount))) * MINUTE;
+                    // Cost: max(2 seconds, (10 - deathCount) * MINUTE).
+                    // Fresh bot → 10 minutes (walks if anything's closer);
+                    // recently-died bot → drops toward 2 seconds (hearth wins).
+                    // Clamp deathCount to 10 to avoid uint32 underflow that
+                    // the reference implementation has at deathCount > 10.
+                    uint32 const dc = std::min<uint32>(10, AI_VALUE(uint32, "death count"));
+                    hsStub->costFromStart = std::max<uint32>(2, (10 - dc) * MINUTE);
                     hsStub->heuristic = hsStub->dataNode->fDist(goal) / botSpeed;
                     hsStub->totalCost = hsStub->costFromStart + hsStub->heuristic;
 
