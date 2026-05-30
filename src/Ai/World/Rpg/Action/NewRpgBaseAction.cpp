@@ -252,24 +252,6 @@ bool NewRpgBaseAction::MoveFarTo(WorldPosition dest)
     if (path.empty())
         return false;
 
-    // Progress guard: refuse to dispatch a path whose endpoint isn't
-    // meaningfully closer to dest than the bot already is. Prevents
-    // oscillation around terrain the mmap probe can route along but the
-    // bot can't actually traverse (cave entries with missing nav, narrow
-    // ledges, geometry that loops back). Reference doesn't have this
-    // guard but their RPG layer detects stuck via different signals;
-    // ours surfaces the issue here so the strategy can re-pick a POI.
-    {
-        float const distFromBot = botPos.distance(dest);
-        float const distFromPathEnd = path.getBack().distance(dest);
-        if (distFromPathEnd + 5.0f >= distFromBot)
-        {
-            EmitDebugMove("MoveFar", "no-progress",
-                          dest.GetPositionX(), dest.GetPositionY(), dest.GetPositionZ());
-            return false;
-        }
-    }
-
     // Walk dispatch.
     std::vector<WorldPosition> const& pts = path.getPointPath();
     Movement::PointsArray points;
