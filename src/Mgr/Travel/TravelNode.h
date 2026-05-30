@@ -467,8 +467,10 @@ enum class PathNodeType : uint8
     NODE_AREA_TRIGGER = 3,
     NODE_TRANSPORT = 4,
     NODE_FLIGHTPATH = 5,
-    // value 6 (NODE_TELEPORT) reserved — no consumer; re-add when a
-    // teleport-spell handler / generator returns.
+    // Teleport-spell endpoint (hearthstone, mage portal). Emitted by
+    // TravelNodeRoute::BuildPath when traversing a teleportSpell-type
+    // edge; consumed by HandleSpecialMovement.
+    NODE_TELEPORT = 6,
     NODE_STATIC_PORTAL = 7
 };
 
