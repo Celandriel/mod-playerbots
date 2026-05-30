@@ -1684,30 +1684,14 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, [[maybe_unused]] uin
 {
     TravelPath path;
 
-    // mmap-probe quick path: only accept if the probe REACHES the
-    // destination (within spellDistance). A partial-progress probe is
-    // refused so the graph A* gets a chance — graph nodes can route
-    // through cave entries / dungeon edges that the raw mmap probe can't
-    // anchor on. Earlier looser acceptance (>50% progress) caused the
-    // bot to take a partial probe pointed at terrain instead of using
-    // the travel-node graph that has a node inside the destination.
-    if (botPos.GetMapId() == destination.GetMapId())
-    {
-        std::vector<WorldPosition> probe = destination.getPathFromPath({botPos}, bot, 40);
-        if (probe.size() >= 2)
-        {
-            float const probeEndToDest = destination.distance(probe.back());
-            if (probeEndToDest < sPlayerbotAIConfig.spellDistance)
-            {
-                path.addPoint(botPos, PathNodeType::NODE_PREPATH);
-                for (size_t i = 1; i < probe.size(); ++i)
-                    path.addPoint(probe[i], PathNodeType::NODE_PATH);
-                return path;
-            }
-        }
-    }
-
     std::shared_lock<std::shared_timed_mutex> guard(m_nMapMtx);
+
+    // Mirror reference: if the bot is mid-transport, the first valid
+    // route wins immediately (no per-candidate validation against the
+    // ground — the transport handles position).
+    uint32 transportEntry = 0;
+    if (bot && bot->GetTransport())
+        transportEntry = bot->GetTransport()->GetEntry();
 
     // K-nearest start + end node candidates (K=5). Map-wide scan to
     // mirror reference `getNodes(pos, -1)` — restricting to bot's zone
@@ -1735,70 +1719,131 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, [[maybe_unused]] uin
     if (startCandidates.empty() || endCandidates.empty())
         return path;  // empty
 
-    TravelNode* startNode = nullptr;
-    TravelNode* endNode = nullptr;
-    TravelNodeRoute route;
-    for (TravelNode* s : startCandidates)
+    // Iterate combinations with per-candidate path validation. Skip
+    // nodes that failed a prior pass (bad*Nodes), reject endNodes whose
+    // mmap-path to dest can't reach within 1y, and reject startNodes
+    // whose mmap-path from bot can't reach within maxStartDistance
+    // (20y for transport, 1y otherwise — matches reference).
+    std::vector<TravelNode*> badStartNodes, badEndNodes;
+
+    for (TravelNode* e : endCandidates)
     {
-        for (TravelNode* e : endCandidates)
+        if (std::find(badEndNodes.begin(), badEndNodes.end(), e) != badEndNodes.end())
+            continue;
+        if (!e)
+            continue;
+        WorldPosition endNodePos = *e->getPosition();
+
+        // Validate endNode -> destination is pathable within 1y.
+        std::vector<WorldPosition> endProbe;
+        bool endPathOk = false;
+        if (endNodePos.GetMapId() == destination.GetMapId())
         {
-            if (!s || !e || s == e)
+            Unit* pathBot = (bot && bot->GetMapId() == destination.GetMapId()) ? bot : nullptr;
+            endProbe = endNodePos.getPathTo(destination, pathBot);
+            endPathOk = destination.isPathTo(endProbe, 1.0f);
+        }
+        else
+        {
+            // Cross-map endNode is its own teleport destination.
+            endProbe = {endNodePos, destination};
+            endPathOk = true;
+        }
+
+        if (!endPathOk)
+        {
+            badEndNodes.push_back(e);
+            continue;
+        }
+
+        for (TravelNode* s : startCandidates)
+        {
+            if (std::find(badStartNodes.begin(), badStartNodes.end(), s) != badStartNodes.end())
+                continue;
+            if (!s || s == e)
                 continue;
             if (!s->hasRouteTo(e))
                 continue;
-            TravelNodeRoute r = GetNodeRoute(s, e, nullptr);
-            if (r.isEmpty())
+
+            WorldPosition startNodePos = *s->getPosition();
+
+            // A* on the graph.
+            TravelNodeRoute route = GetNodeRoute(s, e, dynamic_cast<Player*>(bot));
+            if (route.isEmpty())
                 continue;
-            startNode = s;
-            endNode = e;
-            route = r;
-            break;
+
+            // On a transport: skip ground validation, accept the route.
+            if (transportEntry)
+            {
+                path = route.BuildPath({botPos}, endProbe, bot);
+                route.cleanTempNodes();
+                return path;
+            }
+
+            // Validate bot -> startNode is pathable within maxStartDistance.
+            float const maxStartDistance = s->isTransport() ? 20.0f : 1.0f;
+            std::vector<WorldPosition> pathToStart;
+            bool startPathOk = false;
+            if (bot && botPos.GetMapId() == startNodePos.GetMapId())
+            {
+                pathToStart = botPos.getPathTo(startNodePos, bot);
+                startPathOk = startNodePos.isPathTo(pathToStart, maxStartDistance);
+            }
+
+            if (!startPathOk)
+            {
+                badStartNodes.push_back(s);
+                route.cleanTempNodes();
+                continue;
+            }
+
+            // Both ends validated — build and return.
+            path = route.BuildPath(pathToStart, endProbe, bot);
+            route.cleanTempNodes();
+            return path;
         }
-        if (!route.isEmpty())
-            break;
     }
 
-    if (route.isEmpty() || !startNode || !endNode)
-        return path;  // empty
-
-    WorldPosition startNodePos = *startNode->getPosition();
-    WorldPosition endNodePos = *endNode->getPosition();
-
-    // pathToStart: fresh mmap-path from bot to the first node.
-    std::vector<WorldPosition> pathToStart;
-    if (bot && botPos.GetMapId() == startNodePos.GetMapId())
+    // No graph route found. Last-resort hearthstone fallback (reference
+    // also does this): if bot has hearthstone item and is alive, treat
+    // the bot's current position as a one-off node and try routing from
+    // it to each endCandidate via the hearthstone PortalNode edge.
+    if (Player* player = dynamic_cast<Player*>(bot))
     {
-        std::vector<WorldPosition> probe = botPos.getPathTo(startNodePos, bot);
-        if (probe.size() >= 2)
-            pathToStart = probe;
+        if (player->IsAlive() && player->HasItemCount(6948, 1))
+        {
+            TravelNode* botNode = new TravelNode(botPos, "Bot Pos", false);
+            botNode->setPoint(botPos);
+
+            for (TravelNode* e : endCandidates)
+            {
+                if (!e || std::find(badEndNodes.begin(), badEndNodes.end(), e) != badEndNodes.end())
+                    continue;
+                TravelNodeRoute route = GetNodeRoute(botNode, e, player);
+                if (route.isEmpty())
+                    continue;
+
+                // Build the end-side path again for this candidate.
+                WorldPosition endNodePos = *e->getPosition();
+                std::vector<WorldPosition> endProbe;
+                if (endNodePos.GetMapId() == destination.GetMapId())
+                {
+                    Unit* pathBot = (bot && bot->GetMapId() == destination.GetMapId()) ? bot : nullptr;
+                    endProbe = endNodePos.getPathTo(destination, pathBot);
+                }
+                else
+                    endProbe = {endNodePos, destination};
+
+                route.addTempNodes({botNode});  // transfer ownership of botNode
+                path = route.BuildPath({botPos}, endProbe, bot);
+                route.cleanTempNodes();
+                return path;
+            }
+            delete botNode;
+        }
     }
-    if (pathToStart.empty())
-        pathToStart = {botPos};
 
-    // pathToEnd: mmap-path from the last node to the destination.
-    // Single-map case: use bot's PathGenerator directly.
-    // Cross-map case: pass nullptr — getPathTo constructs a tempCreature
-    // on the destination's base map so we can pathfind there even though
-    // bot isn't loaded into it.
-    std::vector<WorldPosition> pathToEnd;
-    if (endNodePos.GetMapId() == destination.GetMapId())
-    {
-        Unit* pathBot = (bot && bot->GetMapId() == destination.GetMapId()) ? bot : nullptr;
-        std::vector<WorldPosition> probe = endNodePos.getPathTo(destination, pathBot);
-        if (probe.size() >= 2)
-            pathToEnd = probe;
-    }
-    if (pathToEnd.empty())
-        pathToEnd = {destination};
-
-    path = route.BuildPath(pathToStart, pathToEnd, nullptr);
-
-    // Release any synthetic PortalNodes the A* injected (hearthstone /
-    // mage teleports). They served their purpose in route assembly and
-    // their points are now baked into `path`.
-    route.cleanTempNodes();
-
-    return path;
+    return path;  // empty
 }
 
 bool TravelNodeMap::cropUselessNode(TravelNode* startNode)
