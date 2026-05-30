@@ -1679,7 +1679,7 @@ TravelNodeRoute TravelNodeMap::FindRouteNearestNodes(WorldPosition startPos, Wor
     return TravelNodeRoute();
 }
 
-TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, uint32 botZoneId,
+TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, [[maybe_unused]] uint32 botZoneId,
     WorldPosition destination, Unit* bot)
 {
     TravelPath path;
@@ -1709,33 +1709,28 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos, uint32 botZoneId,
 
     std::shared_lock<std::shared_timed_mutex> guard(m_nMapMtx);
 
-    // K-nearest start + end node candidates (cmangos parity: K=5).
-    // Iterate combinations — first pair with a graph route wins. The
-    // single-nearest may have no route while the 2nd/3rd does.
+    // K-nearest start + end node candidates (K=5). Map-wide scan to
+    // mirror reference `getNodes(pos, -1)` — restricting to bot's zone
+    // misses nodes that sit just across a zone boundary (e.g. a cave
+    // whose interior node is in a different zone than its entrance).
     constexpr uint32 K = 5;
-    auto pickKNearest = [&](WorldPosition pos, uint32 zoneId) -> std::vector<TravelNode*>
+    auto pickKNearest = [&](WorldPosition pos) -> std::vector<TravelNode*>
     {
-        std::vector<TravelNode*> const& zoneNodes = GetNodesInZone(zoneId);
-        std::vector<TravelNode*> candidates(zoneNodes.begin(), zoneNodes.end());
-        if (candidates.empty())
-        {
-            // Fallback to per-map scan
-            for (TravelNode* n : nodes)
-                if (n && n->getPosition()->GetMapId() == pos.GetMapId())
-                    candidates.push_back(n);
-        }
+        std::vector<TravelNode*> candidates;
+        for (TravelNode* n : nodes)
+            if (n && n->getPosition()->GetMapId() == pos.GetMapId())
+                candidates.push_back(n);
         if (candidates.empty())
             return {};
-        uint32 n = std::min<uint32>(K, candidates.size());
+        uint32 const n = std::min<uint32>(K, (uint32)candidates.size());
         std::partial_sort(candidates.begin(), candidates.begin() + n, candidates.end(),
                           [pos](TravelNode* i, TravelNode* j) { return i->fDist(pos) < j->fDist(pos); });
         candidates.resize(n);
         return candidates;
     };
 
-    uint32 destZone = sMapMgr->GetZoneId(PHASEMASK_NORMAL, destination);
-    std::vector<TravelNode*> startCandidates = pickKNearest(botPos, botZoneId);
-    std::vector<TravelNode*> endCandidates = pickKNearest(destination, destZone);
+    std::vector<TravelNode*> startCandidates = pickKNearest(botPos);
+    std::vector<TravelNode*> endCandidates = pickKNearest(destination);
 
     if (startCandidates.empty() || endCandidates.empty())
         return path;  // empty
