@@ -17,6 +17,7 @@
 #include "Playerbots.h"
 #include "RaceMgr.h"
 #include "ServerFacade.h"
+#include "Transport.h"
 #include "TransportMgr.h"
 
 // TravelNodePath(float distance = 0.1f, float extraCost = 0, TravelNodePathType pathType = TravelNodePathType::walk,
