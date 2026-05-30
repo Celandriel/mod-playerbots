@@ -1,6 +1,7 @@
 #include "NewRpgBaseAction.h"
 
 #include <limits>
+#include <iomanip>
 #include <sstream>
 
 #include "BroadcastHelper.h"
@@ -251,6 +252,24 @@ bool NewRpgBaseAction::MoveFarTo(WorldPosition dest)
     path.ClipPath(botAI, bot, false);
     if (path.empty())
         return false;
+
+    // Telemetry: show the path's actual tail coords vs bot + dest so we
+    // can see whether the resolved path is heading toward the right
+    // place. dest-distance == 0 means tail IS the dest (good); large
+    // dest-distance means graph picked a far-off endNode.
+    if (botAI->HasStrategy("debug move", BOT_STATE_NON_COMBAT))
+    {
+        WorldPosition tail = path.getBack();
+        float const tailToDest = tail.distance(dest);
+        float const botToTail = bot->GetExactDist(tail.GetPositionX(),
+                                                  tail.GetPositionY(),
+                                                  tail.GetPositionZ());
+        std::ostringstream tlog;
+        tlog << "[PATH] tail=(" << std::fixed << std::setprecision(1)
+             << tail.GetPositionX() << "," << tail.GetPositionY() << "," << tail.GetPositionZ()
+             << ") botToTail=" << botToTail << "y tailToDest=" << tailToDest << "y";
+        botAI->TellMasterNoFacing(tlog);
+    }
 
     // Walk dispatch.
     std::vector<WorldPosition> const& pts = path.getPointPath();
