@@ -1423,13 +1423,12 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
         PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
         if (botAI)
         {
+            AiObjectContext* context = botAI->GetAiObjectContext();
+
             if (botAI->HasCheat(BotCheatMask::gold))
                 startStub->currentGold = 10000000;
             else
-            {
-                AiObjectContext* context = botAI->GetAiObjectContext();
                 startStub->currentGold = AI_VALUE2(uint32, "free money for", (uint32)NeedMoneyFor::travel);
-            }
 
             // Hearthstone (item 6948 / spell 8690): inject a synthetic
             // teleport edge from start to the node nearest the bot's
