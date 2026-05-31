@@ -951,6 +951,10 @@ bool MovementAction::ReachCombatTo(Unit* target, float distance)
         return false;
 
     PathGenerator path(bot);
+    // Soft bias: STEEP / WATER are reachable but de-prioritised so the
+    // bot picks normal ground when an alternative exists.
+    path.SetNavTerrainCost(NAV_GROUND_STEEP, 5.0f);
+    path.SetNavTerrainCost(NAV_WATER, 10.0f);
     path.CalculatePath(tx, ty, tz, false);
     PathType type = path.GetPathType();
     int typeOk = PATHFIND_NORMAL | PATHFIND_INCOMPLETE | PATHFIND_SHORTCUT;
@@ -1880,6 +1884,8 @@ PathResult MovementAction::GeneratePath(float x, float y, float z, uint32 accept
 {
     PathResult result;
     PathGenerator gen(bot);
+    gen.SetNavTerrainCost(NAV_GROUND_STEEP, 5.0f);
+    gen.SetNavTerrainCost(NAV_WATER, 10.0f);
     gen.CalculatePath(x, y, z, forceDestination);
     result.pathType = gen.GetPathType();
     result.reachable = !(result.pathType & (~acceptMask));
