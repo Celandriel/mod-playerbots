@@ -29,6 +29,8 @@ public:
 
     static uint8 GetPlayerSpecTab(Player* player);
     static std::map<uint8, uint32> GetPlayerSpecTabs(Player* player);
+    static uint8 GetDefaultSpecTab(uint8 cls);
+    static uint8 GetSpecTabForSpecIndex(uint8 cls, uint32 specIndex);
     static BotRoles GetPlayerRoles(Player* player);
     static std::string GetPlayerSpecName(Player* player);
 };

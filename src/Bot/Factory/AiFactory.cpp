@@ -64,8 +64,61 @@ AiObjectContext* AiFactory::createAiObjectContext(Player* player, PlayerbotAI* b
     return new AiObjectContext(botAI);
 }
 
+uint8 AiFactory::GetDefaultSpecTab(uint8 cls)
+{
+    switch (cls)
+    {
+        case CLASS_MAGE:
+            return MAGE_TAB_FROST;
+        case CLASS_PALADIN:
+            return PALADIN_TAB_RETRIBUTION;
+        case CLASS_PRIEST:
+            return PRIEST_TAB_HOLY;
+        case CLASS_WARLOCK:
+            return WARLOCK_TAB_DEMONOLOGY;
+        default:
+            return 0;
+    }
+}
+
+uint8 AiFactory::GetSpecTabForSpecIndex(uint8 cls, uint32 specIndex)
+{
+    if (specIndex >= MAX_SPECNO)
+        return 0xFF;
+
+    uint32 tabPoints[3] = {0, 0, 0};
+    for (std::vector<uint32> const& p : sPlayerbotAIConfig.parsedSpecLinkOrder[cls][specIndex][80])
+    {
+        if (p[0] < 3)
+            tabPoints[p[0]] += p[3];
+    }
+    if (tabPoints[0] + tabPoints[1] + tabPoints[2] == 0)
+        return 0xFF;
+
+    uint8 best = 0;
+    uint32 max = 0;
+    for (uint8 i = 0; i < 3; ++i)
+    {
+        if (tabPoints[i] > max)
+        {
+            max = tabPoints[i];
+            best = i;
+        }
+    }
+    return best;
+}
+
 uint8 AiFactory::GetPlayerSpecTab(Player* bot)
 {
+    // If there is a stored spec, return the tab with highest talents in stored spec.
+    uint32 storedSpecNo = sRandomPlayerbotMgr.GetValue(bot->GetGUID().GetCounter(), "specNo");
+    if (storedSpecNo > 0)
+    {
+        uint8 tab = GetSpecTabForSpecIndex(bot->getClass(), storedSpecNo - 1);
+        if (tab != 0xFF)
+            return tab;
+    }
+
     std::map<uint8, uint32> tabs = GetPlayerSpecTabs(bot);
 
     if (bot->GetLevel() >= 10 && ((tabs[0] + tabs[1] + tabs[2]) > 0))
@@ -82,28 +135,8 @@ uint8 AiFactory::GetPlayerSpecTab(Player* bot)
         }
         return tab;
     }
-    else
-    {
-        uint8 tab = 0;
 
-        switch (bot->getClass())
-        {
-            case CLASS_MAGE:
-                tab = MAGE_TAB_FROST;
-                break;
-            case CLASS_PALADIN:
-                tab = PALADIN_TAB_RETRIBUTION;
-                break;
-            case CLASS_PRIEST:
-                tab = PRIEST_TAB_HOLY;
-                break;
-            case CLASS_WARLOCK:
-                tab = WARLOCK_TAB_DEMONOLOGY;
-                break;
-        }
-
-        return tab;
-    }
+    return GetDefaultSpecTab(bot->getClass());
 }
 
 std::map<uint8, uint32> AiFactory::GetPlayerSpecTabs(Player* bot)

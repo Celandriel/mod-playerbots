@@ -680,8 +680,7 @@ void PlayerbotFactory::Randomize(bool incremental)
     if (!incremental || !sPlayerbotAIConfig.equipAndSpecPersistence ||
         bot->GetLevel() < sPlayerbotAIConfig.equipAndSpecPersistenceLevel)
     {
-        uint32 specIndex = InitTalentsTree();
-        sRandomPlayerbotMgr.SetValue(bot->GetGUID().GetCounter(), "specNo", specIndex + 1);
+        InitTalentsTree();
     }
     if (botAI)
     {
@@ -1477,18 +1476,47 @@ void PlayerbotFactory::ResetQuests()
     }
 }
 
-uint32 PlayerbotFactory::InitTalentsTree(bool increment /*false*/, bool use_template /*true*/, bool reset /*false*/)
+void PlayerbotFactory::InitTalentsTree(bool increment /*false*/, bool use_template /*true*/, bool /*reset*/ /*false*/)
 {
-    uint32 specTab;
     uint8 cls = bot->getClass();
     std::map<uint8, uint32> tabs = AiFactory::GetPlayerSpecTabs(bot);
     uint32 total_tabs = tabs[0] + tabs[1] + tabs[2];
-    if (increment && total_tabs != 0)
+    uint32 specIndex = 0;
+    uint32 storedSpecNo = increment ? sRandomPlayerbotMgr.GetValue(bot, "specNo") : 0;
+
+    // No stored spec number, check for a custom spec link
+    if (increment && storedSpecNo == 0)
     {
-        /// @todo: match current talent with template
-        specTab = AiFactory::GetPlayerSpecTab(bot);
-        /// @todo: fix cat druid hardcode
-        if (bot->getClass() == CLASS_DRUID && specTab == DRUID_TAB_FERAL && bot->GetLevel() >= 20)
+        std::string specLink = sRandomPlayerbotMgr.GetData(bot->GetGUID().GetCounter(), "specLink");
+        if (!specLink.empty())
+        {
+            std::vector<std::vector<uint32>> parsed = PlayerbotAIConfig::ParseTempTalentsOrder(cls, specLink);
+            if (!parsed.empty())
+            {
+                InitTalentsByParsedSpecLink(bot, parsed, true);
+                return;
+            }
+        }
+    }
+    // Stored spec found, but stored spec is 1 based while specIndex is 0 based, so adjust by -1.
+    if (storedSpecNo > 0)
+        specIndex = storedSpecNo - 1;
+    else if (increment && total_tabs != 0)
+    {
+        // No assigned spec, but the bot already has talents. Set based on dominant tree.
+        uint8 defaultTab = AiFactory::GetDefaultSpecTab(cls);
+        uint8 specSlot = defaultTab;
+        uint32 maxPoints = 0;
+        for (uint8 i = 0; i < 3; ++i)
+        {
+            if (tabs[i] > maxPoints || (tabs[i] == maxPoints && i == defaultTab))
+            {
+                maxPoints = tabs[i];
+                specSlot = i;
+            }
+        }
+        // @todo: fix cat druid hardcode
+        if (cls == CLASS_DRUID && specSlot == DRUID_TAB_FERAL && bot->GetLevel() >= 20)
         {
             bool isCat = !bot->HasAura(SPELL_DRUID_THICK_HIDE);
             if (!isCat && bot->GetLevel() == 20)
@@ -1500,12 +1528,14 @@ uint32 PlayerbotFactory::InitTalentsTree(bool increment /*false*/, bool use_temp
             }
             if (isCat)
             {
-                specTab = 3;
+                specSlot = 3;
             }
         }
+        specIndex = sPlayerbotAIConfig.randomClassSpecIndex[cls][specSlot];
     }
     else
     {
+        // No talents or increment == false
         uint32 pointSum = 0;
         for (int i = 0; i < MAX_SPECNO; i++)
         {
@@ -1513,37 +1543,36 @@ uint32 PlayerbotFactory::InitTalentsTree(bool increment /*false*/, bool use_temp
         }
         uint32 point = urand(1, pointSum);
         uint32 currentP = 0;
+        uint8 specSlot = 0;
         int i;
         for (i = 0; i < MAX_SPECNO; i++)
         {
             currentP += sPlayerbotAIConfig.randomClassSpecProb[cls][i];
             if (point <= currentP)
             {
-                specTab = i;
+                specSlot = i;
                 break;
             }
         }
         if (i == MAX_SPECNO)
         {
-            specTab = 0;
+            specSlot = 0;
             LOG_ERROR("playerbots", "Fail to select spec num for bot {}! Set to 0.", bot->GetName());
         }
+        specIndex = sPlayerbotAIConfig.randomClassSpecIndex[cls][specSlot];
     }
-    if (reset)
-    {
-        bot->resetTalents(true);
-    }
+
+    // Always (re)build onto a clean slate. The increment flag then purely
+    // selects honor-the-pin (true) vs re-roll a fresh spec (false); neither
+    // can layer onto stale talents. This also self-heals any drift and picks
+    // up edits to the config spec. Bot talent resets are free.
+    bot->resetTalents(true);
     // use template if can
     if (use_template)
     {
-        InitTalentsByTemplate(specTab);
+        InitTalentsByTemplate(specIndex);
     }
-    // if LimitTalentsExpansion = 1 there may be unused talent points
-    if (bot->GetFreeTalentPoints())
-        InitTalents((specTab + 1) % 3);
-
-    if (bot->GetFreeTalentPoints())
-        InitTalents((specTab + 2) % 3);
+    // Leftover talent points are left unspent on purpose.
 
     if (bot->getClass() == CLASS_SHAMAN && bot->HasSpell(SPELL_SHAMAN_DUAL_WIELD))
     {
@@ -1552,7 +1581,8 @@ uint32 PlayerbotFactory::InitTalentsTree(bool increment /*false*/, bool use_temp
     }
 
     bot->SendTalentsInfoData(false);
-    return sPlayerbotAIConfig.randomClassSpecIndex[cls][specTab];
+    // Stored spec is 1 based instead of 0 based, so we increment by 1.
+    sRandomPlayerbotMgr.SetValue(bot->GetGUID().GetCounter(), "specNo", specIndex + 1);
 }
 
 void PlayerbotFactory::InitTalentsBySpecNo(Player* bot, int specNo, bool reset)
@@ -1699,6 +1729,12 @@ void PlayerbotFactory::InitTalentsByParsedSpecLink(Player* bot, std::vector<std:
             break;
         }
     }
+    if (bot->getClass() == CLASS_SHAMAN && bot->HasSpell(SPELL_SHAMAN_DUAL_WIELD))
+    {
+        bot->SetSkill(SKILL_DUAL_WIELD, 0, 1, 1);
+        bot->SetCanDualWield(true);
+    }
+
     bot->SendTalentsInfoData(false);
 }
 
@@ -3355,72 +3391,13 @@ void PlayerbotFactory::InitSpecialSpells()
     }
 }
 
-void PlayerbotFactory::InitTalents(uint32 specNo)
+void PlayerbotFactory::InitTalentsByTemplate(uint32 specIndex)
 {
-    uint32 classMask = bot->getClassMask();
-    std::map<uint32, std::vector<TalentEntry const*>> spells;
-    for (uint32 i = 0; i < sTalentStore.GetNumRows(); ++i)
-    {
-        TalentEntry const* talentInfo = sTalentStore.LookupEntry(i);
-        if (!talentInfo)
-            continue;
+    if (specIndex >= MAX_SPECNO)
+        return;
 
-        TalentTabEntry const* talentTabInfo = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
-        if (!talentTabInfo || talentTabInfo->tabpage != specNo)
-            continue;
-
-        if ((classMask & talentTabInfo->ClassMask) == 0)
-            continue;
-
-        spells[talentInfo->Row].push_back(talentInfo);
-    }
-
-    uint32 freePoints = bot->GetFreeTalentPoints();
-    for (auto i = spells.begin(); i != spells.end(); ++i)
-    {
-        std::vector<TalentEntry const*>& spells_row = i->second;
-        if (spells_row.empty())
-        {
-            LOG_INFO("playerbots", "{}: No spells for talent row {}", bot->GetName().c_str(), i->first);
-            continue;
-        }
-        int attemptCount = 0;
-        while (!spells_row.empty() && (int)freePoints - (int)bot->GetFreeTalentPoints() < 5 && attemptCount++ < 3 &&
-               bot->GetFreeTalentPoints())
-        {
-            int index = urand(0, spells_row.size() - 1);
-            TalentEntry const* talentInfo = spells_row[index];
-            int maxRank = 0;
-            for (int rank = 0; rank < std::min((uint32)MAX_TALENT_RANK, bot->GetFreeTalentPoints()); ++rank)
-            {
-                uint32 spellId = talentInfo->RankID[rank];
-                if (!spellId)
-                    continue;
-
-                maxRank = rank;
-            }
-            if (talentInfo->DependsOn)
-            {
-                bot->LearnTalent(talentInfo->DependsOn,
-                                 std::min(talentInfo->DependsOnRank, bot->GetFreeTalentPoints() - 1));
-            }
-            bot->LearnTalent(talentInfo->TalentID, maxRank);
-            spells_row.erase(spells_row.begin() + index);
-        }
-
-        freePoints = bot->GetFreeTalentPoints();
-    }
-}
-
-void PlayerbotFactory::InitTalentsByTemplate(uint32 specTab)
-{
-    // if (sPlayerbotAIConfig.parsedSpecLinkOrder[bot->getClass()][specNo][80].size() == 0)
-    // {
-    //     return;
-    // }
     uint32 cls = bot->getClass();
     int startLevel = bot->GetLevel();
-    uint32 specIndex = sPlayerbotAIConfig.randomClassSpecIndex[cls][specTab];
     uint32 classMask = bot->getClassMask();
     std::unordered_map<uint32, std::vector<TalentEntry const*>> spells_row;
     for (uint32 i = 0; i < sTalentStore.GetNumRows(); ++i)
