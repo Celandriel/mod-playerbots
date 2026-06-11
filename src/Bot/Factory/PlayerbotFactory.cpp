@@ -205,6 +205,34 @@ std::pair<uint16, uint16> PlayerbotFactory::ChooseProfessionPair(
     return {fallback.firstSkill, fallback.secondSkill};
 }
 
+std::pair<uint16, uint16> PlayerbotFactory::ChooseProfessionPairContaining(
+    std::vector<WeightedProfessionPair> const& professionPairs, uint16 skillId)
+{
+    uint32 totalWeight = 0;
+    for (WeightedProfessionPair const& pair : professionPairs)
+    {
+        if (pair.firstSkill == skillId || pair.secondSkill == skillId)
+            totalWeight += pair.weight;
+    }
+
+    if (!totalWeight)
+        return {0, 0};
+
+    uint32 roll = urand(1, totalWeight);
+    for (WeightedProfessionPair const& pair : professionPairs)
+    {
+        if (pair.firstSkill != skillId && pair.secondSkill != skillId)
+            continue;
+
+        if (roll <= pair.weight)
+            return {pair.firstSkill, pair.secondSkill};
+
+        roll -= pair.weight;
+    }
+
+    return {0, 0};
+}
+
 bool PlayerbotFactory::HasProfessionPair(std::vector<WeightedProfessionPair> const& professionPairs,
                                          uint16 firstSkill, uint16 secondSkill)
 {
@@ -2672,68 +2700,84 @@ void PlayerbotFactory::InitTradeSkills()
 
     uint16 firstSkill = sRandomPlayerbotMgr.GetValue(bot, "firstSkill");
     uint16 secondSkill = sRandomPlayerbotMgr.GetValue(bot, "secondSkill");
-    ProfessionRollType professionRollType =
-        static_cast<ProfessionRollType>(sRandomPlayerbotMgr.GetValue(bot, "professionRollType"));
 
-    if (professionRollType != ProfessionRollType::Class && professionRollType != ProfessionRollType::Random)
+    // Step 1: clear any stored assignment that is invalid or that the bot doesn't actually have so step 2 refills it.
+    if (firstSkill && (!IsPrimaryTradeSkill(firstSkill) || !bot->HasSkill(firstSkill)))
     {
-        professionRollType = urand(1, 100) <= sPlayerbotAIConfig.classMatchingProfessionChance
-                                 ? ProfessionRollType::Class
-                                 : ProfessionRollType::Random;
-        sRandomPlayerbotMgr.SetValue(bot, "professionRollType", static_cast<uint32>(professionRollType));
+        firstSkill = 0;
+        sRandomPlayerbotMgr.SetValue(bot, "firstSkill", firstSkill);
     }
 
-    std::vector<WeightedProfessionPair> professionPairs = professionRollType == ProfessionRollType::Class
-                                                              ? GetClassProfessionPairs(bot)
-                                                              : GetRandomProfessionPairs();
-
-    bool const hasStoredProfessionPair = firstSkill && secondSkill && firstSkill != secondSkill &&
-                                         IsPrimaryTradeSkill(firstSkill) && IsPrimaryTradeSkill(secondSkill) &&
-                                         HasProfessionPair(professionPairs, firstSkill, secondSkill);
-    bool const keepExistingProfessionPair = maxPrimaryTradeSkills < 2 && hasStoredProfessionPair;
-
-    if (maxPrimaryTradeSkills == 1 && !keepExistingProfessionPair)
+    if (secondSkill && (!IsPrimaryTradeSkill(secondSkill) || !bot->HasSkill(secondSkill)))
     {
-        if (!IsPrimaryTradeSkill(firstSkill) || secondSkill != 0)
+        secondSkill = 0;
+        sRandomPlayerbotMgr.SetValue(bot, "secondSkill", secondSkill);
+    }
+
+    uint32 const storedCount = (firstSkill ? 1u : 0u) + (secondSkill ? 1u : 0u);
+    bool const slotMissing = storedCount < maxPrimaryTradeSkills;
+
+    std::vector<uint16> primarySkills;
+
+    if (slotMissing)
+    {
+        ProfessionRollType professionRollType =
+            static_cast<ProfessionRollType>(sRandomPlayerbotMgr.GetValue(bot, "professionRollType"));
+
+        if (professionRollType != ProfessionRollType::Class && professionRollType != ProfessionRollType::Random)
+        {
+            professionRollType = urand(1, 100) <= sPlayerbotAIConfig.classMatchingProfessionChance
+                                     ? ProfessionRollType::Class
+                                     : ProfessionRollType::Random;
+            sRandomPlayerbotMgr.SetValue(bot, "professionRollType", static_cast<uint32>(professionRollType));
+        }
+
+        std::vector<WeightedProfessionPair> professionPairs = professionRollType == ProfessionRollType::Class
+                                                                  ? GetClassProfessionPairs(bot)
+                                                                  : GetRandomProfessionPairs();
+
+        if (maxPrimaryTradeSkills == 1)
         {
             firstSkill = ChooseSingleProfession(professionPairs);
             secondSkill = 0;
-
-            sRandomPlayerbotMgr.SetValue(bot, "firstSkill", firstSkill);
-            sRandomPlayerbotMgr.SetValue(bot, "secondSkill", secondSkill);
         }
-    }
-    else if (maxPrimaryTradeSkills == 0 && !keepExistingProfessionPair)
-    {
-        firstSkill = 0;
-        secondSkill = 0;
+        else if (maxPrimaryTradeSkills == 2)
+        {
+            if (!firstSkill && !secondSkill)
+            {
+                auto const& professionPair = ChooseProfessionPair(professionPairs);
+                firstSkill = professionPair.first;
+                secondSkill = professionPair.second;
+            }
+            else
+            {
+                uint16 const pairFirst = firstSkill ? firstSkill : secondSkill;
+                auto const matched = ChooseProfessionPairContaining(professionPairs, pairFirst);
 
+                uint16 pair = 0;
+                if (matched.first || matched.second)
+                {
+                    pair = matched.first == pairFirst ? matched.second : matched.first;
+                }
+                else
+                {
+                    // Unable to find pair, pick random.
+                    pair = ChooseSingleProfession(GetRandomProfessionPairs());
+                    if (pair == pairFirst)
+                        pair = 0;
+                }
+
+                firstSkill = pairFirst;
+                secondSkill = pair;
+            }
+        }
         sRandomPlayerbotMgr.SetValue(bot, "firstSkill", firstSkill);
         sRandomPlayerbotMgr.SetValue(bot, "secondSkill", secondSkill);
-    }
 
-    if (maxPrimaryTradeSkills >= 2 &&
-        (!firstSkill || !secondSkill || firstSkill == secondSkill || !IsPrimaryTradeSkill(firstSkill) ||
-         !IsPrimaryTradeSkill(secondSkill) || !HasProfessionPair(professionPairs, firstSkill, secondSkill)))
-    {
-        auto const& professionPair = ChooseProfessionPair(professionPairs);
-        firstSkill = professionPair.first;
-        secondSkill = professionPair.second;
-
-        sRandomPlayerbotMgr.SetValue(bot, "firstSkill", firstSkill);
-        sRandomPlayerbotMgr.SetValue(bot, "secondSkill", secondSkill);
-    }
-
-    std::vector<uint16> primarySkills;
-    if (keepExistingProfessionPair)
-    {
         primarySkills.push_back(firstSkill);
-        primarySkills.push_back(secondSkill);
+        if (secondSkill)
+            primarySkills.push_back(secondSkill);
     }
-    else if (maxPrimaryTradeSkills > 0)
-        primarySkills.push_back(firstSkill);
-    if (!keepExistingProfessionPair && maxPrimaryTradeSkills > 1)
-        primarySkills.push_back(secondSkill);
 
     SetRandomSkill(SKILL_FIRST_AID);
     SetRandomSkill(SKILL_FISHING);
@@ -2751,8 +2795,7 @@ void PlayerbotFactory::InitTradeSkills()
         if (!spellId || bot->HasSpell(spellId))
             continue;
 
-        if (IsPrimaryTradeSkill(skillId) && !bot->GetFreePrimaryProfessionPoints() &&
-            !(keepExistingProfessionPair && bot->HasSkill(skillId)))
+        if (IsPrimaryTradeSkill(skillId) && !bot->GetFreePrimaryProfessionPoints())
             continue;
 
         bot->learnSpell(spellId, false);
