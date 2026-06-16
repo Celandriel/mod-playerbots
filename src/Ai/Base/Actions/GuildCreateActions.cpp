@@ -9,6 +9,7 @@
 #include "BudgetValues.h"
 #include "Event.h"
 #include "GuildMgr.h"
+#include "PlayerbotGuildMgr.h"
 #include "Playerbots.h"
 #include "RandomPlayerbotFactory.h"
 #include "ServerFacade.h"
@@ -235,26 +236,11 @@ bool PetitionTurnInAction::Execute(Event /*event*/)
 
         if (bot->GetGuildId())
         {
-            // Ensure that bot has at least 10g for HandleSetEmblem can be managed core side
-            // (EMBLEM_PRICE = 10 * GOLD in core)
-            static constexpr uint32 REQUIRED = 10 * GOLD;
-            uint32 have = bot->GetMoney();               // actual money earned by bot in copper
-            if (have < REQUIRED)
-            {
-                bot->ModifyMoney(int32(REQUIRED - have)); // add only the missing amount to bot to reach 10g
-            }
-
             Guild* guild = sGuildMgr->GetGuildById(bot->GetGuildId());
 
-            uint32 st, cl, br, bc, bg;
-            bg = urand(0, 51);
-            bc = urand(0, 17);
-            cl = urand(0, 17);
-            br = urand(0, 7);
-            st = urand(0, 180);
-            EmblemInfo emblemInfo(st, cl, br, bc, bg);
-
-            guild->HandleSetEmblem(emblemInfo); // official core handling
+            // Apply a random tabard via the module's SQL helper (the same path
+            // the random-bot factory uses); no core-side emblem hook required.
+            PlayerbotGuildMgr::instance().SetGuildEmblem(guild->GetId());
 
             // LANG_GUILD_VETERAN -> can invite
             guild->HandleSetRankInfo(2, GR_RIGHT_GCHATLISTEN | GR_RIGHT_GCHATSPEAK | GR_RIGHT_INVITE);
