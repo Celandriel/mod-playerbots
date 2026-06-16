@@ -6,6 +6,7 @@
 #include "ItemUsageValue.h"
 
 #include "AiFactory.h"
+#include "BotUtils.h"
 #include "ChatHelper.h"
 #include "GuildTaskMgr.h"
 #include "Item.h"
@@ -52,7 +53,7 @@ ItemUsage ItemUsageValue::Calculate()
                 if (bot->HasSpell(proto->Spells[2].SpellId))
                     needItem = false;
                 else
-                    needItem = bot->BotCanUseItem(proto) == EQUIP_ERR_OK;
+                    needItem = BotUtils::CanUseItem(bot, proto) == EQUIP_ERR_OK;
             }
         }
 
@@ -164,7 +165,7 @@ ItemUsage ItemUsageValue::Calculate()
 
 ItemUsage ItemUsageValue::QueryItemUsageForEquip(ItemTemplate const* itemProto, int32 randomPropertyId)
 {
-    if (bot->BotCanUseItem(itemProto) != EQUIP_ERR_OK)
+    if (BotUtils::CanUseItem(bot, itemProto) != EQUIP_ERR_OK)
         return ITEM_USAGE_NONE;
 
     if (itemProto->InventoryType == INVTYPE_NON_EQUIP)

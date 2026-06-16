@@ -1,5 +1,6 @@
 #include "StatsCollector.h"
 
+#include "BotUtils.h"
 #include "DBCStores.h"
 #include "ItemTemplate.h"
 #include "PlayerbotAI.h"
@@ -22,7 +23,7 @@ void StatsCollector::Reset()
 
 void StatsCollector::CollectItemStats(ItemTemplate const* proto)
 {
-    if (proto->IsRangedWeapon())
+    if (BotUtils::IsRangedWeapon(proto))
     {
         float val = (proto->Damage[0].DamageMin + proto->Damage[0].DamageMax) * 1000 / 2 / proto->Delay;
         stats[STATS_TYPE_RANGED_DPS] += val;

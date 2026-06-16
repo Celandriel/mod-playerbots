@@ -5,6 +5,7 @@
 
 #include "RandomItemMgr.h"
 
+#include "BotUtils.h"
 #include "ItemTemplate.h"
 #include "LootValues.h"
 #include "Playerbots.h"
@@ -1392,7 +1393,7 @@ uint32 RandomItemMgr::CalculateStatWeight(uint8 playerclass, uint8 spec, ItemTem
             dps = (proto->Damage[i].DamageMin + proto->Damage[i].DamageMax) / (float)(proto->Delay / 1000.0f) / 2;
             if (dps)
             {
-                if (proto->IsRangedWeapon())
+                if (BotUtils::IsRangedWeapon(proto))
                     statWeight += CalculateSingleStatWeight(playerclass, spec, "rgddps", dps);
                 else
                     statWeight += CalculateSingleStatWeight(playerclass, spec, "mledps", dps);
