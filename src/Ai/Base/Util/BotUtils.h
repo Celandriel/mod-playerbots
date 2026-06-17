@@ -6,8 +6,13 @@
 #pragma once
 
 #include "Define.h"
+#include "ObjectGuid.h"
+#include "SharedDefines.h"
+
+#include <string_view>
 
 class Player;
+class WorldPacket;
 struct ItemTemplate;
 enum InventoryResult : uint8;
 
@@ -23,4 +28,12 @@ public:
     // Item type helpers (relocated from core ItemTemplate).
     static bool IsWeapon(ItemTemplate const* proto);
     static bool IsRangedWeapon(ItemTemplate const* proto);
+
+    // All-in-one chat packet builder (relocated from core ChatHandler). chatTag
+    // is a uint8 so callers can pass a PlayerChatTag without this header needing it.
+    static void BuildChatPacket(WorldPacket& data, ChatMsg msgtype, std::string_view message,
+        Language language = LANG_UNIVERSAL, uint8 chatTag = 0,
+        ObjectGuid const& senderGuid = ObjectGuid(), std::string_view senderName = {},
+        ObjectGuid const& targetGuid = ObjectGuid(), std::string_view targetName = {},
+        std::string_view channelName = {}, uint32 achievementId = 0);
 };
