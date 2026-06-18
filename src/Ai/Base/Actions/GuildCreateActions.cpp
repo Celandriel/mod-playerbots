@@ -237,9 +237,6 @@ bool PetitionTurnInAction::Execute(Event /*event*/)
         if (bot->GetGuildId())
         {
             Guild* guild = sGuildMgr->GetGuildById(bot->GetGuildId());
-
-            // Apply a random tabard via the module's SQL helper (the same path
-            // the random-bot factory uses); no core-side emblem hook required.
             PlayerbotGuildMgr::instance().SetGuildEmblem(guild->GetId());
 
             // LANG_GUILD_VETERAN -> can invite

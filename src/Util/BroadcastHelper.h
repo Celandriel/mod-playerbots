@@ -1,11 +1,18 @@
 #pragma once
 
+#include "Define.h"
+#include "ObjectGuid.h"
+#include "SharedDefines.h"
+
+#include <string_view>
+
 class PlayerbotAI;
 class Player;
 class ItemTemplate;
 class Quest;
 class Creature;
 class Group;
+class WorldPacket;
 
 class BroadcastHelper
 {
@@ -26,6 +33,14 @@ public:
     };
 
     static uint8_t GetLocale();
+
+    // All-in-one chat packet builder (relocated from core ChatHandler). chatTag
+    // is a uint8 so callers can pass a PlayerChatTag without this header needing it.
+    static void BuildChatPacket(WorldPacket& data, ChatMsg msgtype, std::string_view message,
+        Language language = LANG_UNIVERSAL, uint8 chatTag = 0,
+        ObjectGuid const& senderGuid = ObjectGuid(), std::string_view senderName = {},
+        ObjectGuid const& targetGuid = ObjectGuid(), std::string_view targetName = {},
+        std::string_view channelName = {}, uint32 achievementId = 0);
     static bool BroadcastTest(
         PlayerbotAI* ai,
         Player* bot

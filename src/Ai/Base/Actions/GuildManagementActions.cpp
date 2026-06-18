@@ -5,7 +5,6 @@
 
 #include "GuildManagementActions.h"
 
-#include "BotUtils.h"
 #include "GuildMgr.h"
 #include "GuildPackets.h"
 #include "Playerbots.h"
@@ -265,7 +264,7 @@ bool GuildManageNearbyAction::Execute(Event /*event*/)
                 if (sameGroup)
                 {
                     WorldPacket data;
-                    BotUtils::BuildChatPacket(data, bot->GetGroup()->isRaidGroup() ? CHAT_MSG_RAID : CHAT_MSG_PARTY, line.c_str(), LANG_UNIVERSAL, CHAT_TAG_NONE, bot->GetGUID(), bot->GetName());
+                    BroadcastHelper::BuildChatPacket(data, bot->GetGroup()->isRaidGroup() ? CHAT_MSG_RAID : CHAT_MSG_PARTY, line.c_str(), LANG_UNIVERSAL, CHAT_TAG_NONE, bot->GetGUID(), bot->GetName());
                     bot->GetGroup()->BroadcastPacket(&data, true);
                 }
                 else

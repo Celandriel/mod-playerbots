@@ -16,10 +16,12 @@
 #include "ItemTemplate.h"
 
 class ChatHandler;
+class Player;
 
 struct ItemTemplate;
 
 enum EquipmentSlots : uint32;
+enum InventoryResult : uint8;
 
 enum RandomItemType
 {
@@ -171,6 +173,11 @@ public:
     uint32 GetQuestIdForItem(uint32 itemId);
     std::vector<uint32> GetQuestIdsForItem(uint32 itemId);
     static bool IsUsedBySkill(ItemTemplate const* proto, uint32 skillId);
+    // Item type / usability helpers relocated out of the AzerothCore core so the
+    // core stays minimal/upstreamable. Each only uses already-public core API.
+    static bool IsWeapon(ItemTemplate const* proto);
+    static bool IsRangedWeapon(ItemTemplate const* proto);
+    static InventoryResult CanUseItem(Player const* bot, ItemTemplate const* proto);
     bool IsTestItem(uint32 itemId) { return itemForTest.find(itemId) != itemForTest.end(); }
     std::vector<uint32> GetCachedEquipments(uint32 requiredLevel, uint32 inventoryType);
     std::vector<uint32> const& GetEnchantmentPool(uint32 entry) const;

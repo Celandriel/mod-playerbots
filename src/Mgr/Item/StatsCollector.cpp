@@ -1,10 +1,10 @@
 #include "StatsCollector.h"
 
-#include "BotUtils.h"
 #include "DBCStores.h"
 #include "ItemTemplate.h"
 #include "PlayerbotAI.h"
 #include "PlayerbotAIAware.h"
+#include "RandomItemMgr.h"
 #include "SharedDefines.h"
 #include "SpellAuraDefines.h"
 #include "SpellInfo.h"
@@ -23,12 +23,12 @@ void StatsCollector::Reset()
 
 void StatsCollector::CollectItemStats(ItemTemplate const* proto)
 {
-    if (BotUtils::IsRangedWeapon(proto))
+    if (RandomItemMgr::IsRangedWeapon(proto))
     {
         float val = (proto->Damage[0].DamageMin + proto->Damage[0].DamageMax) * 1000 / 2 / proto->Delay;
         stats[STATS_TYPE_RANGED_DPS] += val;
     }
-    else if (proto->IsWeapon())
+    else if (RandomItemMgr::IsWeapon(proto))
     {
         float val = (proto->Damage[0].DamageMin + proto->Damage[0].DamageMax) * 1000 / 2 / proto->Delay;
         stats[STATS_TYPE_MELEE_DPS] += val;
