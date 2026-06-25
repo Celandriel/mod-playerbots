@@ -34,6 +34,7 @@
 #include "PlayerbotAI.h"
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotFactory.h"
+#include "PlayerbotTextMgr.h"
 #include "Playerbots.h"
 #include "Position.h"
 #include "RaceMgr.h"
@@ -2028,7 +2029,7 @@ uint32 RandomPlayerbotMgr::GetZoneLevel(uint16 mapId, float teleX, float teleY, 
     uint32 level = 0;
     QueryResult results = WorldDatabase.Query(
         "SELECT AVG(t.minlevel) minlevel, AVG(t.maxlevel) maxlevel FROM creature c "
-        "INNER JOIN creature_template t ON c.id1 = t.entry WHERE map = {} AND minlevel > 1 AND ABS(position_x - {}) < "
+        "INNER JOIN creature_template t ON c.id = t.entry WHERE map = {} AND minlevel > 1 AND ABS(position_x - {}) < "
         "{} AND ABS(position_y - {}) < {}",
         mapId, teleX, sPlayerbotAIConfig.randomBotTeleportDistance / 2, teleY,
         sPlayerbotAIConfig.randomBotTeleportDistance / 2);
@@ -2589,7 +2590,8 @@ void RandomPlayerbotMgr::OnPlayerLogin(Player* player)
                 {
                     botAI->SetMaster(player);
                     botAI->ResetStrategies();
-                    botAI->TellMaster("Hello");
+                    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                        "hello", "Hello", {}));
                 }
 
                 break;
@@ -3052,7 +3054,7 @@ CreatureData const* RandomPlayerbotMgr::GetCreatureDataByEntry(uint32 entry)
     if (entry != 0)
     {
         for (auto const& itr : sObjectMgr->GetAllCreatureData())
-            if (itr.second.id1 == entry)
+            if (itr.second.id == entry)
                 return &itr.second;
     }
 

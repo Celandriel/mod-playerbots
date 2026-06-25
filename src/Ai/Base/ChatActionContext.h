@@ -3,8 +3,8 @@
  * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
-#ifndef _PLAYERBOT_CHATACTIONCONTEXTACTION_H
-#define _PLAYERBOT_CHATACTIONCONTEXTACTION_H
+#ifndef PLAYERBOTS_CHATACTIONCONTEXT_H
+#define PLAYERBOTS_CHATACTIONCONTEXT_H
 
 #include "AddLootAction.h"
 #include "AttackAction.h"
@@ -139,6 +139,7 @@ public:
         creators["maintenance"] = &ChatActionContext::maintenance;
         creators["remove glyph"] = &ChatActionContext::remove_glyph;
         creators["autogear"] = &ChatActionContext::autogear;
+        creators["autogear bis"] = &ChatActionContext::autogear_bis;
         creators["equip upgrade"] = &ChatActionContext::equip_upgrade;
         creators["attack my target"] = &ChatActionContext::attack_my_target;
         creators["pull my target"] = &ChatActionContext::pull_my_target;
@@ -261,6 +262,7 @@ private:
     static Action* maintenance(PlayerbotAI* botAI) { return new MaintenanceAction(botAI); }
     static Action* remove_glyph(PlayerbotAI* botAI) { return new RemoveGlyphAction(botAI); }
     static Action* autogear(PlayerbotAI* botAI) { return new AutoGearAction(botAI); }
+    static Action* autogear_bis(PlayerbotAI* botAI) { return new BisGearAction(botAI); }
     static Action* equip_upgrade(PlayerbotAI* botAI) { return new EquipUpgradeAction(botAI); }
     static Action* co(PlayerbotAI* botAI) { return new ChangeCombatStrategyAction(botAI); }
     static Action* nc(PlayerbotAI* botAI) { return new ChangeNonCombatStrategyAction(botAI); }

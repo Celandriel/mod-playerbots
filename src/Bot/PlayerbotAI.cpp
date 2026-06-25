@@ -15,6 +15,7 @@
 #include "ChannelMgr.h"
 #include "CharacterPackets.h"
 #include "ChatHelper.h"
+#include "CheckMountStateAction.h"
 #include "Common.h"
 #include "CreatureData.h"
 #include "EmoteAction.h"
@@ -37,11 +38,13 @@
 #include "ObjectMgr.h"
 #include "PerfMonitor.h"
 #include "Player.h"
+#include "PlayerbotTextMgr.h"
 #include "PlayerbotAIConfig.h"
 #include "PlayerbotMgr.h"
 #include "PlayerbotGuildMgr.h"
 #include "Playerbots.h"
 #include "PositionValue.h"
+#include "RBAC.h"
 #include "RandomPlayerbotMgr.h"
 #include "SayAction.h"
 #include "ScriptMgr.h"
@@ -452,9 +455,11 @@ void PlayerbotAI::UpdateAIGroupMaster()
                 botAI->ChangeStrategy("+follow", BOT_STATE_NON_COMBAT);
 
                 if (botAI->GetMaster() == botAI->GetGroupLeader())
-                    botAI->TellMaster("Hello, I follow you!");
+                    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                        "hello_follow", "Hello, I follow you!", {}));
                 else
-                    botAI->TellMaster(!urand(0, 2) ? "Hello!" : "Hi!");
+                    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                        "hello", "Hello!", {}));
             }
             else
             {
@@ -509,7 +514,7 @@ void PlayerbotAI::UpdateAIInternal([[maybe_unused]] uint32 elapsed, bool minimal
             logout = true;
 
         if (bot->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING) || bot->HasUnitState(UNIT_STATE_IN_FLIGHT) ||
-            botWorldSessionPtr->GetSecurity() >= (AccountTypes)sWorld->getIntConfig(CONFIG_INSTANT_LOGOUT))
+            botWorldSessionPtr->HasPermission(rbac::RBAC_PERM_INSTANT_LOGOUT))
         {
             logout = true;
         }
@@ -517,7 +522,7 @@ void PlayerbotAI::UpdateAIInternal([[maybe_unused]] uint32 elapsed, bool minimal
         if (master &&
             (master->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING) || master->HasUnitState(UNIT_STATE_IN_FLIGHT) ||
              (master->GetSession() &&
-              master->GetSession()->GetSecurity() >= (AccountTypes)sWorld->getIntConfig(CONFIG_INSTANT_LOGOUT))))
+              master->GetSession()->HasPermission(rbac::RBAC_PERM_INSTANT_LOGOUT))))
         {
             logout = true;
         }
@@ -858,7 +863,8 @@ void PlayerbotAI::Reset(bool full)
     {
         WorldPackets::Character::LogoutCancel data = WorldPacket(CMSG_LOGOUT_CANCEL);
         bot->GetSession()->HandleLogoutCancelOpcode(data);
-        TellMaster("Logout cancelled!");
+        TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+            "logout_cancel", "Logout cancelled!", {}));
     }
 
     currentEngine = engines[BOT_STATE_NON_COMBAT];
@@ -1368,6 +1374,17 @@ void PlayerbotAI::HandleBotOutgoingPacket(WorldPacket const& packet)
             // */
             return;
         }
+        case SMSG_DISMOUNT:
+        {
+            WorldPacket p(packet);
+            p.rpos(0);
+            ObjectGuid guid;
+            p >> guid.ReadAsPacked();
+            if (guid != bot->GetGUID())
+                return;
+            CheckMountStateAction::CompleteDismount(bot);
+            return;
+        }
         default:
             botOutgoingPacketHandlers.AddPacket(packet);
     }
@@ -1576,6 +1593,27 @@ void PlayerbotAI::ClearStrategies(BotState type)
     e->removeAllStrategies();
 }
 
+// Resets only the combat or non-combat engine: wipe strategies, repopulate with class/spec defaults,
+// re-apply current map's instance strategy (if any), and call Init() to rebuild trigger/action lists.
+void PlayerbotAI::SelectiveResetStrategies(BotState type)
+{
+    Engine* e = engines[type];
+    if (!e)
+        return;
+
+    e->removeAllStrategies();
+
+    if (type == BOT_STATE_COMBAT)
+        AiFactory::AddDefaultCombatStrategies(bot, this, e);
+    else if (type == BOT_STATE_NON_COMBAT)
+        AiFactory::AddDefaultNonCombatStrategies(bot, this, e);
+
+    if (sPlayerbotAIConfig.applyInstanceStrategies)
+        ApplyInstanceStrategies(bot->GetMapId());
+
+    e->Init();
+}
+
 std::vector<std::string> PlayerbotAI::GetStrategies(BotState type)
 {
     Engine* e = engines[type];
@@ -1589,11 +1627,12 @@ void PlayerbotAI::ApplyInstanceStrategies(uint32 mapId, bool tellMaster)
 {
     static const std::vector<std::string> allInstanceStrategies =
     {
-        "aq20", "bwl", "karazhan", "gruulslair", "icc", "magtheridon", "moltencore",
-        "naxx", "onyxia", "ssc", "tbc-ac", "tempestkeep", "ulduar", "voa", "wotlk-an", "wotlk-cos",
-        "wotlk-dtk", "wotlk-eoe", "wotlk-fos", "wotlk-gd", "wotlk-hol", "wotlk-hor",
-        "wotlk-hos", "wotlk-nex", "wotlk-occ", "wotlk-ok", "wotlk-os", "wotlk-pos",
-        "wotlk-toc", "wotlk-uk", "wotlk-up", "wotlk-vh", "zulaman"
+        "aq20", "blacktemple", "bwl", "gruulslair", "hyjal", "icc", "karazhan",
+        "magtheridon", "moltencore", "naxx", "onyxia", "ssc", "tbc-ac", "tempestkeep",
+        "ulduar", "voa", "wotlk-an", "wotlk-cos", "wotlk-dtk", "wotlk-eoe", "wotlk-fos",
+        "wotlk-gd", "wotlk-hol", "wotlk-hor", "wotlk-hos", "wotlk-nex", "wotlk-occ",
+        "wotlk-ok", "wotlk-os", "wotlk-pos", "wotlk-toc", "wotlk-uk", "wotlk-up",
+        "wotlk-vh", "zulaman"
     };
 
     for (const std::string& strat : allInstanceStrategies)
@@ -1623,6 +1662,9 @@ void PlayerbotAI::ApplyInstanceStrategies(uint32 mapId, bool tellMaster)
         case 533:
             strategyName = "naxx";  // Naxxramas
             break;
+        case 534:
+            strategyName = "hyjal";  // The Battle for Mount Hyjal (Hyjal Summit)
+            break;
         case 544:
             strategyName = "magtheridon";  // Magtheridon's Lair
             break;
@@ -1634,6 +1676,9 @@ void PlayerbotAI::ApplyInstanceStrategies(uint32 mapId, bool tellMaster)
             break;
         case 558:
             strategyName = "tbc-ac"; // Auchindoun: Auchenai Crypts
+            break;
+        case 564:
+            strategyName = "blacktemple";  // Black Temple
             break;
         case 565:
             strategyName = "gruulslair";  // Gruul's Lair
@@ -2547,7 +2592,7 @@ Player* PlayerbotAI::GetPlayer(ObjectGuid guid)
 uint32 GetCreatureIdForCreatureTemplateId(uint32 creatureTemplateId)
 {
     QueryResult results =
-        WorldDatabase.Query("SELECT guid FROM `creature` WHERE id1 = {} LIMIT 1;", creatureTemplateId);
+        WorldDatabase.Query("SELECT guid FROM `creature` WHERE id = {} LIMIT 1;", creatureTemplateId);
     if (results)
     {
         Field* fields = results->Fetch();
@@ -2568,7 +2613,7 @@ Unit* PlayerbotAI::GetUnit(CreatureData const* creatureData)
     uint32 spawnId = creatureData->spawnId;
     if (!spawnId)  // workaround for CreatureData with missing spawnId (this just uses first matching creatureId in DB,
                    // but thats ok this method is only used for battlemasters and theres only 1 of each type)
-        spawnId = GetCreatureIdForCreatureTemplateId(creatureData->id1);
+        spawnId = GetCreatureIdForCreatureTemplateId(creatureData->id);
     auto creatureBounds = map->GetCreatureBySpawnIdStore().equal_range(spawnId);
     if (creatureBounds.first == creatureBounds.second)
         return nullptr;
@@ -2840,7 +2885,7 @@ bool PlayerbotAI::SayToParty(const std::string& msg)
 
 bool PlayerbotAI::SayToRaid(const std::string& msg)
 {
-    if (!bot->GetGroup() || bot->GetGroup()->isRaidGroup())
+    if (!bot->GetGroup() || !bot->GetGroup()->isRaidGroup())
         return false;
 
     WorldPacket data;
@@ -2966,7 +3011,7 @@ bool PlayerbotAI::IsTellAllowed(PlayerbotSecurityLevel securityLevel)
         return false;
 
     if (sPlayerbotAIConfig.whisperDistance && !bot->GetGroup() && sRandomPlayerbotMgr.IsRandomBot(bot) &&
-        master->GetSession()->GetSecurity() < SEC_GAMEMASTER &&
+        !master->CanBeGameMaster() &&
         (bot->GetMapId() != master->GetMapId() ||
          ServerFacade::instance().GetDistance2d(bot, master) > sPlayerbotAIConfig.whisperDistance))
         return false;
@@ -2985,6 +3030,8 @@ bool PlayerbotAI::TellMaster(std::string const text, PlayerbotSecurityLevel secu
     {
         if (sPlayerbotAIConfig.randomBotSayWithoutMaster)
             return TellMasterNoFacing(text, securityLevel);
+
+        return false;
     }
     if (!TellMasterNoFacing(text, securityLevel))
         return false;
@@ -3108,20 +3155,10 @@ bool PlayerbotAI::HasAura(std::string const name, Unit* unit, bool maxStack, boo
     return false;
 }
 
-bool PlayerbotAI::HasAura(uint32 spellId, Unit const* unit)
+bool PlayerbotAI::HasSpell(std::string const spellName) const
 {
-    if (!spellId || !unit)
-        return false;
-
-    return unit->HasAura(spellId);
-    // for (uint8 effect = EFFECT_0; effect <= EFFECT_2; effect++)
-    // {
-    //     AuraEffect const* aurEff = unit->GetAuraEffect(spellId, effect);
-    //     if (IsRealAura(bot, aurEff, unit))
-    //         return true;
-    // }
-
-    // return false;
+    uint32 const spellId = aiObjectContext->GetValue<uint32>("spell id", spellName)->Get();
+    return spellId && bot->HasSpell(spellId);
 }
 
 Aura* PlayerbotAI::GetAura(std::string const name, Unit* unit, bool checkIsOwner, bool checkDuration, int checkStack)
@@ -4225,7 +4262,7 @@ void PlayerbotAI::InterruptSpell()
 void PlayerbotAI::RemoveAura(std::string const name)
 {
     uint32 spellid = aiObjectContext->GetValue<uint32>("spell id", name)->Get();
-    if (spellid && HasAura(spellid, bot))
+    if (spellid && bot->HasAura(spellid))
         bot->RemoveAurasDueToSpell(spellid);
 }
 
@@ -5526,7 +5563,7 @@ Item* PlayerbotAI::FindStoneFor(Item* weapon) const
         SOLID_SHARPENING_STONE,      HEAVY_SHARPENING_STONE, COARSE_SHARPENING_STONE,    ROUGH_SHARPENING_STONE};
 
     static const std::vector<uint32_t> uPrioritizedWeightStoneIds = {
-        ADAMANTITE_WEIGHTSTONE, FEL_WEIGHTSTONE,    DENSE_WEIGHTSTONE, SOLID_WEIGHTSTONE,
+        ADAMANTITE_WEIGHTSTONE, FEL_WEIGHTSTONE,    ELEMENTAL_SHARPENING_STONE, DENSE_WEIGHTSTONE, SOLID_WEIGHTSTONE,
         HEAVY_WEIGHTSTONE,      COARSE_WEIGHTSTONE, ROUGH_WEIGHTSTONE};
 
     Item* stone = nullptr;
@@ -5927,29 +5964,6 @@ void PlayerbotAI::EnchantItemT(uint32 spellid, uint8 slot)
     bot->ApplyEnchantment(pItem, PERM_ENCHANTMENT_SLOT, true);
 
     LOG_INFO("playerbots", "{}: items was enchanted successfully!", bot->GetName().c_str());
-}
-
-uint32 PlayerbotAI::GetBuffedCount(Player* player, std::string const spellname)
-{
-    uint32 bcount = 0;
-
-    if (Group* group = bot->GetGroup())
-    {
-        for (GroupReference* gref = group->GetFirstMember(); gref; gref = gref->next())
-        {
-            Player* member = gref->GetSource();
-            if (!member || !member->IsInWorld())
-                continue;
-
-            if (!member->IsInSameRaidWith(player))
-                continue;
-
-            if (HasAura(spellname, member, true))
-                bcount++;
-        }
-    }
-
-    return bcount;
 }
 
 int32 PlayerbotAI::GetNearGroupMemberCount(float dis)

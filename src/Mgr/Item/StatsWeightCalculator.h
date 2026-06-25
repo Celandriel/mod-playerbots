@@ -3,8 +3,8 @@
  * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
-#ifndef _PLAYERBOT_GEARSCORECALCULATOR_H
-#define _PLAYERBOT_GEARSCORECALCULATOR_H
+#ifndef PLAYERBOTS_STATSWEIGHTCALCULATOR_H
+#define PLAYERBOTS_STATSWEIGHTCALCULATOR_H
 
 #include "Player.h"
 #include "StatsCollector.h"
@@ -30,6 +30,7 @@ public:
     void Reset();
     float CalculateItem(uint32 itemId, int32 randomPropertyId = 0, int32 slot = -1);
     float CalculateEnchant(uint32 enchantId);
+    int32 PickBestRandomPropertyId(uint32 itemId);
 
     void SetOverflowPenalty(bool apply) { enable_overflow_penalty_ = apply; }
     void SetItemSetBonus(bool apply) { enable_item_set_bonus_ = apply; }

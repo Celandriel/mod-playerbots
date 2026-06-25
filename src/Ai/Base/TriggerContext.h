@@ -3,8 +3,8 @@
  * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
-#ifndef _PLAYERBOT_TRIGGERCONTEXT_H
-#define _PLAYERBOT_TRIGGERCONTEXT_H
+#ifndef PLAYERBOTS_TRIGGERCONTEXT_H
+#define PLAYERBOTS_TRIGGERCONTEXT_H
 
 #include "CureTriggers.h"
 #include "FishingTriggers.h"
@@ -51,6 +51,7 @@ public:
 
         creators["low mana"] = &TriggerContext::LowMana;
         creators["medium mana"] = &TriggerContext::MediumMana;
+        creators["low energy"] = &TriggerContext::LowEnergy;
         creators["high mana"] = &TriggerContext::HighMana;
         creators["almost full mana"] = &TriggerContext::AlmostFullMana;
         creators["enough mana"] = &TriggerContext::EnoughMana;
@@ -59,11 +60,14 @@ public:
         creators["party member low health"] = &TriggerContext::PartyMemberLowHealth;
         creators["party member medium health"] = &TriggerContext::PartyMemberMediumHealth;
         creators["party member almost full health"] = &TriggerContext::PartyMemberAlmostFullHealth;
+        creators["healer low mana"] = &TriggerContext::HealerLowMana;
 
         creators["generic boost"] = &TriggerContext::generic_boost;
         creators["loss of control"] = &TriggerContext::loss_of_control;
         creators["fear charm sleep"] = &TriggerContext::fear_charm_sleep;
         creators["fear sleep sap"] = &TriggerContext::fear_sleep_sap;
+        creators["poison disease bleed"] = &TriggerContext::poison_disease_bleed;
+        creators["movement impaired"] = &TriggerContext::movement_impaired;
 
         creators["protect party member"] = &TriggerContext::protect_party_member;
 
@@ -313,6 +317,7 @@ private:
     static Trigger* TargetCriticalHealth(PlayerbotAI* botAI) { return new TargetCriticalHealthTrigger(botAI); }
     static Trigger* LowMana(PlayerbotAI* botAI) { return new LowManaTrigger(botAI); }
     static Trigger* MediumMana(PlayerbotAI* botAI) { return new MediumManaTrigger(botAI); }
+    static Trigger* LowEnergy(PlayerbotAI* botAI) { return new LowEnergyTrigger(botAI); }
     static Trigger* HighMana(PlayerbotAI* botAI) { return new HighManaTrigger(botAI); }
     static Trigger* AlmostFullMana(PlayerbotAI* botAI) { return new AlmostFullManaTrigger(botAI); }
     static Trigger* EnoughMana(PlayerbotAI* botAI) { return new EnoughManaTrigger(botAI); }
@@ -380,10 +385,13 @@ private:
     static Trigger* loss_of_control(PlayerbotAI* botAI) { return new LossOfControlTrigger(botAI); }
     static Trigger* fear_charm_sleep(PlayerbotAI* botAI) { return new FearCharmSleepTrigger(botAI); }
     static Trigger* fear_sleep_sap(PlayerbotAI* botAI) { return new FearSleepSapTrigger(botAI); }
+    static Trigger* poison_disease_bleed(PlayerbotAI* botAI) { return new PoisonDiseaseBleedTrigger(botAI); }
+    static Trigger* movement_impaired(PlayerbotAI* botAI) { return new MovementImpairedTrigger(botAI); }
     static Trigger* PartyMemberCriticalHealth(PlayerbotAI* botAI)
     {
         return new PartyMemberCriticalHealthTrigger(botAI);
     }
+    static Trigger* HealerLowMana(PlayerbotAI* botAI) { return new HealerLowManaTrigger(botAI); }
     static Trigger* protect_party_member(PlayerbotAI* botAI) { return new ProtectPartyMemberTrigger(botAI); }
     static Trigger* no_pet(PlayerbotAI* botAI) { return new NoPetTrigger(botAI); }
     static Trigger* has_pet(PlayerbotAI* botAI) { return new HasPetTrigger(botAI); }
