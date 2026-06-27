@@ -16,13 +16,11 @@ bool SetHomeAction::Execute(Event /*event*/)
     ObjectGuid selection = bot->GetTarget();
     bool isRpgAction = AI_VALUE(GuidPosition, "rpg target") == selection;
 
-    if (!isRpgAction)
-    {
-        if (master)
-            selection = master->GetTarget();
-        else
-            return false;
-    }
+    // Prefer an explicitly targeted innkeeper (master command / legacy rpg target).
+    // Autonomous NewRpg bots have neither, so they fall through to the self-resolve
+    // scan below instead of bailing out.
+    if (!isRpgAction && master)
+        selection = master->GetTarget();
 
     if (Unit* unit = botAI->GetUnit(selection))
         if (unit->HasNpcFlag(UNIT_NPC_FLAG_INNKEEPER))

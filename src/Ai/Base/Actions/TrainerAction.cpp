@@ -75,13 +75,32 @@ bool TrainerAction::isPossible()
 
 Unit* TrainerAction::GetTarget()
 {
-    // There are just two scenarios: the bot has a master or it doesn't. If the
-    // bot has a master, the master should target a unit; otherwise, the bot
-    // should target the unit itself.
+    // With a master, the master targets the trainer.
     if (Player* master = GetMaster())
         return master->GetSelectedUnit();
 
-    return bot->GetSelectedUnit();
+    // Master-less (autonomous) bot: honor an already-selected valid trainer,
+    // otherwise self-resolve the nearest interactable trainer that can actually
+    // teach this bot. This keeps target resolution inside the action so callers
+    // (e.g. the NewRpg GoCity sequencer) need not pre-select an NPC.
+    if (Unit* selected = bot->GetSelectedUnit())
+        if (Creature* creature = selected->ToCreature())
+            if (creature->IsTrainer())
+                return selected;
+
+    GuidVector npcs = AI_VALUE(GuidVector, "nearest npcs");
+    for (ObjectGuid const& guid : npcs)
+    {
+        Creature* trainer = bot->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_TRAINER);
+        if (!trainer)
+            continue;
+
+        Trainer::Trainer const* trainerData = sObjectMgr->GetTrainer(trainer->GetEntry());
+        if (trainerData && trainerData->IsTrainerValidForPlayer(bot))
+            return trainer;
+    }
+
+    return nullptr;
 }
 
 Creature* TrainerAction::GetCreatureTarget()

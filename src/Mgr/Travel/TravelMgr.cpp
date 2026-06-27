@@ -11,6 +11,7 @@
 #include "AreaDefines.h"
 #include "Creature.h"
 #include "Log.h"
+#include "Trainer.h"
 #include "ObjectAccessor.h"
 #include "TravelNode.h"
 #include "Talentspec.h"
@@ -4555,6 +4556,78 @@ std::vector<WorldLocation> TravelMgr::GetCityLocations(Player* bot)
     return fallbackLocations;
 }
 
+bool TravelMgr::SelectCityDestination(Player* bot, WorldPosition& outPos, uint32& outZone)
+{
+    uint32 level = bot->GetLevel();
+    // .find() (not operator[]) so this shared startup-built cache is never mutated
+    // from a map thread.
+    auto bankerIt = bankerLocsPerLevelCache.find(level);
+    if (bankerIt == bankerLocsPerLevelCache.end() || bankerIt->second.empty())
+        return false;
+    auto const& bankers = bankerIt->second;
+
+    // Mirror GetCityLocations' weighted-capital selection, but keep the chosen
+    // city's zone id so the RPG sequencer can resolve services without an area
+    // lookup (which would create/load the destination map on a map thread).
+    if (sPlayerbotAIConfig.enableWeightTeleToCityBankers)
+    {
+        TeamId botTeamId = bot->GetTeamId();
+        std::vector<uint32> weightedCities;
+        for (auto const& banker : bankers)
+        {
+            Capital const* capital = FindCapitalByBanker(banker.entry);
+            if (!capital)
+                continue;
+            if (capital->team != botTeamId && capital->team != TEAM_NEUTRAL)
+                continue;
+
+            int weight = GetCityWeight(capital->zoneId);
+            for (int i = 0; i < weight; ++i)
+                weightedCities.push_back(capital->zoneId);
+        }
+
+        if (!weightedCities.empty())
+        {
+            uint32 selectedZone = weightedCities[urand(0, weightedCities.size() - 1)];
+            Capital const* selectedCapital = FindCapitalByZone(selectedZone);
+            if (selectedCapital && !selectedCapital->bankers.empty())
+            {
+                uint32 entry = selectedCapital->bankers[urand(0, selectedCapital->bankers.size() - 1)];
+                auto locIt = bankerEntryToLocation.find(entry);
+                if (locIt != bankerEntryToLocation.end())
+                {
+                    WorldLocation const& loc = locIt->second;
+                    outPos = WorldPosition(loc.GetMapId(), loc.GetPositionX(), loc.GetPositionY(),
+                                           loc.GetPositionZ(), loc.GetOrientation());
+                    outZone = selectedZone;
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Fallback: a random bracket banker whose city is the bot's team (or neutral).
+    // The banker cache is not team-split, so without this filter an Alliance bot
+    // could be routed into a Horde capital where no own-team services exist.
+    TeamId botTeamId = bot->GetTeamId();
+    std::vector<NpcLocation const*> eligible;
+    for (auto const& candidate : bankers)
+    {
+        Capital const* candidateCapital = FindCapitalByBanker(candidate.entry);
+        if (candidateCapital && (candidateCapital->team == botTeamId || candidateCapital->team == TEAM_NEUTRAL))
+            eligible.push_back(&candidate);
+    }
+    if (eligible.empty())
+        return false;
+
+    NpcLocation const& banker = *eligible[urand(0, eligible.size() - 1)];
+    outPos = WorldPosition(banker.loc.GetMapId(), banker.loc.GetPositionX(), banker.loc.GetPositionY(),
+                           banker.loc.GetPositionZ(), banker.loc.GetOrientation());
+    Capital const* capital = FindCapitalByBanker(banker.entry);
+    outZone = capital ? capital->zoneId : 0;
+    return outZone != 0;
+}
+
 bool TravelMgr::SelectAuctioneerByMap(Player* bot, NpcLocation& outAuctioneer)
 {
     uint16 botMapId = bot->GetMapId();
@@ -4580,6 +4653,47 @@ bool TravelMgr::SelectAuctioneerByMap(Player* bot, NpcLocation& outAuctioneer)
     uint32 selectedArea = areaIds[urand(0, areaIds.size() - 1)];
     auto const& auctioneers = mapIt->second.at(selectedArea);
     outAuctioneer = auctioneers[urand(0, auctioneers.size() - 1)];
+    return true;
+}
+
+bool TravelMgr::SelectCityServiceInZone(Player* bot, uint32 zoneId, CityServiceType service, NpcLocation& out)
+{
+    auto const& cache = (bot->GetTeamId() == TEAM_HORDE) ? hordeCityServiceCache : allianceCityServiceCache;
+
+    auto zoneIt = cache.find(zoneId);
+    if (zoneIt == cache.end())
+        return false;
+
+    CityServiceLocations const& locs = zoneIt->second;
+    std::vector<NpcLocation> const* list = nullptr;
+    switch (service)
+    {
+        case CityServiceType::Vendor:
+            list = &locs.vendor;
+            break;
+        case CityServiceType::Repair:
+            list = &locs.repair;
+            break;
+        case CityServiceType::ClassTrainer:
+        {
+            // Class trainers are bucketed by the class they teach; pick the bot's
+            // own-class trainer (empty/absent => no task for this bot's class).
+            auto classIt = locs.classTrainer.find(bot->getClass());
+            if (classIt != locs.classTrainer.end())
+                list = &classIt->second;
+            break;
+        }
+        case CityServiceType::Innkeeper:
+            list = &locs.innkeeper;
+            break;
+        default:
+            break;
+    }
+
+    if (!list || list->empty())
+        return false;
+
+    out = (*list)[urand(0, list->size() - 1)];
     return true;
 }
 
@@ -4701,6 +4815,61 @@ void TravelMgr::PrepareDestinationCache()
             continue;
 
         uint32 areaId = area->zone ? area->zone : area->ID;
+
+        // === CITY SERVICE NPCs (vendor / repair / class trainer / innkeeper) ===
+        // Independent of the role chain below: a single NPC frequently fills more
+        // than one role (e.g. vendor + repair), and we only keep spawns inside
+        // capital zones, which is where the RPG GoCity sequencer sends bots.
+        if (FindCapitalByZone(areaId))
+        {
+            if (FactionTemplateEntry const* svcFaction = sFactionTemplateStore.LookupEntry(creatureTemplate->faction))
+            {
+                bool svcForHorde = !(svcFaction->hostileMask & 4);
+                bool svcForAlliance = !(svcFaction->hostileMask & 2);
+                if (svcForHorde || svcForAlliance)
+                {
+                    uint32 npcFlags = creatureTemplate->npcflag;
+                    NpcLocation svcLoc;
+                    svcLoc.loc = WorldLocation(mapId, x + cos(orient) * 3.0f, y + sin(orient) * 3.0f, z + 0.5f,
+                                              orient + M_PI);
+                    svcLoc.entry = templateEntry;
+                    svcLoc.zoneId = areaId;
+
+                    auto cacheService = [&](std::vector<NpcLocation>& hordeList, std::vector<NpcLocation>& allianceList)
+                    {
+                        if (svcForHorde)
+                            hordeList.push_back(svcLoc);
+                        if (svcForAlliance)
+                            allianceList.push_back(svcLoc);
+                    };
+
+                    if (npcFlags & UNIT_NPC_FLAG_VENDOR)
+                        cacheService(hordeCityServiceCache[areaId].vendor, allianceCityServiceCache[areaId].vendor);
+                    if (npcFlags & UNIT_NPC_FLAG_REPAIR)
+                        cacheService(hordeCityServiceCache[areaId].repair, allianceCityServiceCache[areaId].repair);
+                    if (npcFlags & UNIT_NPC_FLAG_INNKEEPER)
+                        cacheService(hordeCityServiceCache[areaId].innkeeper,
+                                     allianceCityServiceCache[areaId].innkeeper);
+                    if (npcFlags & UNIT_NPC_FLAG_TRAINER)
+                    {
+                        Trainer::Trainer* trainer = sObjectMgr->GetTrainer(templateEntry);
+                        if (trainer && trainer->GetTrainerType() == Trainer::Type::Class)
+                        {
+                            // Bucket class trainers by the class they teach so the bot is
+                            // routed to its OWN class trainer, not a random one.
+                            uint8 trainerClass = static_cast<uint8>(trainer->GetTrainerRequirement());
+                            if (trainerClass)
+                            {
+                                if (svcForHorde)
+                                    hordeCityServiceCache[areaId].classTrainer[trainerClass].push_back(svcLoc);
+                                if (svcForAlliance)
+                                    allianceCityServiceCache[areaId].classTrainer[trainerClass].push_back(svcLoc);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // CREATURES
         if (creatureTemplate->npcflag == 0 &&
@@ -4851,6 +5020,7 @@ void TravelMgr::PrepareDestinationCache()
             NpcLocation aLoc;
             aLoc.loc = WorldLocation(mapId, x + cos(orient) * 3.0f, y + sin(orient) * 3.0f, z + 0.5f, orient + M_PI);
             aLoc.entry = templateEntry;
+            aLoc.zoneId = areaId;
 
             if (forHorde)
                 hordeAuctioneerCache[mapId][areaId].push_back(aLoc);

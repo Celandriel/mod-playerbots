@@ -52,8 +52,12 @@ protected:
 
 protected:
     bool GetQuestPOIPosAndObjectiveIdx(uint32 questId, std::vector<POIInfo>& poiInfo, bool toComplete = false);
-    bool SelectAuctionHouseTarget(WorldPosition& outPos, uint32& outEntry);
+    bool SelectAuctionHouseTarget(WorldPosition& outPos, uint32& outEntry, uint32& outZone);
     bool BuildCityTasks(std::vector<NewRpgInfo::CityTask>& outTaskList);
+    // Append a service task for `taskKind` if `needed`, resolving a random NPC of
+    // `service` inside `cityZone`. No-op when the city has no such NPC for the team.
+    void AppendCityServiceTask(std::vector<NewRpgInfo::CityTask>& outTaskList, uint32 cityZone, bool needed,
+                               NewRpgInfo::CityTaskType taskKind, TravelMgr::CityServiceType service);
     static WorldPosition SelectRandomGrindPos(Player* bot);
     static WorldPosition SelectRandomCampPos(Player* bot);
     bool SelectRandomFlightTaxiNode(uint32& flightMasterEntry, WorldPosition& flightMasterPos, std::vector<uint32>& path);

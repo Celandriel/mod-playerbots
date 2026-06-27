@@ -529,6 +529,7 @@ bool NewRpgGoCityAction::Execute(Event /*event*/)
         data.currentTaskKind = next.kind;
         data.currentTaskNpc = next.npc;
         data.currentTaskLocation = next.location;
+        data.currentTaskAttempts = 0;
     }
 
     if (bot->GetDistance(data.currentTaskLocation) > INTERACTION_DISTANCE)
@@ -545,6 +546,18 @@ bool NewRpgGoCityAction::Execute(Event /*event*/)
         break;
         case NewRpgInfo::CityTaskType::Auctioneer:
             stillWorking = ExecuteAuctioneerTask(data);
+            break;
+        case NewRpgInfo::CityTaskType::Vendor:
+            stillWorking = ExecuteVendorTask(data);
+            break;
+        case NewRpgInfo::CityTaskType::RepairVendor:
+            stillWorking = ExecuteRepairTask(data);
+            break;
+        case NewRpgInfo::CityTaskType::Trainer:
+            stillWorking = ExecuteTrainerTask(data);
+            break;
+        case NewRpgInfo::CityTaskType::Innkeeper:
+            stillWorking = ExecuteInnkeeperTask(data);
             break;
         // Handle all other cases.
         default:
@@ -637,5 +650,45 @@ bool NewRpgGoCityAction::ExecuteAuctioneerTask(NewRpgInfo::GoCity& data)
 
     // Nothing actionable left for the auctioneer this trip.
     return false;
+}
+
+bool NewRpgGoCityAction::ExecuteVendorTask(NewRpgInfo::GoCity& data)
+{
+    // SellAction self-resolves an in-range vendor from "nearest npcs" and offloads
+    // junk to free bag space. One-shot, bounded-retry if not in range yet.
+    return RetryIfNotDone(data, botAI->DoSpecificAction("sell", Event("rpg action", "vendor"), true));
+}
+
+bool NewRpgGoCityAction::ExecuteRepairTask(NewRpgInfo::GoCity& data)
+{
+    // RepairAllAction self-resolves an in-range repairer.
+    return RetryIfNotDone(data, botAI->DoSpecificAction("repair", Event(), true));
+}
+
+bool NewRpgGoCityAction::ExecuteTrainerTask(NewRpgInfo::GoCity& data)
+{
+    // TrainerAction self-resolves a valid (own-class) nearby trainer and learns
+    // directly onto the bot, so no caller-side selection is needed.
+    return RetryIfNotDone(data, botAI->DoSpecificAction("trainer", Event(), true));
+}
+
+bool NewRpgGoCityAction::ExecuteInnkeeperTask(NewRpgInfo::GoCity& data)
+{
+    // SetHomeAction ("home") self-resolves the nearest interactable innkeeper and
+    // binds the hearth, so we route through it instead of a raw SendBindPoint.
+    return RetryIfNotDone(data, botAI->DoSpecificAction("home", Event(), true));
+}
+
+bool NewRpgGoCityAction::RetryIfNotDone(NewRpgInfo::GoCity& data, bool actionRan)
+{
+    // stillWorking semantics: true => keep this task; false => promote the next.
+    if (actionRan)
+    {
+        data.currentTaskAttempts = 0;
+        return false;
+    }
+
+    constexpr uint32 maxCityTaskAttempts = 5;
+    return ++data.currentTaskAttempts < maxCityTaskAttempts;
 }
 

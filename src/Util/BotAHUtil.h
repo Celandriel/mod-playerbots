@@ -86,7 +86,7 @@ struct MarketSample
 };
 static_assert(sizeof(MarketSample) == 16,
     "MarketSample must be 16 bytes — persisted as packed little-endian on disk.");
-static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__,
+static_assert(ACORE_ENDIAN == ACORE_LITTLEENDIAN,
     "MarketSample blob is packed in host byte order; only little-endian targets are supported. "
     "Switch to explicit LE byte-by-byte packing in PackHistory/UnpackHistory if porting.");
 

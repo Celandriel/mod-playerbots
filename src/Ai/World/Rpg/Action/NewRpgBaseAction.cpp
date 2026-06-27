@@ -1259,13 +1259,16 @@ bool NewRpgBaseAction::CheckRpgStatusAvailable(NewRpgStatus status)
                     return false;
             }
 
-            bool shouldSell = AI_VALUE(bool, "should ah sell");
-            bool shouldBuy = AI_VALUE(bool, "should ah buy");
-            if (shouldSell || shouldBuy)
+            // AH is the rarest service: if reachable it alone justifies a trip.
+            // Otherwise (and for repair/sell/train/hearth needs) any reachable
+            // city works, since those services are resolved once the bot arrives.
+            if (AI_VALUE(bool, "should ah sell") || AI_VALUE(bool, "should ah buy"))
             {
                 WorldPosition pos;
                 uint32 entry = 0;
-                return SelectAuctionHouseTarget(pos, entry);
+                uint32 zone = 0;
+                if (SelectAuctionHouseTarget(pos, entry, zone))
+                    return true;
             }
 
             std::vector<WorldLocation> cities = sTravelMgr.GetCityLocations(bot);
@@ -1322,7 +1325,7 @@ bool NewRpgBaseAction::CheckRpgStatusAvailable(NewRpgStatus status)
     return false;
 }
 
-bool NewRpgBaseAction::SelectAuctionHouseTarget(WorldPosition& outPos, uint32& outEntry)
+bool NewRpgBaseAction::SelectAuctionHouseTarget(WorldPosition& outPos, uint32& outEntry, uint32& outZone)
 {
     TravelMgr::NpcLocation auctioneer;
     if (sTravelMgr.SelectAuctioneerByMap(bot, auctioneer))
@@ -1331,6 +1334,7 @@ bool NewRpgBaseAction::SelectAuctionHouseTarget(WorldPosition& outPos, uint32& o
                                auctioneer.loc.GetPositionY(), auctioneer.loc.GetPositionZ(),
                                auctioneer.loc.GetOrientation());
         outEntry = auctioneer.entry;
+        outZone = auctioneer.zoneId;
         return true;
     }
     return false;
@@ -1339,14 +1343,30 @@ bool NewRpgBaseAction::SelectAuctionHouseTarget(WorldPosition& outPos, uint32& o
 bool NewRpgBaseAction::BuildCityTasks(std::vector<NewRpgInfo::CityTask>& outTaskList)
 {
     outTaskList.clear();
-    WorldPosition cityPosition;
 
-    // --- Auctioneer task ---
-    if (AI_VALUE(bool, "should ah sell") || AI_VALUE(bool, "should ah buy"))
+    // 1. Gather the bot's maintenance needs up front. The bot decides what it
+    //    needs first, then we resolve where to go to satisfy those needs.
+    bool const needAh     = AI_VALUE(bool, "should ah sell") || AI_VALUE(bool, "should ah buy");
+    bool const needRepair = AI_VALUE(bool, "should repair") && AI_VALUE(bool, "can repair");
+    bool const needVendor = AI_VALUE(bool, "should sell") && AI_VALUE(bool, "can sell");
+    bool const needTrain  = AI_VALUE(bool, "can train") && AI_VALUE(uint32, "train cost") > 0;
+    bool const needInn    = AI_VALUE(bool, "should home bind");
+
+    // 2. Pick the destination city ("pyramid" selection). Auctioneers are the
+    //    rarest service, so when the bot needs the AH the auctioneer dictates
+    //    which city we travel to and everything else is resolved within it.
+    //    Otherwise fall back to a weighted city pick.
+    //    The destination zone is resolved from cached data (auctioneer/banker),
+    //    never via a runtime area lookup — that would create/load the target map
+    //    on a map thread and can deadlock the server.
+    WorldPosition cityPosition;
+    uint32 cityZone = 0;
+    if (needAh)
     {
         WorldPosition auctioneerPos;
         uint32 entry = 0;
-        if (SelectAuctionHouseTarget(auctioneerPos, entry))
+        uint32 zone = 0;
+        if (SelectAuctionHouseTarget(auctioneerPos, entry, zone))
         {
             NewRpgInfo::CityTask task;
             task.kind = NewRpgInfo::CityTaskType::Auctioneer;
@@ -1354,26 +1374,56 @@ bool NewRpgBaseAction::BuildCityTasks(std::vector<NewRpgInfo::CityTask>& outTask
             task.location = auctioneerPos;
             outTaskList.push_back(task);
             cityPosition = auctioneerPos;
+            cityZone = zone;
         }
     }
-    // TODO: Other cases
 
     if (cityPosition == WorldPosition())
     {
-        std::vector<WorldLocation> cities = sTravelMgr.GetCityLocations(bot);
-        if (cities.empty())
+        if (!sTravelMgr.SelectCityDestination(bot, cityPosition, cityZone))
             return false;
-
-        WorldLocation const& cityLoc = cities[urand(0, cities.size() - 1)];
-        cityPosition = WorldPosition(cityLoc.GetMapId(), cityLoc.GetPositionX(),
-                               cityLoc.GetPositionY(), cityLoc.GetPositionZ(),
-                               cityLoc.GetOrientation());
     }
 
+    // 3. Resolve the remaining (common) services inside the destination city.
+    //    Vendors/repairers/innkeepers/class trainers are plentiful, so a random
+    //    pick keeps repeated trips from feeling robotic. Each is best-effort:
+    //    if the city has no such NPC for the bot's team the task is skipped.
+    if (cityZone)
+    {
+        AppendCityServiceTask(outTaskList, cityZone, needVendor, NewRpgInfo::CityTaskType::Vendor,
+                              TravelMgr::CityServiceType::Vendor);
+        AppendCityServiceTask(outTaskList, cityZone, needRepair, NewRpgInfo::CityTaskType::RepairVendor,
+                              TravelMgr::CityServiceType::Repair);
+        AppendCityServiceTask(outTaskList, cityZone, needTrain, NewRpgInfo::CityTaskType::Trainer,
+                              TravelMgr::CityServiceType::ClassTrainer);
+        AppendCityServiceTask(outTaskList, cityZone, needInn, NewRpgInfo::CityTaskType::Innkeeper,
+                              TravelMgr::CityServiceType::Innkeeper);
+    }
+
+    // 4. Lead with a Visit task so the bot travels into the city before working.
     NewRpgInfo::CityTask visit;
     visit.kind = NewRpgInfo::CityTaskType::Visit;
     visit.location = cityPosition;
     outTaskList.insert(outTaskList.begin(), std::move(visit));
 
     return true;
+}
+
+void NewRpgBaseAction::AppendCityServiceTask(std::vector<NewRpgInfo::CityTask>& outTaskList, uint32 cityZone,
+                                             bool needed, NewRpgInfo::CityTaskType taskKind,
+                                             TravelMgr::CityServiceType service)
+{
+    if (!needed)
+        return;
+
+    TravelMgr::NpcLocation npcLoc;
+    if (!sTravelMgr.SelectCityServiceInZone(bot, cityZone, service, npcLoc))
+        return;
+
+    NewRpgInfo::CityTask task;
+    task.kind = taskKind;
+    task.npc = ObjectGuid(HighGuid::Unit, npcLoc.entry, uint32(0));
+    task.location = WorldPosition(npcLoc.loc.GetMapId(), npcLoc.loc.GetPositionX(), npcLoc.loc.GetPositionY(),
+                                  npcLoc.loc.GetPositionZ(), npcLoc.loc.GetOrientation());
+    outTaskList.push_back(std::move(task));
 }

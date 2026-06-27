@@ -113,6 +113,13 @@ public:
 
 private:
     bool ExecuteAuctioneerTask(NewRpgInfo::GoCity& data);
+    bool ExecuteVendorTask(NewRpgInfo::GoCity& data);
+    bool ExecuteRepairTask(NewRpgInfo::GoCity& data);
+    bool ExecuteTrainerTask(NewRpgInfo::GoCity& data);
+    bool ExecuteInnkeeperTask(NewRpgInfo::GoCity& data);
+    // Keep a failed one-shot service task active for a few ticks (bounded) instead
+    // of dropping it, so a transient not-in-range failure can recover.
+    bool RetryIfNotDone(NewRpgInfo::GoCity& data, bool actionRan);
 };
 
 #endif

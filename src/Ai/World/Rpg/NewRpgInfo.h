@@ -72,7 +72,11 @@ struct NewRpgInfo
     {
         Visit, //Initial state to get to a city.
         Auctioneer,
-        // TODO: Vendor, RepairVendor, Trainer, Innkeeper, etc...
+        Vendor,       // sell junk at a general goods / vendor NPC
+        RepairVendor, // repair gear at a repair-capable NPC
+        Trainer,      // learn available spells from a class trainer
+        Innkeeper,    // set hearthstone home at an innkeeper
+        // TODO: profession trainers (direct entry lookup), banker, etc...
     };
 
     struct CityTask
@@ -88,6 +92,7 @@ struct NewRpgInfo
         CityTaskType currentTaskKind{CityTaskType::Visit};
         ObjectGuid     currentTaskNpc{};
         WorldPosition  currentTaskLocation{};
+        uint32         currentTaskAttempts{0};
     };
 
     uint32 startT{0};  // start timestamp of the current status

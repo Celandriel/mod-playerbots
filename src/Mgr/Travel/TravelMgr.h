@@ -507,7 +507,7 @@ public:
         radiusMin = radiusMin1;
         radiusMax = radiusMax1;
     }
-    virtual ~TravelDestination();
+    virtual ~TravelDestination() = default;
 
     void addPoint(WorldPosition* pos) { points.push_back(pos); }
 
@@ -850,6 +850,18 @@ public:
     {
         WorldLocation loc;
         uint32 entry;
+        uint32 zoneId{0};  // resolved at cache-build time so callers never area-lookup on a map thread
+    };
+
+    // Common, city-bound service NPCs the RPG GoCity sequencer can visit.
+    // Profession trainers are deliberately excluded — they need a direct,
+    // per-profession entry lookup rather than a random pick.
+    enum class CityServiceType : uint8
+    {
+        Vendor,        // UNIT_NPC_FLAG_VENDOR
+        Repair,        // UNIT_NPC_FLAG_REPAIR
+        ClassTrainer,  // UNIT_NPC_FLAG_TRAINER with Trainer::Type::Class
+        Innkeeper      // UNIT_NPC_FLAG_INNKEEPER
     };
 
     struct FlightMasterInfo
@@ -881,6 +893,13 @@ public:
     std::vector<WorldLocation> GetCityLocations(Player* bot);
     std::vector<uint32> GetFlightNodesInZone(uint32 zoneId, TeamId team, uint32 excludeNode = 0) const;
     bool SelectAuctioneerByMap(Player* bot, NpcLocation& outAuctioneer);
+    // Pick a weighted destination capital for the bot's team, returning a banker
+    // position and the city's zone id. Resolves the zone from cached capital data
+    // so RPG callers never do a map-thread area lookup (which would load the map).
+    bool SelectCityDestination(Player* bot, WorldPosition& outPos, uint32& outZone);
+    // Pick a random service NPC of the requested type within a city zone for the
+    // bot's team. Random (not nearest) so repeated trips feel less robotic.
+    bool SelectCityServiceInZone(Player* bot, uint32 zoneId, CityServiceType service, NpcLocation& out);
     const std::vector<WorldLocation>& GetLocsPerLevelCache(uint8 level) { return locsPerLevelCache[level]; }
 
     template <class D, class W, class URBG>
@@ -994,6 +1013,17 @@ private:
     std::unordered_map<uint16, std::unordered_map<uint32, std::vector<NpcLocation>>> hordeAuctioneerCache;
     std::unordered_map<uint16, std::unordered_map<uint32, std::vector<NpcLocation>>> allianceAuctioneerCache;
     std::unordered_map<uint32, WorldLocation> bankerEntryToLocation;
+    // Common city service NPCs (vendor/repair/class-trainer/innkeeper), keyed by
+    // city zone id, split by faction. Only spawns inside capital zones are cached.
+    struct CityServiceLocations
+    {
+        std::vector<NpcLocation> vendor;
+        std::vector<NpcLocation> repair;
+        std::unordered_map<uint8, std::vector<NpcLocation>> classTrainer;  // keyed by Classes
+        std::vector<NpcLocation> innkeeper;
+    };
+    std::unordered_map<uint32, CityServiceLocations> hordeCityServiceCache;
+    std::unordered_map<uint32, CityServiceLocations> allianceCityServiceCache;
     std::map<uint8, std::vector<WorldLocation>> locsPerLevelCache;
     std::unordered_map<uint32, std::vector<WorldLocation>> creatureSpawnsByTemplate;
     std::map<uint32, LevelBracket> zone2LevelBracket;
