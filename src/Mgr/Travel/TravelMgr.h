@@ -900,6 +900,9 @@ public:
     // Pick a random service NPC of the requested type within a city zone for the
     // bot's team. Random (not nearest) so repeated trips feel less robotic.
     bool SelectCityServiceInZone(Player* bot, uint32 zoneId, CityServiceType service, NpcLocation& out);
+    // Resolve a service NPC in any of the bot's faction capitals (fallback when the
+    // chosen destination zone, e.g. a neutral auction town, lacks the service).
+    bool SelectCityServiceInAnyCapital(Player* bot, CityServiceType service, NpcLocation& out);
     const std::vector<WorldLocation>& GetLocsPerLevelCache(uint8 level) { return locsPerLevelCache[level]; }
 
     template <class D, class W, class URBG>

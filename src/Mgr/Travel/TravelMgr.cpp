@@ -4697,6 +4697,30 @@ bool TravelMgr::SelectCityServiceInZone(Player* bot, uint32 zoneId, CityServiceT
     return true;
 }
 
+bool TravelMgr::SelectCityServiceInAnyCapital(Player* bot, CityServiceType service, NpcLocation& out)
+{
+    // Collect the bot's own faction capitals that actually offer this service, then
+    // pick one at random. Faction capitals are level-agnostic and always reachable,
+    // so this never sends a low-level bot to a neutral high-level city.
+    TeamId botTeamId = bot->GetTeamId();
+    std::vector<NpcLocation> candidates;
+    for (Capital const& capital : capitals)
+    {
+        if (capital.team != botTeamId)
+            continue;
+
+        NpcLocation loc;
+        if (SelectCityServiceInZone(bot, capital.zoneId, service, loc))
+            candidates.push_back(loc);
+    }
+
+    if (candidates.empty())
+        return false;
+
+    out = candidates[urand(0, candidates.size() - 1)];
+    return true;
+}
+
 void TravelMgr::PrepareZone2LevelBracket()
 {
     // Classic WoW - starter zones

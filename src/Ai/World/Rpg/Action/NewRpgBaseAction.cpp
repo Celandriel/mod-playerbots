@@ -1416,8 +1416,11 @@ void NewRpgBaseAction::AppendCityServiceTask(std::vector<NewRpgInfo::CityTask>& 
     if (!needed)
         return;
 
+    // Prefer the destination zone; if it can't satisfy this need (e.g. a neutral
+    // auction town with no such service), direct the bot to a faction capital that can.
     TravelMgr::NpcLocation npcLoc;
-    if (!sTravelMgr.SelectCityServiceInZone(bot, cityZone, service, npcLoc))
+    if (!sTravelMgr.SelectCityServiceInZone(bot, cityZone, service, npcLoc) &&
+        !sTravelMgr.SelectCityServiceInAnyCapital(bot, service, npcLoc))
         return;
 
     NewRpgInfo::CityTask task;
