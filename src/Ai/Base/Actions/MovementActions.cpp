@@ -2574,6 +2574,29 @@ TravelPath MovementAction::ResolveMovePath(WorldPosition startPos,
                                            WorldPosition endPos,
                                            LastMovement& lastMove)
 {
+    // Invariant: a Detour pathfind must only ever run on the bot's CURRENT map.
+    // The travel-node graph bridges maps via transition links (portals/flights/
+    // boats) and exists ONLY on the overworld continents (0/1/530/571). If either
+    // endpoint of a cross-map move is an instance, there is no graph route — the
+    // only way to "reach" it would be to project the bot onto another map and live-
+    // pathfind that map's navmesh query from this thread, which races that map's own
+    // update thread and can corrupt the shared dtNavMeshQuery node pool into an
+    // infinite loop (world-thread freeze). Refuse instead: MoveTo2 returns false on
+    // an empty path, so MoveFarTo fails and the RPG layer drops the objective.
+    if (startPos.GetMapId() != endPos.GetMapId() &&
+        (!startPos.isOverworld() || !endPos.isOverworld()))
+    {
+        LOG_DEBUG("playerbots",
+                  "[TravelGate] {} {} refused cross-map path: map {} ({:.0f},{:.0f},{:.0f}) "
+                  "-> map {} ({:.0f},{:.0f},{:.0f}) (instance endpoint, no graph route)",
+                  bot->GetName(), bot->GetGUID().ToString(),
+                  startPos.GetMapId(), startPos.GetPositionX(),
+                  startPos.GetPositionY(), startPos.GetPositionZ(),
+                  endPos.GetMapId(), endPos.GetPositionX(),
+                  endPos.GetPositionY(), endPos.GetPositionZ());
+        return {};
+    }
+
     float const totalDistance = startPos.distance(endPos);
     float const maxDistChange = totalDistance * 0.1f;
 
@@ -2595,7 +2618,9 @@ TravelPath MovementAction::ResolveMovePath(WorldPosition startPos,
 
     TravelPath out;
 
-    if (needsLongPath && !sTravelNodeMap.getNodes().empty() && !bot->InBattleground())
+    bool const usedGraph = needsLongPath &&
+                           !sTravelNodeMap.getNodes().empty() && !bot->InBattleground();
+    if (usedGraph)
     {
         out = sTravelNodeMap.GetFullPath(startPos, endPos, bot);
     }
@@ -2615,7 +2640,25 @@ TravelPath MovementAction::ResolveMovePath(WorldPosition startPos,
     // Last-ditch fallback: a single point at the destination, so the
     // caller has at least something to dispatch.
     if (out.empty())
+    {
+        // Tracking: the chosen pathfinder produced nothing, so we beeline a single
+        // point at the destination. For a far target this means the travel-node graph
+        // could not route there (sparse coverage / disconnected) after we declined a
+        // live long-distance Detour — the exact case to watch when tuning the gates.
+        // Only logged for non-trivial distances; short in-zone beelines are normal.
+        // Graph-route failures are classified by [TravelFail] inside GetFullPath;
+        // here we only note the direct-probe (non-graph) beelines.
+        if (!usedGraph && totalDistance > sPlayerbotAIConfig.sightDistance)
+            LOG_DEBUG("playerbots",
+                      "[TravelGate] {} {} no path, beelining {:.0f}y: map {} "
+                      "({:.0f},{:.0f},{:.0f}) -> map {} ({:.0f},{:.0f},{:.0f}) (mmap probe failed)",
+                      bot->GetName(), bot->GetGUID().ToString(), totalDistance,
+                      startPos.GetMapId(), startPos.GetPositionX(),
+                      startPos.GetPositionY(), startPos.GetPositionZ(),
+                      endPos.GetMapId(), endPos.GetPositionX(),
+                      endPos.GetPositionY(), endPos.GetPositionZ());
         out.addPoint(endPos);
+    }
 
     return out;
 }

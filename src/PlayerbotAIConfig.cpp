@@ -675,6 +675,12 @@ bool PlayerbotAIConfig::Initialize()
     autoDoQuests = sConfigMgr->GetOption<bool>("AiPlayerbot.AutoDoQuests", true);
     enableNewRpgStrategy = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableNewRpgStrategy", true);
     enableTravelNodes = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableTravelNodes", false);
+    // When true, the travel-node graph is loaded at startup but link/path
+    // GENERATION is NOT run during Init() (which happens before the world has
+    // finished loading maps/grids/navmesh, so pathfinding stalls or comes up
+    // empty -- instance maps in particular). Bring the server up fully, then run
+    // `.playerbots travel generatenode` once everything is loaded.
+    deferTravelNodeGeneration = sConfigMgr->GetOption<bool>("AiPlayerbot.DeferTravelNodeGeneration", false);
 
     RpgStatusProbWeight[RPG_WANDER_RANDOM] = sConfigMgr->GetOption<int32>("AiPlayerbot.RpgStatusProbWeight.WanderRandom", 15);
     RpgStatusProbWeight[RPG_WANDER_NPC] = sConfigMgr->GetOption<int32>("AiPlayerbot.RpgStatusProbWeight.WanderNpc", 20);

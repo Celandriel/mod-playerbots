@@ -148,6 +148,14 @@ public:
 
     bool getCalculated() { return calculated; }
 
+    // Transient marker (NOT persisted to DB): set true when this path is
+    // (re)built during the current generation run in BuildPath. Lets the
+    // cheating-link sweep touch only freshly-generated links and never the
+    // curated links loaded from the DB. Defaults false; DB-loaded paths keep
+    // it false since it is never read back from storage.
+    void setBuiltDuringRun(bool built = true) { builtDuringRun = built; }
+    bool getBuiltDuringRun() { return builtDuringRun; }
+
     std::string const print();
 
     // Setters
@@ -182,6 +190,10 @@ private:
     float extraCost = 0;
 
     bool calculated = false;
+
+    // Transient (not persisted): true if built this generation run. See
+    // setBuiltDuringRun.
+    bool builtDuringRun = false;
 
     // Derived distance in yards
     float distance = 0.1f;
@@ -236,6 +248,16 @@ public:
     void setLinked(bool linked1) { linked = linked1; }
     void setPoint(WorldPosition point1) { point = point1; }
 
+    // Intrinsic areaTrigger identity. Ported from cmangos getAreaTriggerId(),
+    // but stored on the node instead of derived from sAreaTriggerStore (AC has
+    // no such DBC store). Set in generateAreaTriggerNodes when the node is
+    // created; NOT persisted across DB round-trips, so loaded graphs must fall
+    // back to the incoming/outgoing structural-link checks below.
+    void setAreaTriggerId(uint32 id) { areaTriggerId = id; }
+    uint32 getAreaTriggerId() { return areaTriggerId; }
+    void setAreaTriggerTarget(bool target) { areaTriggerTarget = target; }
+    bool isAreaTriggerTarget() { return areaTriggerTarget; }
+
     // Getters
     std::string const getName() { return nodeName; }
     WorldPosition* getPosition() { return &point; }
@@ -243,6 +265,14 @@ public:
     std::unordered_map<TravelNode*, TravelNodePath*>* getLinks() { return &links; }
     bool isImportant() { return important; }
     bool isLinked() { return linked; }
+
+    // Does any OTHER node hold a structural (areaTrigger/transport/staticPortal)
+    // link INTO this node? Incoming links are not stored per-node, so this
+    // scans the whole graph. It gives portal/transport EXIT nodes (which have
+    // only incoming structural edges) an identity, so prune protection is
+    // symmetric. Scoped to structural types only — walk incoming links do not
+    // confer structural identity.
+    bool hasStructuralIncoming();
 
     bool isTransport()
     {
@@ -269,6 +299,17 @@ public:
                 link.second->getPathType() == TravelNodePathType::staticPortal)
                 return true;
         return false;
+    }
+
+    // Symmetric structural identity: a node is "structural" if it has an
+    // outgoing portal/transport link (isPortal/isTransport), an intrinsic
+    // areaTrigger id, is a teleport target, or has any incoming structural
+    // link (exit nodes). Used to gate prune protection so portal/transport
+    // EXIT nodes are protected too.
+    bool isStructural()
+    {
+        return isPortal() || isTransport() || getAreaTriggerId() ||
+               isAreaTriggerTarget() || hasStructuralIncoming();
     }
 
     bool isWalking()
@@ -357,21 +398,41 @@ public:
     bool isUselessLink(TravelNode* farNode);
     bool cropUselessLinks();
 
-    // Returns all nodes that can be reached from this node.
+    // Returns all nodes that can be reached from this node. mapOnly restricts
+    // the BFS to links that stay on this node's map (no portals/flights/
+    // areaTriggers to other maps).
     std::vector<TravelNode*> getNodeMap(bool importantOnly = false,
-        std::vector<TravelNode*> ignoreNodes = {});
+        std::vector<TravelNode*> ignoreNodes = {}, bool mapOnly = false);
 
-    // Checks if it is even possible to route to this node.
-    bool hasRouteTo(TravelNode* node)
+    // Checks if it is even possible to route to this node. mapOnly answers
+    // "reachable without leaving the map" — the crop pass uses it so a walk
+    // link is never judged redundant based on a route through portal/flight
+    // edges (cmangos hasRouteTo(node, true)).
+    bool hasRouteTo(TravelNode* node, bool mapOnly = false)
+    {
+        auto& cache = mapOnly ? routesSameMap : routes;
+        if (cache.empty())
+            for (auto mNode : getNodeMap(false, {}, mapOnly))
+                cache[mNode] = true;
+
+        return cache.find(node) != cache.end();
+    }
+
+    // Number of nodes reachable from this one (size of its route network).
+    uint32 getRouteSize()
     {
         if (routes.empty())
             for (auto mNode : getNodeMap())
                 routes[mNode] = true;
 
-        return routes.find(node) != routes.end();
+        return routes.size();
     }
 
-    void clearRoutes() { routes.clear(); }
+    void clearRoutes()
+    {
+        routes.clear();
+        routesSameMap.clear();
+    }
     void setRouteTo(TravelNode* node) { routes[node] = true; }
 
     void print(bool printFailed = true);
@@ -389,12 +450,28 @@ protected:
 
     // List of nodes and if there is 'any' route possible
     std::unordered_map<TravelNode*, bool> routes;
+    std::unordered_map<TravelNode*, bool> routesSameMap;
 
     // This node should not be removed
     bool important = false;
 
     // This node has been checked for nearby links
     bool linked = false;
+
+    // Intrinsic areaTrigger identity (see setAreaTriggerId). 0 = not an
+    // areaTrigger entrance node. Not persisted to DB.
+    uint32 areaTriggerId = 0;
+
+    // True when this node is the teleport DESTINATION of an areaTrigger (an
+    // exit node). Not persisted to DB.
+    bool areaTriggerTarget = false;
+
+    // Cache for hasStructuralIncoming(): -1 = uncomputed, 0/1 = result.
+    // Structural (areaTrigger/transport/staticPortal) links are created at the
+    // start of generation and never removed by the walk-link crop passes, so
+    // the incoming-structural status is stable across a generation run and safe
+    // to memoize. Not persisted.
+    int8 structuralIncomingCache = -1;
 
     // This node is a (moving) transport.
     // bool transport = false;
@@ -682,14 +759,32 @@ public:
     void generateAreaTriggerNodes();
     void generateNodes();
     void generateTransportNodes();
+    void generatePortalNodes();
+    // Create a ground-level dock/exit node near a transport stop and wire a
+    // pre-made BIDIRECTIONAL, complete transport link between it and the
+    // transport node, then mark the transport node linked. This keeps
+    // transport nodes out of the walk pass as unlinked starts (ported from
+    // cmangos makeDockNode). exitPos should already carry the display-specific
+    // Z offset that lands it on walkable ground.
+    void makeDockNode(TravelNode* node, WorldPosition exitPos,
+                      std::string const dockName);
     void generateZoneMeanNodes();
 
+    void generateWalkPathMap(uint32 mapId);
     void generateWalkPaths();
+    void generateHelperNodes(uint32 mapId);
+    void generateHelperNodes();
     void removeLowNodes();
     void removeUselessPaths();
+    // Re-validate every saved walk link against IsPathCheating and drop the
+    // failures (and their reverse). The build-time guards only gate links as
+    // BuildPath creates them; links loaded from the DB (the bulk of the graph)
+    // are trusted verbatim, so stale pre-guard "straight shot" links survive
+    // there. This sweeps the whole in-memory graph so a regen cleans them.
+    void removeCheatingPaths();
     void calculatePathCosts();
     void generateTaxiPaths();
-    void generatePaths(bool fullGen = false);
+    void generatePaths();
 
     void generateAll();
 

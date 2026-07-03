@@ -741,19 +741,23 @@ std::vector<WorldPosition> WorldPosition::getPathStepFrom(WorldPosition startPos
     }
 
     PathGenerator path(pathUnit);
-    // Source is a temp Creature, so CreateFilter's bot block doesn't
-    // fire — apply the same bot cost biases here so generated paths
-    // match what bots prefer at runtime (STEEP/water are reachable
-    // but not preferred).
+    // Runtime bots get these cost biases automatically via CreateFilter's
+    // bot block. A temp-Creature source (travel-node GENERATION) does not,
+    // and we intentionally leave generation UNBIASED: biasing it makes the
+    // pathfinder route around steep/water and drops reachable-but-steep
+    // structure approaches from the graph. The graph must encode
+    // reachability; the steep/water preference belongs to runtime
+    // path-selection only.
     //
-    // Reference also applies setAreaCost(12, 5) + setAreaCost(13, 20)
-    // here. Not ported: reference and AC use different mmap generators
-    // and Detour area-id assignments diverge — raw IDs 12/13 are
-    // unlikely to match any polys on AC's navmesh and could no-op or
-    // bias something unintended. If we ever regenerate mmaps to match
-    // the reference dataset, revisit.
-    path.SetNavTerrainCost(NAV_GROUND_STEEP, 5.0f);
-    path.SetNavTerrainCost(NAV_WATER, 10.0f);
+    // (Reference also applies setAreaCost(12, 5) + setAreaCost(13, 20) here.
+    // Not ported: reference and AC use different mmap generators and Detour
+    // area-id assignments diverge. If we ever regenerate mmaps to match the
+    // reference dataset, revisit.)
+    if (!tempCreature)
+    {
+        path.SetNavTerrainCost(NAV_GROUND_STEEP, 5.0f);
+        path.SetNavTerrainCost(NAV_WATER, 10.0f);
+    }
     auto result = getPathStepFrom(startPos, path);
 
     if (tempCreature)
@@ -781,8 +785,14 @@ std::vector<WorldPosition> WorldPosition::getPathStepFrom(WorldPosition startPos
     // (BuildShortcut produces a 2-point straight line through whatever's
     // in the way). Reject those to avoid silently dispatching a
     // geometry-ignoring shortcut.
+    //
+    // AC also ORs NOPATH/SHORT onto the still-set NORMAL bit after
+    // replacing the geometry with a 2-point BuildShortcut straight line
+    // (PathGenerator.cpp point-cap overrun -> NORMAL|NOPATH, point-limit
+    // hit -> NORMAL|SHORT). Reject those composite results too, otherwise
+    // we accept a poisoned shortcut that ignores geometry.
     if (!(type & (PATHFIND_NORMAL | PATHFIND_INCOMPLETE)) ||
-        (type & PATHFIND_NOT_USING_PATH))
+        (type & (PATHFIND_NOT_USING_PATH | PATHFIND_NOPATH | PATHFIND_SHORT)))
         return {};
 
     std::vector<WorldPosition> retvec = fromPointsArray(points);
@@ -845,6 +855,65 @@ bool WorldPosition::cropPathTo(std::vector<WorldPosition>& path, float maxDistan
     return insRange;
 }
 
+namespace
+{
+    // Collapse out-and-back resampling stutters introduced where the chained
+    // stepper restarts: when one step ends PATHFIND_INCOMPLETE, the next step
+    // re-pathfinds from that point and Detour's 4y (SMOOTH_PATH_STEP_SIZE)
+    // resampling can plant its first waypoint back toward where we came from,
+    // giving a "...X -> X-4y -> X..." 180deg spike at every junction. Drop the
+    // apex B of any A-B-C triple that reverses (>120deg) AND lands back within
+    // ~5y of A: that is jitter, not a real switchback (whose far leg carries C
+    // well past A). The removed detour is <=~5y, so the executor's local MoveTo
+    // re-paths it cleanly -- no navmesh validation needed. 2D test; z is kept on
+    // the surviving points. Iterates: collapsing one apex can expose the next.
+    void removeBacktrackJitter(std::vector<WorldPosition>& path)
+    {
+        constexpr float REVERSE_COS = -0.5f;  // turn sharper than 120 degrees
+        constexpr float NET_SKIP = 5.0f;      // C lands back near A (yards)
+        constexpr float COINCIDENT = 1.0f;    // duplicate-point dedup (yards)
+
+        bool changed = true;
+        while (changed && path.size() >= 3)
+        {
+            changed = false;
+            for (size_t i = 1; i + 1 < path.size();)
+            {
+                WorldPosition const& a = path[i - 1];
+                WorldPosition const& b = path[i];
+                WorldPosition const& c = path[i + 1];
+
+                float const abx = b.GetPositionX() - a.GetPositionX();
+                float const aby = b.GetPositionY() - a.GetPositionY();
+                float const bcx = c.GetPositionX() - b.GetPositionX();
+                float const bcy = c.GetPositionY() - b.GetPositionY();
+
+                float const abLen = std::sqrt(abx * abx + aby * aby);
+                float const bcLen = std::sqrt(bcx * bcx + bcy * bcy);
+
+                // B sits on top of A (or B->C is degenerate): drop B.
+                if (abLen < COINCIDENT || bcLen < COINCIDENT)
+                {
+                    path.erase(path.begin() + i);
+                    changed = true;
+                    continue;
+                }
+
+                float const cosTurn = (abx * bcx + aby * bcy) / (abLen * bcLen);
+                float const skip = a.GetExactDist2d(c.GetPositionX(), c.GetPositionY());
+
+                if (cosTurn < REVERSE_COS && skip < NET_SKIP)
+                {
+                    path.erase(path.begin() + i);
+                    changed = true;
+                }
+                else
+                    ++i;
+            }
+        }
+    }
+}
+
 // A sequential series of pathfinding attempts. Returns the complete path and if the patfinder eventually found a way to
 // the destination.
 std::vector<WorldPosition> WorldPosition::getPathFromPath(std::vector<WorldPosition> startPath, Unit* bot,
@@ -886,10 +955,14 @@ std::vector<WorldPosition> WorldPosition::getPathFromPath(std::vector<WorldPosit
     }
 
     PathGenerator path(pathUnit);
-    // Same reason as getPathStepFrom: temp-Creature source doesn't trip
-    // CreateFilter's bot block, so apply the bot cost biases manually.
-    path.SetNavTerrainCost(NAV_GROUND_STEEP, 5.0f);
-    path.SetNavTerrainCost(NAV_WATER, 10.0f);
+    // See getPathStepFrom: generation (temp-Creature source) is left
+    // UNBIASED so reachable-but-steep links still form. Runtime bots keep
+    // the steep/water preference via CreateFilter's bot block.
+    if (!tempCreature)
+    {
+        path.SetNavTerrainCost(NAV_GROUND_STEEP, 5.0f);
+        path.SetNavTerrainCost(NAV_WATER, 10.0f);
+    }
 
     // Limit the pathfinding attempts
     for (uint32 i = 0; i < maxAttempt; i++)
@@ -912,6 +985,14 @@ std::vector<WorldPosition> WorldPosition::getPathFromPath(std::vector<WorldPosit
 
         currentPos = subPath.back();
     }
+
+    // Smooth out the 4y out-and-back stutters the chained stepper leaves at
+    // its restart junctions — runtime probes only. During GENERATION (temp
+    // creature) the raw geometry must be kept: dropping points lengthens the
+    // first/last segments, which makes IsPathCheating's endpoint-slope guard
+    // (and the 2-point rule) reject legitimately walkable links.
+    if (!tempCreature)
+        removeBacktrackJitter(fullPath);
 
     if (tempCreature)
         delete tempCreature;

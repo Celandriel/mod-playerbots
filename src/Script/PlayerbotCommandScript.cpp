@@ -116,7 +116,7 @@ public:
 
     static bool HandleGenerateTravelNodesCommand(ChatHandler* handler, char const* /*args*/)
     {
-        handler->PSendSysMessage("Regenerating travel node paths...");
+        handler->PSendSysMessage("Regenerating travel node paths (all maps)...");
         LOG_INFO("playerbots", "Manual travel node regeneration started via console command.");
         sTravelNodeMap.generateAll();
         handler->PSendSysMessage("Travel node regeneration complete. Paths saved to database.");
