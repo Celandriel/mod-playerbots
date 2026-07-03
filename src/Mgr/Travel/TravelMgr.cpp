@@ -563,7 +563,7 @@ std::string const WorldPosition::getAreaName(bool fullName, bool zoneName)
     return areaName;
 }
 
-std::set<Transport*> WorldPosition::getTransports(uint32 entry)
+std::set<Transport*> WorldPosition::getTransports(uint32 /*entry*/)
 {
     /*
     if (!entry)
@@ -1037,7 +1037,7 @@ uint32 WorldPosition::getUnitsAggro(GuidVector& units, Player* bot)
 
 void FindPointCreatureData::operator()(CreatureData const& creatureData)
 {
-    if (!entry || creatureData.id1 == entry)
+    if (!entry || creatureData.id == entry)
         if ((!point || creatureData.mapid == point.GetMapId()) &&
             (!radius || point.sqDistance(WorldPosition(creatureData.mapid, creatureData.posX, creatureData.posY,
                                                        creatureData.posZ)) < radius * radius))
@@ -1188,7 +1188,7 @@ bool GuidPosition::IsCreatureOrGOAccessible()
 GuidPosition::GuidPosition(WorldObject* wo) : ObjectGuid(wo->GetGUID()), WorldPosition(wo), loadedFromDB(false) {}
 
 GuidPosition::GuidPosition(CreatureData const& creData)
-    : ObjectGuid(HighGuid::Unit, creData.id1, creData.spawnId),
+    : ObjectGuid(HighGuid::Unit, creData.id, creData.spawnId),
       WorldPosition(creData.mapid, creData.posX, creData.posY, creData.posZ, creData.orientation)
 {
     loadedFromDB = true;
@@ -1394,7 +1394,7 @@ bool QuestObjectiveTravelDestination::isActive(Player* bot)
         GuidVector targets = AI_VALUE(GuidVector, "possible targets");
 
         for (auto& target : targets)
-            if (target.GetEntry() == getEntry() && target.IsCreature() && botAI->GetCreature(target) &&
+            if (target.GetEntry() == uint32(getEntry()) && target.IsCreature() && botAI->GetCreature(target) &&
                 botAI->GetCreature(target)->IsAlive())
                 return true;
 
@@ -1446,7 +1446,7 @@ bool RpgTravelDestination::isActive(Player* bot)
 
     for (ObjectGuid const guid : ignoreList)
     {
-        if (guid.GetEntry() == getEntry())
+        if (guid.GetEntry() == uint32(getEntry()))
             return false;
 
     }
@@ -1591,7 +1591,7 @@ bool BossTravelDestination::isActive(Player* bot)
         GuidVector targets = AI_VALUE(GuidVector, "possible targets");
 
         for (auto& target : targets)
-            if (target.GetEntry() == getEntry() && target.IsCreature() && botAI->GetCreature(target) &&
+            if (target.GetEntry() == uint32(getEntry()) && target.IsCreature() && botAI->GetCreature(target) &&
                 botAI->GetCreature(target)->IsAlive())
                 return true;
 
@@ -2021,14 +2021,14 @@ void TravelMgr::LoadQuestTravelTable()
     for (auto& creatureData : WorldPosition().getCreaturesNear())
     {
         t_unit.type = 0;
-        t_unit.entry = creatureData->id1;
+        t_unit.entry = creatureData->id;
         t_unit.map = creatureData->mapid;
         t_unit.x = creatureData->posX;
         t_unit.y = creatureData->posY;
         t_unit.z = creatureData->posZ;
         t_unit.o = creatureData->orientation;
 
-        entryCount[creatureData->id1]++;
+        entryCount[creatureData->id]++;
 
         units.push_back(t_unit);
     }
@@ -2283,7 +2283,7 @@ void TravelMgr::LoadQuestTravelTable()
     {
         for (CreatureData const* cData : WorldPosition().getCreaturesNear())
         {
-            CreatureTemplate const* cInfo = sObjectMgr->GetCreatureTemplate(cData->id1);
+            CreatureTemplate const* cInfo = sObjectMgr->GetCreatureTemplate(cData->id);
             if (!cInfo)
                 continue;
 
@@ -3142,7 +3142,7 @@ uint32 TravelMgr::getDialogStatus(Player* pPlayer, int32 questgiver, Quest const
 
 // Selects a random WorldPosition from a list. Use a distance weighted distribution.
 std::vector<WorldPosition*> TravelMgr::getNextPoint(WorldPosition* center, std::vector<WorldPosition*> points,
-                                                    uint32 amount)
+                                                    uint32 /*amount*/)
 {
     std::vector<WorldPosition*> retVec;
 
@@ -3983,7 +3983,7 @@ void TravelMgr::PrepareDestinationCache()
     std::map<uint32, std::map<uint32, std::vector<WorldLocation>>> tempCreatureCache;
     for (auto const& [guid, creatureData] : sObjectMgr->GetAllCreatureData())
     {
-        CreatureTemplate const* creatureTemplate = sObjectMgr->GetCreatureTemplate(creatureData.id1);
+        CreatureTemplate const* creatureTemplate = sObjectMgr->GetCreatureTemplate(creatureData.id);
         if (!creatureTemplate)
             continue;
 
@@ -3996,7 +3996,7 @@ void TravelMgr::PrepareDestinationCache()
         float y = creatureData.posY;
         float z = creatureData.posZ;
         float orient = creatureData.orientation;
-        uint32 templateEntry = creatureData.id1;
+        uint32 templateEntry = creatureData.id;
 
         Map* map = sMapMgr->FindMap(mapId, 0);
         if (!map)
@@ -4081,7 +4081,7 @@ void TravelMgr::PrepareDestinationCache()
                 {
                     LevelBracket bracket = zone2LevelBracket[areaId];
                     WorldPosition loc(mapId, x + cos(orient) * 5.0f, y + sin(orient) * 5.0f, z + 0.5f, orient + M_PI);
-                    for (int i = bracket.low; i <= bracket.high; i++)
+                    for (uint32 i = bracket.low; i <= bracket.high; i++)
                     {
                         if (forHorde)
                             hordeHubsPerLevelCache[i].push_back(loc);
@@ -4097,7 +4097,7 @@ void TravelMgr::PrepareDestinationCache()
 
                 LevelBracket bracket = zone2LevelBracket[areaId];
                 WorldPosition loc(mapId, x + cos(orient) * 5.0f, y + sin(orient) * 5.0f, z + 0.5f, orient + M_PI);
-                for (int i = bracket.low; i <= bracket.high; i++)
+                for (uint32 i = bracket.low; i <= bracket.high; i++)
                 {
                     if (forHorde)
                         hordeHubsPerLevelCache[i].push_back(loc);
@@ -4122,7 +4122,7 @@ void TravelMgr::PrepareDestinationCache()
             bLoc.loc = WorldLocation(mapId, x + cos(orient) * 6.0f, y + sin(orient) * 6.0f, z + 2.0f, orient + M_PI);
             bLoc.entry = templateEntry;
             uint32 level = (creatureTemplate->minlevel + creatureTemplate->maxlevel + 1) / 2;
-            for (int32 l = 1; l <= maxLevel; l++)
+            for (uint32 l = 1; l <= maxLevel; l++)
             {
                 // Bots 1-60 go to base game bankers (all have minlevel 30 or 45)
                 if (l <=60 && level > 45)
@@ -4173,7 +4173,7 @@ void TravelMgr::PrepareDestinationCache()
     {
         if (creatureDataList.size() >= 2)
         {
-            CreatureTemplate const* creatureTemplate = sObjectMgr->GetCreatureTemplate(creatureDataList[0].id1);
+            CreatureTemplate const* creatureTemplate = sObjectMgr->GetCreatureTemplate(creatureDataList[0].id);
             uint32 level = (creatureTemplate->minlevel + creatureTemplate->maxlevel + 1) / 2;
 
             float totalX = 0.0f;
@@ -4194,7 +4194,7 @@ void TravelMgr::PrepareDestinationCache()
             for (int32 l = (int32)level - (int32)sPlayerbotAIConfig.randomBotTeleLowerLevel;
                  l <= (int32)level + (int32)sPlayerbotAIConfig.randomBotTeleHigherLevel; l++)
             {
-                if (l < 1 || l > maxLevel)
+                if (l < 1 || l > int32(maxLevel))
                     continue;
 
                 locsPerLevelCache[(uint8)l].push_back(WorldLocation(mapId, avgX, avgY, avgZ, 0.0f));

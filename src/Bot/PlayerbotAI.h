@@ -3,8 +3,8 @@
  * and/or modify it under version 3 of the License, or (at your option), any later version.
  */
 
-#ifndef _PLAYERBOT_PLAYERBOTAI_H
-#define _PLAYERBOT_PLAYERBOTAI_H
+#ifndef PLAYERBOTS_PLAYERBOTAI_H
+#define PLAYERBOTS_PLAYERBOTAI_H
 
 #include <stack>
 
@@ -427,6 +427,7 @@ public:
     static bool IsCombo(Player* player);
     static bool IsBotMainTank(Player* player);
     static bool IsMainTank(Player* player, bool ignoreMemberFlag = false);
+    static bool IsExplicitMainTank(Player* player);
     static uint32 GetGroupTankNum(Player* player);
     static bool IsAssistTank(Player* player);
     static bool IsAssistTankOfIndex(Player* player, uint8 index, bool ignoreDeadPlayers = false);
@@ -498,6 +499,7 @@ public:
 
     virtual bool CanCastSpell(std::string const name, Unit* target, Item* itemTarget = nullptr);
     virtual bool CastSpell(std::string const name, Unit* target, Item* itemTarget = nullptr);
+    virtual bool HasSpell(std::string const spellName) const;
     virtual bool HasAura(std::string const spellName, Unit* player, bool maxStack = false, bool checkIsOwner = false,
                          int maxAmount = -1, bool checkDuration = false);
     virtual bool HasAnyAuraOf(Unit* player, ...);
@@ -510,7 +512,6 @@ public:
     bool CanCastSpell(uint32 spellid, float x, float y, float z, bool checkHasSpell = true,
                       Item* itemTarget = nullptr);
 
-    bool HasAura(uint32 spellId, Unit const* player);
     Aura* GetAura(std::string const spellName, Unit* unit, bool checkIsOwner = false, bool checkDuration = false,
                   int checkStack = -1);
     bool CastSpell(uint32 spellId, Unit* target, Item* itemTarget = nullptr);

@@ -1458,7 +1458,7 @@ bool FleeWithPetAction::Execute(Event /*event*/)
 
 bool AvoidAoeAction::isUseful()
 {
-    if (getMSTime() - moveInterval < lastMoveTimer)
+    if (getMSTime() - moveInterval < uint32(lastMoveTimer))
         return false;
 
     GuidVector traps = AI_VALUE(GuidVector, "nearest trap with damage");
@@ -1890,7 +1890,7 @@ bool MovementAction::CheckLastFlee(float curAngle, std::list<FleeInfo>& infoList
 
 bool CombatFormationMoveAction::isUseful()
 {
-    if (getMSTime() - moveInterval < lastMoveTimer)
+    if (getMSTime() - moveInterval < uint32(lastMoveTimer))
         return false;
 
     if (bot->GetCurrentSpell(CURRENT_CHANNELED_SPELL) != nullptr)

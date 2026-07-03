@@ -164,7 +164,7 @@ bool BuffTrigger::IsActive()
         return false;
 
     Aura* aura = botAI->GetAura(spell, target, checkIsOwner, checkDuration);
-    if (!aura || (beforeDuration && aura->GetDuration() < beforeDuration))
+    if (!aura || (beforeDuration && uint32(aura->GetDuration()) < beforeDuration))
         return true;
 
     return false;
@@ -418,7 +418,7 @@ bool HealerShouldAttackTrigger::IsActive()
     return true;
 }
 
-bool ItemCountTrigger::IsActive() { return AI_VALUE2(uint32, "item count", item) < count; }
+bool ItemCountTrigger::IsActive() { return AI_VALUE2(uint32, "item count", item) < uint32(count); }
 
 bool InterruptSpellTrigger::IsActive()
 {
@@ -489,6 +489,19 @@ bool FearSleepSapTrigger::IsActive()
     return bot->HasAuraType(SPELL_AURA_MOD_FEAR) ||
            bot->HasAuraWithMechanic(1 << MECHANIC_SLEEP) ||
            bot->HasAuraWithMechanic(1 << MECHANIC_SAPPED);
+}
+
+bool PoisonDiseaseBleedTrigger::IsActive()
+{
+    return botAI->HasAuraToDispel(bot, DISPEL_POISON) ||
+           botAI->HasAuraToDispel(bot, DISPEL_DISEASE) ||
+           bot->HasAuraWithMechanic(1 << MECHANIC_BLEED);
+}
+
+bool MovementImpairedTrigger::IsActive()
+{
+    return botAI->IsMovementImpaired(bot) &&
+           !botAI->HasAnyAuraOf(bot, "stealth", "prowl", nullptr);
 }
 
 bool HasAuraStackTrigger::IsActive()
