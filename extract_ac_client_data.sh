@@ -2,13 +2,20 @@
 # =============================================================================
 #  AzerothCore client-data extraction for mod-playerbots.
 #  Run from anywhere — output lands in $SERVER_DATA_DIR.
+#
+#  Configure via environment variables (or edit the defaults below):
+#    WOW_CLIENT_DATA   3.3.5a client Data/ directory (source MPQs)
+#    TOOLS_DIR         server bin dir holding the extractors
+#                      (map_extractor, vmap4_extractor, mmaps_generator, ...)
+#    SERVER_DATA_DIR   where dbc/maps/vmaps/mmaps are written
+#                      (defaults to TOOLS_DIR)
 # =============================================================================
 set -euo pipefail
 
 # ─── PATHS ──────────────────────────────────────────────────────────────────
-WOW_CLIENT_DATA="/home/dev/wow_client_data"
-TOOLS_DIR="/home/dev/azerothcore_installer/_server/azerothcore/env/dist/bin"
-SERVER_DATA_DIR="$TOOLS_DIR"
+WOW_CLIENT_DATA="${WOW_CLIENT_DATA:-$HOME/wow_client_data}"
+TOOLS_DIR="${TOOLS_DIR:-$HOME/azerothcore/env/dist/bin}"
+SERVER_DATA_DIR="${SERVER_DATA_DIR:-$TOOLS_DIR}"
 
 # ─── TOGGLES ────────────────────────────────────────────────────────────────
 EXTRACT_DBC_AND_MAPS=true
@@ -18,8 +25,15 @@ EXTRACT_MMAPS=true
 MMAP_THREADS=0           # 0 = auto-detect (each thread uses 1-2 GB RAM)
 MMAP_SINGLE_MAP=""       # e.g. "489" for Warsong Gulch only
 
-# Verbatim copy of azerothcore-wotlk/master:src/tools/mmaps_generator/mmaps-config.yaml
-# (also the same config the mod-playerbots fork ships).
+# Copy of the mod-playerbots CORE FORK's src/tools/mmaps_generator/mmaps-config.yaml.
+# This is NOT the stock AzerothCore config: values diverge deliberately
+# (maxSimplificationError 0.8 vs stock 1.8, per-tile 1.8 overrides for tiles
+# that would otherwise exceed Detour's 16-bit vertex cap and be skipped).
+# The shipped travel-node graph SQL was generated against a mesh built with
+# exactly this config — regenerating mmaps with different values produces a
+# mesh the graph no longer matches.
+# A mmaps-config.yaml already present next to the generator takes precedence
+# over this embedded copy (see STEP 3 below).
 MMAPS_CONFIG_YAML=$(cat <<'YAML_EOF'
 mmapsConfig:
   skipLiquid: false
@@ -38,37 +52,30 @@ mmapsConfig:
 
     # Maximum slope angle (in degrees) NPCs can walk on.
     # Surfaces steeper than this will be considered unwalkable.
-    walkableSlopeAngle: 50
+    walkableSlopeAngle: 60
 
     # --- Cell Size Calculation ---
     # Many parameters below are defined in "cell units".
     # In RecastDemo, you often work with world units instead of cell units.
-    # The actual generator uses (src/tools/mmaps_generator/Config.cpp:28):
+    # By default, these cell units are converted to world units using the formula:
     #
-    #     cellSize = MMAP::GRID_SIZE / vertexPerMapEdge
+    #     cellSize = MMAP::GRID_SIZE / (vertexPerMapEdge - 1)
     #
     # Where:
     #     MMAP::GRID_SIZE = 533.3333f (the size of one map tile in world units)
     #     vertexPerMapEdge = number of vertices along one edge of the full map grid
     #
-    # Example (AC stock):
-    #     vertexPerMapEdge = 2000 → cellSize ≈ 533.3333 / 2000 ≈ 0.2667 yd
-    #
-    # IMPORTANT: when changing vertexPerMapEdge, the per-cell parameters
-    # below (walkableHeight, walkableClimb, walkableRadius) must be re-scaled
-    # to preserve their world-unit semantics. Doubling vertexPerMapEdge
-    # halves cellSize, so cell counts must double to keep the same yd value.
+    # Example:
+    #     If vertexPerMapEdge = 2000, then:
+    #         cellSize ≈ 533.3333 / (2000 - 1) ≈ 0.2667 world units per cell
     #
     # To convert a value from cell units to world units (e.g., walkableClimb),
-    # multiply by cellSize. For example, a walkableClimb of 6 at 2000 resolution:
-    #     6 × 0.2667 ≈ 1.60 yd
+    # multiply by cellSize. For example, a walkableClimb of 6 corresponds to:
+    #     6 * 0.2667 ≈ 1.6 world units
 
     # Minimum ceiling height (in cell units) NPCs need to pass under an obstacle.
     # Controls how much vertical clearance is required.
     # To convert to world units, multiply by cellSize (see "Cell Size Calculation").
-    # 6 cells × 0.2667 yd ≈ 1.60 yd — matches WoW player capsule height at
-    # 2000 resolution (AC stock). Preserves the 1.60 yd world-unit
-    # ceiling-clearance requirement.
     walkableHeight: 6
 
     # Maximum height difference (in cell units) NPCs can step up or down.
@@ -77,42 +84,25 @@ mmapsConfig:
     #
     # Vanilla WotLK uses 6, which allows creatures to "jump" over fences.
     # Classic WotLK uses 4, which forces creatures to walk around fences.
-    # 6 cells × 0.2667 yd ≈ 1.60 yd — Vanilla-WotLK step semantics at
-    # 2000 resolution. Preserves the 1.60 yd world-unit step. The mmap
-    # is shared with every creature, NPC patrol, escort, and quest mob;
-    # tightening below stock breaks patrols that cross 1.5y ledges.
     walkableClimb: 4
 
     # Minimum distance (in cell units) around walkable surfaces.
     # Helps prevent NPCs from clipping into walls and narrow gaps.
     # To convert to world units, multiply by cellSize (see "Cell Size Calculation").
-    # 2 cells × 0.2667 yd ≈ 0.53 yd — AC stock world-unit buffer at
-    # 2000 resolution. Tested wider (= 0.71y world units): erodes polys
-    # near mountains/cliffs so pathfinder routes through surviving
-    # (higher/worse) polys → bot climbs mountains.
     walkableRadius: 2
 
     # Number of vertices along one edge of the entire map's navmesh grid.
     # Higher values increase mesh resolution but also CPU/memory usage.
-    # 2000 = AC stock baseline. cellSize ≈ 0.2667 yd.
     vertexPerMapEdge: 2000
 
     # Number of vertices along one edge of each tile chunk.
-    # Must divide vertexPerMapEdge evenly — the generator uses integer
-    # division: tilesPerMapEdge = vertexPerMap / vertexPerTile
-    # (src/tools/mmaps_generator/Config.cpp:144).
+    # Must divide (vertexPerMapEdge - 1) evenly for seamless tiles.
     # A higher vertex count per tile means fewer total tiles,
     # reducing runtime work to load, unload, and manage tiles.
-    # 80 = AC stock baseline. 2000 / 80 = 25 tiles per map edge, 625
-    # tiles per map (~21y per tile). Lots of small tiles, low per-tile
-    # RAM, more seams to stitch across.
     vertexPerTileEdge: 80
 
     # Tolerance for how much a polygon can deviate from the original geometry when simplified.
     # Higher values produce simpler (faster) meshes but can reduce accuracy.
-    # 0.8 (vs the AC stock 1.8 and recast canonical 1.3) keeps polygon
-    # edges close to real terrain. Targets "merged step into ramp"
-    # simplification artifacts that produce corner-cuts and false NOPATH.
     maxSimplificationError: 0.8
 
     # You can override any global parameter for a specific map by specifying its map ID.
@@ -153,8 +143,19 @@ mmapsConfig:
     # All parameters defined globally are eligible for override.
     # Just specify the parameter name and new value in the override section.
     mapsOverrides:
+      # NOTE on maxSimplificationError: 1.8 below: with the global 0.8 these
+      # geometry-heavy tiles exceed Detour's hard 16-bit vertex cap
+      # (dtCreateNavMeshData rejects vertCount >= 0xffff) and the generator
+      # SKIPS them entirely — leaving holes in the navmesh (Karazhan/Deadwind,
+      # most of Blade's Edge Mountains, Coilfang, Zul'Drak/Storm Peaks spots).
+      # 1.8 is the legacy generator's coarseness, which built these same tiles
+      # at ~21k vertices. Applied per tile so the rest of each map keeps the
+      # fine global setting.
       "562": # Blade's Edge Arena
         walkableRadius: 0 # This allows walking on the ropes to the pillars
+        tilesOverrides:
+          "20,31":
+            maxSimplificationError: 1.8
 
       "48": # Blackfathom Deeps
         cellSizeVertical: 0.5334 # ch*2 = 0.2667 * 2 ≈ 0.5334. Reduce the chance to have underground levels.
@@ -166,10 +167,90 @@ mmapsConfig:
             # https://github.com/azerothcore/azerothcore-wotlk/pull/22462#issuecomment-3067024680
             walkableSlopeAngle: 45
 
+      "0": # Eastern Kingdoms
+        tilesOverrides:
+          "52,35": # Karazhan / Deadwind Pass
+            maxSimplificationError: 1.8
+
+      "509": # Ruins of Ahn'Qiraj
+        tilesOverrides:
+          "49,29":
+            maxSimplificationError: 1.8
+
       "530": # Outland
         tilesOverrides:
           "32,30": # Dark portal
             walkableSlopeAngle: 45 # https://github.com/chromiecraft/chromiecraft/issues/8404#issuecomment-3476012660
+          # Blade's Edge Mountains / Zangarmarsh-Coilfang block
+          "24,21":
+            maxSimplificationError: 1.8
+          "24,22":
+            maxSimplificationError: 1.8
+          "25,19":
+            maxSimplificationError: 1.8
+          "25,20":
+            maxSimplificationError: 1.8
+          "25,21":
+            maxSimplificationError: 1.8
+          "25,22":
+            maxSimplificationError: 1.8
+          "26,19":
+            maxSimplificationError: 1.8
+          "26,20":
+            maxSimplificationError: 1.8
+          "27,19":
+            maxSimplificationError: 1.8
+          "27,20":
+            maxSimplificationError: 1.8
+          "27,21":
+            maxSimplificationError: 1.8
+          "28,21":
+            maxSimplificationError: 1.8
+          "28,22":
+            maxSimplificationError: 1.8
+          "29,18":
+            maxSimplificationError: 1.8
+          "29,19":
+            maxSimplificationError: 1.8
+          "29,20":
+            maxSimplificationError: 1.8
+          "29,21":
+            maxSimplificationError: 1.8
+          "30,19":
+            maxSimplificationError: 1.8
+          "30,20":
+            maxSimplificationError: 1.8
+          "35,21":
+            maxSimplificationError: 1.8
+
+      "532": # Karazhan (instance)
+        tilesOverrides:
+          "52,35":
+            maxSimplificationError: 1.8
+          "52,36":
+            maxSimplificationError: 1.8
+
+      "533": # Naxxramas
+        tilesOverrides:
+          "26,38":
+            maxSimplificationError: 1.8
+
+      "571": # Northrend
+        tilesOverrides:
+          "16,34":
+            maxSimplificationError: 1.8
+          "16,35":
+            maxSimplificationError: 1.8
+          "17,34":
+            maxSimplificationError: 1.8
+          "21,28":
+            maxSimplificationError: 1.8
+          "21,30":
+            maxSimplificationError: 1.8
+          "21,37":
+            maxSimplificationError: 1.8
+          "29,21":
+            maxSimplificationError: 1.8
 
   # debugOutput generates debug files in the `meshes` directory for use with RecastDemo.
   # This is useful for inspecting and debugging mmap generation visually.
@@ -316,7 +397,17 @@ if [ "$EXTRACT_MMAPS" = true ]; then
 
     echo
     echo "[3/3] Generating MMaps... (do not interrupt)"
-    printf '%s\n' "$MMAPS_CONFIG_YAML" > mmaps-config.yaml
+    # Config precedence: an existing mmaps-config.yaml here, then one installed
+    # next to the generator, then the embedded copy (synced from the core fork).
+    if [ -f mmaps-config.yaml ]; then
+        echo "Using existing mmaps-config.yaml in $(pwd)"
+    elif [ -f "$TOOLS_DIR/mmaps-config.yaml" ]; then
+        cp "$TOOLS_DIR/mmaps-config.yaml" mmaps-config.yaml
+        echo "Using mmaps-config.yaml from $TOOLS_DIR"
+    else
+        printf '%s\n' "$MMAPS_CONFIG_YAML" > mmaps-config.yaml
+        echo "No mmaps-config.yaml found — writing embedded copy"
+    fi
 
     # Wipe any existing tiles before regenerating. Mixed tiles from
     # previous runs (different cellSize / verticesPerTileEdge / etc.)
@@ -325,11 +416,20 @@ if [ "$EXTRACT_MMAPS" = true ]; then
     safe_rm mmaps
     mkdir -p mmaps
 
-    # Workaround: some mmaps_generator builds write a few tiles to /mmaps
-    # via an absolute path. Pre-create it so the writes don't fail, then
-    # fold the strays into our local mmaps/ at the end.
-    sudo rm -rf /mmaps
-    sudo mkdir -p /mmaps && sudo chmod 777 /mmaps
+    # Workaround: some mmaps_generator builds write a few tiles to /mmaps via
+    # an absolute path. We won't create a world-writable root directory here;
+    # if your build is affected, create it once yourself before running:
+    #     sudo mkdir -p /mmaps && sudo chown "$USER" /mmaps
+    # Stale tiles from earlier runs must not leak into this one:
+    if [ -d /mmaps ] && compgen -G "/mmaps/*.mmtile" >/dev/null; then
+        if [ -w /mmaps ]; then
+            rm -f /mmaps/*.mmtile
+        else
+            echo "ERROR: /mmaps contains stale .mmtile files but is not writable." >&2
+            echo "Clean it first (needs privileges): sudo rm -f /mmaps/*.mmtile" >&2
+            exit 1
+        fi
+    fi
 
     CMD=("$TOOLS_DIR/mmaps_generator" --config mmaps-config.yaml --threads "$MMAP_THREADS")
     [ -n "$MMAP_SINGLE_MAP" ] && CMD+=("$MMAP_SINGLE_MAP")
@@ -338,8 +438,10 @@ if [ "$EXTRACT_MMAPS" = true ]; then
     "${CMD[@]}"
     ELAPSED=$(( $(date +%s) - START ))
 
-    if compgen -G "/mmaps/*.mmtile" >/dev/null; then
-        cp /mmaps/*.mmtile mmaps/ && rm -f /mmaps/*.mmtile
+    # Fold any strays written to /mmaps back into the local output.
+    if [ -d /mmaps ] && compgen -G "/mmaps/*.mmtile" >/dev/null; then
+        cp /mmaps/*.mmtile mmaps/
+        [ -w /mmaps ] && rm -f /mmaps/*.mmtile
     fi
 
     echo
