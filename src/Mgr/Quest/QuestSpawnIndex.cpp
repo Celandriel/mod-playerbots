@@ -27,9 +27,9 @@ void QuestSpawnIndex::Init()
     for (auto const& kv : sObjectMgr->GetAllCreatureData())
     {
         CreatureData const& cd = kv.second;
-        if (!cd.id1)
+        if (!cd.id)
             continue;
-        Key const key{cd.mapid, static_cast<int32>(cd.id1)};
+        Key const key{cd.mapid, static_cast<int32>(cd.id)};
         _index[key].emplace_back(cd.mapid, cd.posX, cd.posY, cd.posZ, cd.orientation);
         ++creatures;
     }

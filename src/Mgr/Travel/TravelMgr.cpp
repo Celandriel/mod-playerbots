@@ -721,7 +721,12 @@ std::vector<WorldPosition> WorldPosition::getPathStepFrom(WorldPosition startPos
 
     if (!pathUnit)
     {
-        Map* map = sMapMgr->FindBaseMap(startPos.GetMapId());
+        // CreateBaseMap, not FindBaseMap: generation must be able to path on
+        // instance maps nobody has entered since boot (Find returns null there,
+        // which silently left every instance-interior node link-less). Create
+        // returns the existing map when already loaded, so primary maps are
+        // unaffected; grids/mmap tiles then load via EnsureGridCreated below.
+        Map* map = sMapMgr->CreateBaseMap(startPos.GetMapId());
         if (!map)
             return {};
 
@@ -936,7 +941,10 @@ std::vector<WorldPosition> WorldPosition::getPathFromPath(std::vector<WorldPosit
     Creature* tempCreature = nullptr;
     if (!pathUnit)
     {
-        Map* map = sMapMgr->FindBaseMap(GetMapId());
+        // CreateBaseMap for the same reason as getPathStepFrom: instance maps
+        // nobody entered since boot don't exist yet, and Find left their nodes
+        // permanently link-less during generation.
+        Map* map = sMapMgr->CreateBaseMap(GetMapId());
         if (!map)
             return fullPath;
 

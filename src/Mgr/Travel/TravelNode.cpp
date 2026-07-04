@@ -7,6 +7,7 @@
 
 #include <array>
 #include <iomanip>
+#include <limits>
 #include <queue>
 #include <regex>
 #include <unordered_set>
@@ -570,22 +571,56 @@ bool TravelNode::isUselessLink(TravelNode* farNode)
 }
 
 
-bool TravelNode::cropUselessLinks()
+namespace
 {
     // Structure nodes (elevators / zeppelins / portals / instance entrances /
-    // exits) keep all of their walk approaches: the bot needs them to reach the
-    // transport, and they cannot be regenerated for non-taxi-path transports.
-    // isStructural() is symmetric (checks incoming links + intrinsic ids too),
-    // so portal/transport EXIT nodes are protected as well.
-    if (this->isStructural())
-        return false;
+    // exits) used to be fully exempt from redundancy cropping. That exemption
+    // was a bandage for crop severing their approaches, whose real causes are
+    // all fixed now (honest pathfinder, intrinsic identity, sweep-before-crop,
+    // clearRoutes per iteration, mapOnly route pre-filter) -- and it let
+    // instance exits accumulate up to 200 walk links (~30% of all graph
+    // edges). Crop their redundant walk links like any other node, but with a
+    // seatbelt that makes the old isolation bug structurally impossible: a
+    // structural node always keeps at least MIN_STRUCTURAL_WALK_LINKS walk
+    // approaches, and its shortest approach is never removed.
+    constexpr uint32 MIN_STRUCTURAL_WALK_LINKS = 3;
 
+    bool canCropStructuralWalkLink(TravelNode* node, TravelNode* other)
+    {
+        if (!node->isStructural())
+            return true;
+
+        uint32 walkLinks = 0;
+        TravelNode* shortest = nullptr;
+        float best = std::numeric_limits<float>::max();
+        for (auto& link : *node->getLinks())
+        {
+            if (link.second->getPathType() != TravelNodePathType::walk)
+                continue;
+
+            ++walkLinks;
+            if (link.second->getDistance() < best)
+            {
+                best = link.second->getDistance();
+                shortest = link.first;
+            }
+        }
+
+        return walkLinks > MIN_STRUCTURAL_WALK_LINKS && shortest != other;
+    }
+}
+
+bool TravelNode::cropUselessLinks()
+{
     bool hasRemoved = false;
 
     for (auto& firstLink : *getPaths())
     {
         TravelNode* farNode = firstLink.first;
-        if (farNode->isStructural())
+
+        // Both endpoints must be croppable: each structural endpoint keeps its
+        // degree floor and its shortest walk approach.
+        if (!canCropStructuralWalkLink(this, farNode) || !canCropStructuralWalkLink(farNode, this))
             continue;
 
         if (this->hasLinkTo(farNode) && this->isUselessLink(farNode))
@@ -726,24 +761,46 @@ bool TravelPath::IsPathCheating(std::vector<WorldPosition> const& path, float en
     if (path.size() == 2 && endpointDistance > 5.0f)
         return true;
 
-    // Guard 2: steep slope at start or end suggests the pathfinder
-    // hopped through a near-vertical step. >10y drop with >2:1 slope
-    // is too steep to walk.
+    // Guard 2: steep near-vertical step. The terminal segments are the joint
+    // between the RAW node position (path.front()/back() are never mesh
+    // points -- subzone means are coordinate averages, POI/spirithealer nodes
+    // come from spawn tables, and all z values predate AC's mesh) and the
+    // first mesh-snapped point. Measured on curated data, 521/532 links this
+    // guard used to flag were steep ONLY in that node-attachment stub while
+    // the interior was near-flat -- a data artifact, not a navmesh cheat. So
+    // the stub alone never condemns a path; flag only when it is actually
+    // suspicious:
+    //   - the path is too short to have a trustworthy mesh interior (<=3 pts)
+    //   - the steep stub covers a real horizontal run (>5y: a traversal, not
+    //     a vertical snap)
+    //   - the adjacent MESH segment is steep too (the slope continues into
+    //     real geometry).
     if (path.size() > 2)
     {
-        WorldPosition const& a = path.front();
-        WorldPosition const& b = path[1];
-        float vDist = std::fabs(a.GetPositionZ() - b.GetPositionZ());
-        float hDist = a.GetExactDist2d(b.GetPositionX(), b.GetPositionY());
-        if (vDist > 10.0f && (hDist == 0.0f || vDist / hDist > 2.0f))
-            return true;
+        auto const isSteep = [](WorldPosition const& a, WorldPosition const& b)
+        {
+            float vDist = std::fabs(a.GetPositionZ() - b.GetPositionZ());
+            float hDist = a.GetExactDist2d(b.GetPositionX(), b.GetPositionY());
+            return vDist > 10.0f && (hDist == 0.0f || vDist / hDist > 2.0f);
+        };
+
+        constexpr float MAX_STUB_RUN = 5.0f;
+
+        if (isSteep(path.front(), path[1]))
+        {
+            float stubRun = path.front().GetExactDist2d(path[1].GetPositionX(), path[1].GetPositionY());
+            if (path.size() <= 3 || stubRun > MAX_STUB_RUN || isSteep(path[1], path[2]))
+                return true;
+        }
 
         WorldPosition const& c = path.back();
         WorldPosition const& d = path[path.size() - 2];
-        float vDist2 = std::fabs(c.GetPositionZ() - d.GetPositionZ());
-        float hDist2 = c.GetExactDist2d(d.GetPositionX(), d.GetPositionY());
-        if (vDist2 > 10.0f && (hDist2 == 0.0f || vDist2 / hDist2 > 2.0f))
-            return true;
+        if (isSteep(c, d))
+        {
+            float stubRun = c.GetExactDist2d(d.GetPositionX(), d.GetPositionY());
+            if (path.size() <= 3 || stubRun > MAX_STUB_RUN || isSteep(d, path[path.size() - 3]))
+                return true;
+        }
     }
 
     return false;
