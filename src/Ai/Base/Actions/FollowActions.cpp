@@ -19,9 +19,6 @@
 #include "Transport.h"
 #include "Map.h"
 
-// Transport helpers (GetTransportForPosTolerant, FindBoardingPointOnTransport,
-// BoardTransport) are now on MovementAction — inherited by FollowAction.
-
 bool FollowAction::Execute(Event /*event*/)
 {
     Formation* formation = AI_VALUE(Formation*, "formation");

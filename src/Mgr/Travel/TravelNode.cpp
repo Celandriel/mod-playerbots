@@ -54,13 +54,7 @@ void TravelNodePath::calculateCost(bool distanceOnly)
     maxLevelCreature = {0, 0, 0};
     swimDistance = 0;
 
-    // Sample the creature scan along the path instead of hitting every
-    // waypoint. getCreaturesNear(50) already covers a 50y radius, so scanning
-    // it at every ~5y waypoint is ~10x redundant work; on dense maps a long
-    // real path then makes this loop take minutes per link. Sampling every 40y
-    // keeps the 50y radii overlapping (full corridor coverage -> same worst
-    // creature) while cutting the scan count to the path's length, not its
-    // vertex count. Distance/swim accumulation stays per-waypoint (exact).
+    // Reduce creature sampleling to every 40y to reduce calculation time. Distance/swim accumulation stays per-waypoint (exact).
     constexpr float CREATURE_SAMPLE_INTERVAL = 40.0f;
     WorldPosition lastScan = WorldPosition();
 
@@ -2924,18 +2918,10 @@ void TravelNodeMap::Init()
     LoadNodeStore();
     calcMapOffset();
 
-    // Boot-time generation runs here, BEFORE the world has finished loading maps,
-    // grids and navmesh -- so pathfinding stalls (on-demand grid loads) and
-    // instance-map nodes get no links. When DeferTravelNodeGeneration is set,
-    // only load the existing graph now and leave generation to a manual
-    // `.playerbots travel generatenode` run once the server is fully up.
-    if ((hasToGen || hasToFullGen) && sPlayerbotAIConfig.deferTravelNodeGeneration)
-    {
-        LOG_INFO("playerbots",
-                 ">> Travel node generation deferred (AiPlayerbot.DeferTravelNodeGeneration=1). "
-                 "Run '.playerbots travel generatenode' after the world has fully loaded.");
-    }
-    else if (hasToGen || hasToFullGen)
+    // Boot-time generation self-loads the grids/mmap tiles it needs
+    // (ensureNavTilesForGeneration in TravelMgr.cpp), including instance
+    // maps nobody has entered -- it just makes boot slower.
+    if (hasToGen || hasToFullGen)
     {
         if (hasToFullGen)
             generateNodes();

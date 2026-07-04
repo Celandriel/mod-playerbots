@@ -6,7 +6,9 @@
 #include "TravelMgr.h"
 
 #include <iomanip>
+#include <mutex>
 #include <numeric>
+#include <unordered_set>
 
 #include "AreaDefines.h"
 #include "Creature.h"
@@ -713,6 +715,29 @@ std::vector<WorldPosition> WorldPosition::fromPointsArray(std::vector<G3D::Vecto
     return retVec;
 }
 
+namespace
+{
+    // Travel-node generation only (temp-Creature pathing). Detour can only
+    // search loaded mmap tiles and nobody is on the map to load them during
+    // generation, so create every grid once per map -- same effect as a
+    // player zoning in (Map::OnCreateMap -> LoadAllGrids), minus object
+    // spawns. On preloaded continents the sweep is a no-op.
+    void ensureNavTilesForGeneration(Map* map)
+    {
+        static std::mutex ensuredLock;
+        static std::unordered_set<uint32> ensuredMaps;
+        {
+            std::lock_guard<std::mutex> lock(ensuredLock);
+            if (!ensuredMaps.insert(map->GetId()).second)
+                return;
+        }
+
+        for (uint32 x = 0; x < MAX_NUMBER_OF_GRIDS; ++x)
+            for (uint32 y = 0; y < MAX_NUMBER_OF_GRIDS; ++y)
+                map->EnsureGridCreated(GridCoord(x, y));
+    }
+}
+
 // A single pathfinding attempt from one position to another. Returns pathfinding status and path.
 std::vector<WorldPosition> WorldPosition::getPathStepFrom(WorldPosition startPos, Unit* bot)
 {
@@ -721,11 +746,9 @@ std::vector<WorldPosition> WorldPosition::getPathStepFrom(WorldPosition startPos
 
     if (!pathUnit)
     {
-        // CreateBaseMap, not FindBaseMap: generation must be able to path on
-        // instance maps nobody has entered since boot (Find returns null there,
-        // which silently left every instance-interior node link-less). Create
-        // returns the existing map when already loaded, so primary maps are
-        // unaffected; grids/mmap tiles then load via EnsureGridCreated below.
+        // CreateBaseMap, not FindBaseMap: generation must path on instance
+        // maps nobody has entered since boot. The fresh map's navmesh is
+        // empty; ensureNavTilesForGeneration below loads the tiles.
         Map* map = sMapMgr->CreateBaseMap(startPos.GetMapId());
         if (!map)
             return {};
@@ -741,8 +764,7 @@ std::vector<WorldPosition> WorldPosition::getPathStepFrom(WorldPosition startPos
         }
         pathUnit = tempCreature;
 
-        map->EnsureGridCreated(Acore::ComputeGridCoord(startPos.GetPositionX(), startPos.GetPositionY()));
-        map->EnsureGridCreated(Acore::ComputeGridCoord(GetPositionX(), GetPositionY()));
+        ensureNavTilesForGeneration(map);
     }
 
     PathGenerator path(pathUnit);
@@ -771,10 +793,7 @@ std::vector<WorldPosition> WorldPosition::getPathStepFrom(WorldPosition startPos
     return result;
 }
 
-// Pathfinder-reuse overload — caller owns the PathGenerator and any
-// per-call configuration. Used by getPathFromPath to thread one
-// PathGenerator through the whole 40-step chain instead of
-// constructing a new one per step.
+// A single pathfinding attempt from one position to another. Returns pathfinding status and path.
 std::vector<WorldPosition> WorldPosition::getPathStepFrom(WorldPosition startPos, PathGenerator& path)
 {
     // Explicit-start overload. Without this, the chain begins from the
@@ -860,65 +879,6 @@ bool WorldPosition::cropPathTo(std::vector<WorldPosition>& path, float maxDistan
     return insRange;
 }
 
-namespace
-{
-    // Collapse out-and-back resampling stutters introduced where the chained
-    // stepper restarts: when one step ends PATHFIND_INCOMPLETE, the next step
-    // re-pathfinds from that point and Detour's 4y (SMOOTH_PATH_STEP_SIZE)
-    // resampling can plant its first waypoint back toward where we came from,
-    // giving a "...X -> X-4y -> X..." 180deg spike at every junction. Drop the
-    // apex B of any A-B-C triple that reverses (>120deg) AND lands back within
-    // ~5y of A: that is jitter, not a real switchback (whose far leg carries C
-    // well past A). The removed detour is <=~5y, so the executor's local MoveTo
-    // re-paths it cleanly -- no navmesh validation needed. 2D test; z is kept on
-    // the surviving points. Iterates: collapsing one apex can expose the next.
-    void removeBacktrackJitter(std::vector<WorldPosition>& path)
-    {
-        constexpr float REVERSE_COS = -0.5f;  // turn sharper than 120 degrees
-        constexpr float NET_SKIP = 5.0f;      // C lands back near A (yards)
-        constexpr float COINCIDENT = 1.0f;    // duplicate-point dedup (yards)
-
-        bool changed = true;
-        while (changed && path.size() >= 3)
-        {
-            changed = false;
-            for (size_t i = 1; i + 1 < path.size();)
-            {
-                WorldPosition const& a = path[i - 1];
-                WorldPosition const& b = path[i];
-                WorldPosition const& c = path[i + 1];
-
-                float const abx = b.GetPositionX() - a.GetPositionX();
-                float const aby = b.GetPositionY() - a.GetPositionY();
-                float const bcx = c.GetPositionX() - b.GetPositionX();
-                float const bcy = c.GetPositionY() - b.GetPositionY();
-
-                float const abLen = std::sqrt(abx * abx + aby * aby);
-                float const bcLen = std::sqrt(bcx * bcx + bcy * bcy);
-
-                // B sits on top of A (or B->C is degenerate): drop B.
-                if (abLen < COINCIDENT || bcLen < COINCIDENT)
-                {
-                    path.erase(path.begin() + i);
-                    changed = true;
-                    continue;
-                }
-
-                float const cosTurn = (abx * bcx + aby * bcy) / (abLen * bcLen);
-                float const skip = a.GetExactDist2d(c.GetPositionX(), c.GetPositionY());
-
-                if (cosTurn < REVERSE_COS && skip < NET_SKIP)
-                {
-                    path.erase(path.begin() + i);
-                    changed = true;
-                }
-                else
-                    ++i;
-            }
-        }
-    }
-}
-
 // A sequential series of pathfinding attempts. Returns the complete path and if the patfinder eventually found a way to
 // the destination.
 std::vector<WorldPosition> WorldPosition::getPathFromPath(std::vector<WorldPosition> startPath, Unit* bot,
@@ -941,9 +901,7 @@ std::vector<WorldPosition> WorldPosition::getPathFromPath(std::vector<WorldPosit
     Creature* tempCreature = nullptr;
     if (!pathUnit)
     {
-        // CreateBaseMap for the same reason as getPathStepFrom: instance maps
-        // nobody entered since boot don't exist yet, and Find left their nodes
-        // permanently link-less during generation.
+        // Same as getPathStepFrom: create the map, then load its navmesh tiles.
         Map* map = sMapMgr->CreateBaseMap(GetMapId());
         if (!map)
             return fullPath;
@@ -958,8 +916,7 @@ std::vector<WorldPosition> WorldPosition::getPathFromPath(std::vector<WorldPosit
             return fullPath;
         }
         pathUnit = tempCreature;
-        map->EnsureGridCreated(Acore::ComputeGridCoord(currentPos.GetPositionX(), currentPos.GetPositionY()));
-        map->EnsureGridCreated(Acore::ComputeGridCoord(GetPositionX(), GetPositionY()));
+        ensureNavTilesForGeneration(map);
     }
 
     PathGenerator path(pathUnit);
@@ -993,14 +950,6 @@ std::vector<WorldPosition> WorldPosition::getPathFromPath(std::vector<WorldPosit
 
         currentPos = subPath.back();
     }
-
-    // Smooth out the 4y out-and-back stutters the chained stepper leaves at
-    // its restart junctions — runtime probes only. During GENERATION (temp
-    // creature) the raw geometry must be kept: dropping points lengthens the
-    // first/last segments, which makes IsPathCheating's endpoint-slope guard
-    // (and the 2-point rule) reject legitimately walkable links.
-    if (!tempCreature)
-        removeBacktrackJitter(fullPath);
 
     if (tempCreature)
         delete tempCreature;
