@@ -535,10 +535,6 @@ bool TravelNode::isUselessLink(TravelNode* farNode)
         }
         else
         {
-            // (ref 518-519) same areaTrigger guard on the multi-hop branch.
-            if (nearNode->getAreaTriggerId())
-                continue;
-
             // (ref 515) mapOnly reachability pre-filter: only consider the
             // alternate route if farNode is reachable from nearNode WITHOUT
             // leaving the map. GetNodeRoute happily routes through portal
@@ -563,7 +559,6 @@ bool TravelNode::isUselessLink(TravelNode* farNode)
 
     return false;
 }
-
 
 namespace
 {
@@ -660,7 +655,6 @@ bool TravelNode::cropUselessLinks()
     return hasRemoved;
 
 }
-
 
 void TravelNode::print([[maybe_unused]] bool printFailed)
 {
@@ -1068,11 +1062,18 @@ bool TravelPath::UpcommingSpecialMovement(WorldPosition startPos,
 
 void TravelPath::ClipPath(PlayerbotAI* ai, Unit* mover, bool ignoreEnemyTargets)
 {
-    auto startP = getNextPoint(WorldPosition(mover), 0.0f, false);
-    cutTo(*startP, false);
+    if (fullPath.empty())
+        return;
 
+    auto startP = getNextPoint(WorldPosition(mover), 0.0f, false);
     if (startP == fullPath.end())
         return;
+
+    // cutTo re-finds the point by value and erases everything before it,
+    // which invalidates startP — don't touch the iterator afterwards
+    // (cutTo with including=false always keeps the found point, so the
+    // path stays non-empty).
+    cutTo(*startP, false);
 
     GuidVector targets;
     Player* bot = ai ? ai->GetBot() : nullptr;
@@ -1905,7 +1906,6 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos,
     return path;  // empty
 }
 
-
 void TravelNodeMap::generateNpcNodes()
 {
     std::unordered_map<uint32, std::pair<CreatureTemplate const*, WorldPosition>> bossMap;
@@ -2383,11 +2383,15 @@ void TravelNodeMap::generateWalkPathMap(uint32 mapId)
         if (startNode->isLinked())
             continue;
 
-        // Log BEFORE the inner loop so a hang inside BuildPath is pinned to
-        // this exact node (no "done" line follows it).
         ++processed;
         WorldPosition* p = startNode->getPosition();
-        LOG_INFO("playerbots", "-- walkpaths: map {} {}/{} start | node ({:.0f},{:.0f},{:.0f})",
+        if (processed % 50 == 0 || processed == total)
+            LOG_INFO("playerbots", "-- walkpaths: map {} {}/{}", mapId, processed, total);
+
+        // Per-node trace at debug: logged BEFORE the inner loop so a hang
+        // inside BuildPath is pinned to this exact node (no "done" line
+        // follows it). Enable debug on "playerbots" to hunt regen hangs.
+        LOG_DEBUG("playerbots", "-- walkpaths: map {} {}/{} start | node ({:.0f},{:.0f},{:.0f})",
                  mapId, processed, total,
                  p->GetPositionX(), p->GetPositionY(), p->GetPositionZ());
 
@@ -2410,7 +2414,7 @@ void TravelNodeMap::generateWalkPathMap(uint32 mapId)
 
         startNode->setLinked(true);
 
-        LOG_INFO("playerbots", "-- walkpaths: map {} {}/{} done | got {} links",
+        LOG_DEBUG("playerbots", "-- walkpaths: map {} {}/{} done | got {} links",
                  mapId, processed, total, (uint32)startNode->getLinks()->size());
     }
 }
@@ -2771,7 +2775,9 @@ namespace
             {
                 WorldPosition* sp = startNode->getPosition();
                 WorldPosition* ep = endNode->getPosition();
-                LOG_INFO("playerbots",
+                // Per-link detail at debug; removeCheatingPaths logs the
+                // pruned total, and cheat.csv carries the forensic record.
+                LOG_DEBUG("playerbots",
                          "-- prunecheat: dropping walk link '{}' -> '{}' "
                          "(map {} ({:.0f},{:.0f},{:.0f}) -> ({:.0f},{:.0f},{:.0f}))",
                          startNode->getName(), endNode->getName(), startNode->GetMapId(),
@@ -2817,11 +2823,15 @@ void TravelNodeMap::calculatePathCosts()
 
     for (auto& startNode : TravelNodeMap::instance().getNodes())
     {
-        // Log BEFORE costing this node's links so a hang inside calculateCost
-        // (which scans creatures per waypoint) is pinned to this exact node.
         ++processed;
         WorldPosition* sp = startNode->getPosition();
-        LOG_INFO("playerbots", "-- pathcosts: {}/{} start | map {} node ({:.0f},{:.0f},{:.0f}) {} links",
+        if (processed % 50 == 0 || processed == total)
+            LOG_INFO("playerbots", "-- pathcosts: {}/{}", processed, total);
+
+        // Per-node trace at debug: logged BEFORE costing this node's links so
+        // a hang inside calculateCost (which scans creatures per waypoint) is
+        // pinned to this exact node.
+        LOG_DEBUG("playerbots", "-- pathcosts: {}/{} start | map {} node ({:.0f},{:.0f},{:.0f}) {} links",
                  processed, total, startNode->GetMapId(),
                  sp->GetPositionX(), sp->GetPositionY(), sp->GetPositionZ(),
                  (uint32)startNode->getLinks()->size());

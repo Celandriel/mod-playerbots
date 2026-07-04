@@ -796,7 +796,6 @@ public:
     void saveNodeStore();
     void LoadNodeStore();
 
-
     void calcMapOffset();
     WorldPosition getMapOffset(uint32 mapId);
 
@@ -811,14 +810,6 @@ public:
     // the caller is then expected to fall back to a single-point path.
     TravelPath GetFullPath(WorldPosition botPos,
         WorldPosition destination, Unit* bot = nullptr);
-
-    // Resolve A* route between two world positions (returns node vector)
-    std::vector<TravelNode*> ResolveRoute(WorldPosition startPos,
-        WorldPosition endPos);
-
-    // Get stored walk points for one edge (from→to). Empty if no path.
-    std::vector<G3D::Vector3> GetEdgeWalkPoints(TravelNode* from,
-        TravelNode* to);
 
     std::shared_timed_mutex m_nMapMtx;
 

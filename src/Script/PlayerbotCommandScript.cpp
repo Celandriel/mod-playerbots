@@ -116,7 +116,13 @@ public:
 
     static bool HandleGenerateTravelNodesCommand(ChatHandler* handler, char const* /*args*/)
     {
-        handler->PSendSysMessage("Regenerating travel node paths (all maps)...");
+        if (!sPlayerbotAIConfig.enableTravelNodes)
+        {
+            handler->PSendSysMessage("Travel node generation refused: AiPlayerbot.EnableTravelNodes is disabled, so the node store was never loaded and generating now would overwrite it.");
+            return true;
+        }
+
+        handler->PSendSysMessage("Regenerating travel node paths (all maps)... The world thread is blocked until this finishes.");
         LOG_INFO("playerbots", "Manual travel node regeneration started via console command.");
         sTravelNodeMap.generateAll();
         handler->PSendSysMessage("Travel node regeneration complete. Paths saved to database.");
