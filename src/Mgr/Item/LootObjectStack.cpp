@@ -87,6 +87,7 @@ void LootObject::Refresh(Player* bot, ObjectGuid lootGUID)
     {
         bool onlyHasQuestItems = true;
         bool hasAnyQuestItems = false;
+        bool neededQuestItem = false;
 
         GameObjectQuestItemList const* items = sObjectMgr->GetGameObjectQuestItemList(go->GetEntry());
         for (size_t i = 0; i < MAX_GAMEOBJECT_QUEST_ITEMS; i++)
@@ -102,9 +103,13 @@ void LootObject::Refresh(Player* bot, ObjectGuid lootGUID)
 
             if (IsNeededForQuest(bot, itemId))
             {
+                // A gathering node can also drop a needed quest item (e.g.
+                // Root Sample off Barrens herbs); gathering yields both, so
+                // keep reading the lock below to set skillId rather than
+                // bailing here.
                 this->guid = lootGUID;
                 this->isNeededQuestItem = true;
-                return;
+                neededQuestItem = true;
             }
 
             const ItemTemplate* proto = sObjectMgr->GetItemTemplate(itemId);
@@ -186,7 +191,7 @@ void LootObject::Refresh(Player* bot, ObjectGuid lootGUID)
         }
 
         // If gameobject has only quest items that bot doesn’t need, skip it.
-        if (hasAnyQuestItems && onlyHasQuestItems)
+        if (!neededQuestItem && hasAnyQuestItems && onlyHasQuestItems)
             return;
 
         // Otherwise, loot it.

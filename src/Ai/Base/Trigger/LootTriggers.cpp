@@ -15,7 +15,9 @@ bool LootAvailableTrigger::IsActive()
     // safety net. Don't gate on hostiles-in-sight: that locked out
     // looting in zones with continuous respawns (e.g. cave farms).
     // If a new enemy aggros mid-loot the combat engine takes over, loot
-    // resumes on the next non-combat window.
+    // resumes on the next non-combat window. (Upstream's stuck-target
+    // escape clause is unnecessary under this always-active design: the
+    // loot action runs every non-combat window and can re-select.)
     if (!AI_VALUE(bool, "has available loot"))
         return false;
 
