@@ -5,8 +5,11 @@
 
 #include "TravelMgr.h"
 
+#include <chrono>
 #include <iomanip>
 #include <numeric>
+#include <set>
+#include <unordered_map>
 
 #include "AreaDefines.h"
 #include "Creature.h"
@@ -4359,6 +4362,7 @@ void TravelMgr::Init()
     {
         PrepareZone2LevelBracket();
         PrepareDestinationCache();
+        BuildQuestHubIndex();
     }
     sTravelNodeMap.InitTaxiGraph();
     LOG_INFO("playerbots", "Playerbots Taxi graph and destination cache built.");
@@ -5132,4 +5136,381 @@ void TravelMgr::PrepareDestinationCache()
         }
     }
     LOG_INFO("playerbots", ">> {} flight masters, {} innkeepers, {} bankers, {} auctioneers collected.", flightMastersCount, innkeepersCount, bankerCount, auctioneerCount);
+}
+// ---------------------------------------------------------------------------
+// Quest Hub Index
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    constexpr float kQuestHubCellSize = 100.0f;
+
+    // Build a cell key that is safe for negative cell coords.
+    // cx/cy are re-interpreted as uint16 (bit-preserving cast) before packing,
+    // so sign-extension never bleeds into the mapId bits.
+    // All mapId/cx/cy reads use the CellData fields — never decode from the key.
+    uint64 QuestHubCellKey(uint32 mapId, int32 cx, int32 cy)
+    {
+        return (static_cast<uint64>(mapId) << 32) |
+               (static_cast<uint64>(static_cast<uint16>(static_cast<int16>(cx))) << 16) |
+               static_cast<uint64>(static_cast<uint16>(static_cast<int16>(cy)));
+    }
+
+    bool IsQuestIndexable(Quest const* quest)
+    {
+        if (!quest)
+            return false;
+        if (quest->IsRepeatable())
+            return false;
+        if (quest->IsSeasonal())
+            return false;
+        if (quest->GetType() != 0)
+            return false;
+        if (quest->GetSuggestedPlayers() >= 2)
+            return false;
+        return true;
+    }
+
+    struct QuestHubSpawn
+    {
+        uint32 mapId;
+        float  x;
+        float  y;
+        bool   hostileToAlliance{false};  // faction template hostile to alliance players
+        bool   hostileToHorde{false};     // faction template hostile to horde players
+        std::vector<RpgQuestEntry> quests;
+    };
+
+    // Stores the real mapId and cell coords alongside non-owning spawn pointers.
+    // All mapId/cx/cy reads come from these fields — never decoded from the packed key.
+    struct CellData
+    {
+        uint32 mapId{0};
+        int32  cx{0};
+        int32  cy{0};
+        std::vector<QuestHubSpawn*> spawns;  // non-owning; backing store is allSpawns
+    };
+}  // namespace
+
+void TravelMgr::BuildQuestHubIndex()
+{
+    // Map threads hold pointers into _questHubs; the index is immutable after
+    // the first build. A second call (e.g. from "playerbots reload") must be a
+    // no-op to avoid appending duplicates into live data.
+    if (!_questHubs.empty())
+        return;
+
+    auto startMs = std::chrono::steady_clock::now();
+
+    // -----------------------------------------------------------------------
+    // 1. Build quest entry map from all quest templates.
+    // -----------------------------------------------------------------------
+    std::unordered_map<uint32, RpgQuestEntry> questEntryMap;
+    questEntryMap.reserve(4096);
+
+    {
+        ObjectMgr::QuestMap const& allQuests = sObjectMgr->GetQuestTemplates();
+        for (auto const& kv : allQuests)
+        {
+            Quest const* quest = kv.second;
+            if (!IsQuestIndexable(quest))
+                continue;
+
+            RpgQuestEntry qe;
+            qe.questId    = quest->GetQuestId();
+            qe.questLevel = quest->GetQuestLevel();
+            qe.minLevel   = quest->GetMinLevel();
+            qe.raceMask   = quest->GetAllowableRaces();
+            questEntryMap[qe.questId] = qe;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Collect quest-giver spawn points (creatures + GOs).
+    //    CellData stores mapId/cx/cy explicitly so mapId and coords are always
+    //    read from the struct, never decoded from the packed key.  Negative cell
+    //    coordinates (e.g. western Azeroth) are safe because QuestHubCellKey
+    //    masks cx/cy through uint16 before packing.
+    //
+    //    Two-pass design: first collect all spawns, then build the cell index.
+    //    This avoids pointer invalidation: CellData::spawns holds pointers into
+    //    allSpawns, which must not reallocate after the index is built.
+    // -----------------------------------------------------------------------
+    std::vector<QuestHubSpawn> allSpawns;
+    allSpawns.reserve(16384);
+
+    auto addQuestsForBounds = [&](QuestHubSpawn& sp, QuestRelationBounds bounds)
+    {
+        for (auto it = bounds.first; it != bounds.second; ++it)
+        {
+            auto qIt = questEntryMap.find(it->second);
+            if (qIt != questEntryMap.end())
+                sp.quests.push_back(qIt->second);
+        }
+    };
+
+    // Pass 1: collect spawns.
+    for (auto const& cdKv : sObjectMgr->GetAllCreatureData())
+    {
+        CreatureData const& cd = cdKv.second;
+        QuestRelationBounds bounds = sObjectMgr->GetCreatureQuestRelationBounds(cd.id);
+        if (bounds.first == bounds.second)
+            continue;
+
+        QuestHubSpawn sp;
+        sp.mapId = cd.mapid;
+        sp.x     = cd.posX;
+        sp.y     = cd.posY;
+        addQuestsForBounds(sp, bounds);
+        if (sp.quests.empty())
+            continue;
+
+        // Resolve faction hostility from creature_template.
+        if (CreatureTemplate const* ct = sObjectMgr->GetCreatureTemplate(cd.id))
+        {
+            if (FactionTemplateEntry const* ft = sFactionTemplateStore.LookupEntry(ct->faction))
+            {
+                sp.hostileToAlliance = ft->IsHostileToAlliancePlayers();
+                sp.hostileToHorde    = ft->IsHostileToHordePlayers();
+            }
+        }
+
+        allSpawns.push_back(std::move(sp));
+    }
+
+    for (auto const& gdKv : sObjectMgr->GetAllGOData())
+    {
+        GameObjectData const& gd = gdKv.second;
+        QuestRelationBounds bounds = sObjectMgr->GetGOQuestRelationBounds(gd.id);
+        if (bounds.first == bounds.second)
+            continue;
+
+        QuestHubSpawn sp;
+        sp.mapId = gd.mapid;
+        sp.x     = gd.posX;
+        sp.y     = gd.posY;
+        addQuestsForBounds(sp, bounds);
+        if (sp.quests.empty())
+            continue;
+        // GOs don't have a faction template; leave hostility flags false.
+
+        allSpawns.push_back(std::move(sp));
+    }
+
+    // Pass 2: build cell index with stable pointers (allSpawns is now frozen).
+    std::unordered_map<uint64, CellData> cellMap;
+    cellMap.reserve(8192);
+
+    for (QuestHubSpawn& sp : allSpawns)
+    {
+        int32 const cx = static_cast<int32>(sp.x / kQuestHubCellSize);
+        int32 const cy = static_cast<int32>(sp.y / kQuestHubCellSize);
+        uint64 const key = QuestHubCellKey(sp.mapId, cx, cy);
+
+        auto res = cellMap.emplace(key, CellData{});
+        CellData& cd = res.first->second;
+        if (res.second)
+        {
+            cd.mapId = sp.mapId;
+            cd.cx    = cx;
+            cd.cy    = cy;
+        }
+        cd.spawns.push_back(&sp);
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Cluster occupied cells into hubs (3x3 neighbourhood merge).
+    //    mapId and anchor cx/cy come from CellData — never decoded from key.
+    //    Already-claimed neighbour cells are skipped (no double-accumulation).
+    // -----------------------------------------------------------------------
+    std::unordered_map<uint64, uint32> cellToHub;
+    cellToHub.reserve(cellMap.size());
+
+    for (auto const& cellKv : cellMap)
+    {
+        if (cellToHub.count(cellKv.first))
+            continue;
+
+        uint32 const hubIndex = static_cast<uint32>(_questHubs.size());
+        _questHubs.emplace_back();
+        RpgQuestHub& hub = _questHubs.back();
+        // Public id is 1-based: 0 means "no active hub" in NewRpgInfo.
+        hub.hubId = hubIndex + 1;
+
+        CellData const& anchorCell = cellKv.second;
+        uint32 const mapId    = anchorCell.mapId;
+        int32  const anchorCX = anchorCell.cx;
+        int32  const anchorCY = anchorCell.cy;
+        hub.mapId = mapId;
+
+        float  sumX = 0.0f, sumY = 0.0f;
+        uint32 spawnCount = 0;
+        std::set<uint32> addedQuestIds;
+        bool anyHostileAlliance = false;
+        bool anyHostileHorde    = false;
+
+        for (int ndx = -1; ndx <= 1; ++ndx)
+        {
+            for (int ndy = -1; ndy <= 1; ++ndy)
+            {
+                uint64 const neighbourKey = QuestHubCellKey(mapId, anchorCX + ndx, anchorCY + ndy);
+                auto nIt = cellMap.find(neighbourKey);
+                if (nIt == cellMap.end())
+                    continue;
+
+                // Skip already-claimed cells to avoid double-accumulation (M1).
+                if (!cellToHub.emplace(neighbourKey, hubIndex).second)
+                    continue;
+
+                CellData const& nCell = nIt->second;
+                for (QuestHubSpawn const* sp : nCell.spawns)
+                {
+                    sumX += sp->x;
+                    sumY += sp->y;
+                    ++spawnCount;
+
+                    if (sp->hostileToAlliance)
+                        anyHostileAlliance = true;
+                    if (sp->hostileToHorde)
+                        anyHostileHorde = true;
+
+                    for (RpgQuestEntry const& qe : sp->quests)
+                    {
+                        if (addedQuestIds.insert(qe.questId).second)
+                            hub.quests.push_back(qe);
+                    }
+                }
+            }
+        }
+
+        if (spawnCount > 0)
+            hub.centroid = WorldPosition(mapId, sumX / static_cast<float>(spawnCount),
+                                         sumY / static_cast<float>(spawnCount), 0.0f);
+
+        hub.hostileToAlliance = anyHostileAlliance;
+        hub.hostileToHorde    = anyHostileHorde;
+
+        // Derive zone from majority ZoneOrSort of hub quests.
+        {
+            std::unordered_map<uint32, uint32> zoneCounts;
+            for (RpgQuestEntry const& qe : hub.quests)
+            {
+                Quest const* q = sObjectMgr->GetQuestTemplate(qe.questId);
+                if (q && q->GetZoneOrSort() > 0)
+                    ++zoneCounts[static_cast<uint32>(q->GetZoneOrSort())];
+            }
+            uint32 bestZone = 0, bestCount = 0;
+            for (auto const& zc : zoneCounts)
+            {
+                if (zc.second > bestCount)
+                {
+                    bestCount = zc.second;
+                    bestZone  = zc.first;
+                }
+            }
+            hub.zoneId = bestZone;
+        }
+
+        _questHubsByMap[hub.mapId].push_back(hubIndex);
+    }
+
+    auto endMs = std::chrono::steady_clock::now();
+    uint32 buildMs = static_cast<uint32>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(endMs - startMs).count());
+
+    LOG_INFO("playerbots", ">> Quest hub index: {} hubs built in {} ms.", _questHubs.size(), buildMs);
+}
+
+bool TravelMgr::QuestEntryMatchesBot(RpgQuestEntry const& qe, Player* bot)
+{
+    uint8  const level       = bot->GetLevel();
+    uint32 const lowHideDiff = sWorld->getIntConfig(CONFIG_QUEST_LOW_LEVEL_HIDE_DIFF);
+
+    // Quest already completed or already in the log — skip.
+    if (bot->GetQuestRewardStatus(qe.questId))
+        return false;
+    if (bot->GetQuestStatus(qe.questId) != QUEST_STATUS_NONE)
+        return false;
+
+    if (qe.minLevel > level)
+        return false;
+    // Scaling quests (questLevel == -1) are always level-appropriate.
+    if (qe.questLevel != -1)
+    {
+        if (qe.questLevel > static_cast<int32>(level) + 3)
+            return false;
+        if (static_cast<int32>(level) > qe.questLevel + static_cast<int32>(lowHideDiff))
+            return false;
+    }
+    if (qe.raceMask != 0 && !(qe.raceMask & (1u << (bot->getRace() - 1))))
+        return false;
+    return true;
+}
+
+std::vector<RpgQuestHub const*> TravelMgr::GetQuestHubsForBot(
+    Player* bot, std::set<uint32> const& exhaustedHubs) const
+{
+    std::vector<RpgQuestHub const*> result;
+    auto mapIt = _questHubsByMap.find(bot->GetMapId());
+    if (mapIt == _questHubsByMap.end())
+        return result;
+
+    bool const isAlliance = bot->GetTeamId() == TEAM_ALLIANCE;
+    bool const isHorde    = bot->GetTeamId() == TEAM_HORDE;
+
+    for (uint32 hubIndex : mapIt->second)
+    {
+        RpgQuestHub const& hub = _questHubs[hubIndex];
+        // exhaustedHubs stores the public 1-based hub.hubId, not the index.
+        if (exhaustedHubs.count(hub.hubId))
+            continue;
+        // Skip hubs whose quest-givers are hostile to the bot's faction.
+        if (isAlliance && hub.hostileToAlliance)
+            continue;
+        if (isHorde && hub.hostileToHorde)
+            continue;
+        if (CountHubQuestsForBot(hub, bot) == 0)
+            continue;
+        result.push_back(&hub);
+    }
+    return result;
+}
+
+uint32 TravelMgr::CountHubQuestsForBot(RpgQuestHub const& hub, Player* bot) const
+{
+    uint32 count = 0;
+    for (RpgQuestEntry const& qe : hub.quests)
+    {
+        if (QuestEntryMatchesBot(qe, bot))
+            ++count;
+    }
+    return count;
+}
+
+RpgQuestHub const* TravelMgr::FindNearestQuestHub(uint32 mapId, float x, float y, float z, float maxDist) const
+{
+    auto mapIt = _questHubsByMap.find(mapId);
+    if (mapIt == _questHubsByMap.end())
+        return nullptr;
+
+    float const maxDistSq = maxDist * maxDist;
+    RpgQuestHub const* best = nullptr;
+    float bestDistSq = maxDistSq;
+
+    for (uint32 hubIndex : mapIt->second)
+    {
+        RpgQuestHub const& hub = _questHubs[hubIndex];
+        // 2D on purpose: stored centroids carry z=0 (no terrain data at build
+        // time) while callers pass terrain-resolved positions.
+        float const dx = hub.centroid.GetPositionX() - x;
+        float const dy = hub.centroid.GetPositionY() - y;
+        float const distSq = dx * dx + dy * dy;
+        if (distSq < bestDistSq)
+        {
+            bestDistSq = distSq;
+            best = &hub;
+        }
+    }
+
+    return best;
 }

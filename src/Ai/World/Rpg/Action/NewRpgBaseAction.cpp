@@ -1,6 +1,8 @@
 #include "NewRpgBaseAction.h"
 
 #include "AhActions.h"
+#include "PlayerbotRpgStateRepository.h"
+#include "RpgGoalSelector.h"
 #include "BroadcastHelper.h"
 #include "ChatHelper.h"
 #include "Creature.h"
@@ -867,7 +869,20 @@ bool NewRpgBaseAction::GetQuestPOIPosAndObjectiveIdx(uint32 questId, std::vector
             if (bot->GetZoneId() != bot->GetMap()->GetZoneId(bot->GetPhaseMask(), dx, dy, dz))
                 continue;
 
-            poiInfo.push_back({{dx, dy}, qPoi.ObjectiveIndex});
+            // Only copy patrol polygon points in intentional mode — legacy callers
+            // never use them, so skipping avoids the per-call allocation churn.
+            std::vector<std::pair<float, float>> rawPoints;
+            if (sPlayerbotAIConfig.newRpgIntentional)
+            {
+                uint32 const cap = NewRpgInfo::DoQuest::kMaxPatrolPoints;
+                uint32 const n   = std::min(static_cast<uint32>(qPoi.points.size()), cap);
+                rawPoints.reserve(n);
+                for (uint32 i = 0; i < n; ++i)
+                    rawPoints.emplace_back(static_cast<float>(qPoi.points[i].x),
+                                           static_cast<float>(qPoi.points[i].y));
+            }
+
+            poiInfo.push_back({{dx, dy}, qPoi.ObjectiveIndex, std::move(rawPoints)});
         }
 
         if (poiInfo.empty())
@@ -939,7 +954,20 @@ bool NewRpgBaseAction::GetQuestPOIPosAndObjectiveIdx(uint32 questId, std::vector
         if (bot->GetZoneId() != bot->GetMap()->GetZoneId(bot->GetPhaseMask(), dx, dy, dz))
             continue;
 
-        poiInfo.push_back({{dx, dy}, qPoi.ObjectiveIndex});
+        // Only copy patrol polygon points in intentional mode — legacy callers
+        // never use them, so skipping avoids the per-call allocation churn.
+        std::vector<std::pair<float, float>> rawPoints;
+        if (sPlayerbotAIConfig.newRpgIntentional)
+        {
+            uint32 const cap = NewRpgInfo::DoQuest::kMaxPatrolPoints;
+            uint32 const n   = std::min(static_cast<uint32>(qPoi.points.size()), cap);
+            rawPoints.reserve(n);
+            for (uint32 i = 0; i < n; ++i)
+                rawPoints.emplace_back(static_cast<float>(qPoi.points[i].x),
+                                       static_cast<float>(qPoi.points[i].y));
+        }
+
+        poiInfo.push_back({{dx, dy}, qPoi.ObjectiveIndex, std::move(rawPoints)});
     }
 
     if (poiInfo.size() == 0)
@@ -1146,32 +1174,7 @@ bool NewRpgBaseAction::RandomChangeStatus(std::vector<NewRpgStatus> candidateSta
             return false;
         }
         case RPG_DO_QUEST:
-        {
-            std::vector<uint32> availableQuests;
-            for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
-            {
-                uint32 questId = bot->GetQuestSlotQuestId(slot);
-                if (botAI->lowPriorityQuest.find(questId) != botAI->lowPriorityQuest.end())
-                    continue;
-
-                std::vector<POIInfo> poiInfo;
-                if (GetQuestPOIPosAndObjectiveIdx(questId, poiInfo, true))
-                {
-                    availableQuests.push_back(questId);
-                }
-            }
-            if (availableQuests.size())
-            {
-                uint32 questId = availableQuests[urand(0, availableQuests.size() - 1)];
-                const Quest* quest = sObjectMgr->GetQuestTemplate(questId);
-                if (quest)
-                {
-                    botAI->rpgInfo.ChangeToDoQuest(questId, quest);
-                    return true;
-                }
-            }
-            return false;
-        }
+            return TryStartDoQuest();
         case RPG_TRAVEL_FLIGHT:
         {
             uint32 flightMasterEntry = 0;
@@ -1185,29 +1188,7 @@ bool NewRpgBaseAction::RandomChangeStatus(std::vector<NewRpgStatus> candidateSta
             return false;
         }
         case RPG_GO_CITY:
-        {
-            std::vector<NewRpgInfo::CityTask> taskList;
-            if (!BuildCityTasks(taskList))
-                return false;
-
-
-            //if the only task is visiting a city, make sure we arent already in one.
-            if (taskList.size() <= 1)
-            {
-                if (AreaTableEntry const* zone = sAreaTableStore.LookupEntry(bot->GetZoneId()))
-                {
-                    if (zone->flags & AREA_FLAG_CAPITAL)
-                        return false;
-                }
-                if (urand(0, 100) >= sPlayerbotAIConfig.probTeleToBankers * 100)
-                    return false;
-            }
-
-            LOG_DEBUG("playerbots", "[New RPG] Bot {} -> GO_CITY tasks={}",
-                      bot->GetName(), taskList.size());
-            botAI->rpgInfo.ChangeToGoCity(std::move(taskList));
-            return true;
-        }
+            return TryStartGoCity();
         case RPG_IDLE:
         {
             botAI->rpgInfo.ChangeToIdle();
@@ -1429,4 +1410,255 @@ void NewRpgBaseAction::AppendCityServiceTask(std::vector<NewRpgInfo::CityTask>& 
     task.location = WorldPosition(npcLoc.loc.GetMapId(), npcLoc.loc.GetPositionX(), npcLoc.loc.GetPositionY(),
                                   npcLoc.loc.GetPositionZ(), npcLoc.loc.GetOrientation());
     outTaskList.push_back(std::move(task));
+}
+
+bool NewRpgBaseAction::TryStartGoCity()
+{
+    std::vector<NewRpgInfo::CityTask> taskList;
+    if (!BuildCityTasks(taskList))
+        return false;
+
+    // Visiting a city purely for tourism is only allowed when the bot is not
+    // already standing in one, and then only probabilistically.
+    if (taskList.size() <= 1)
+    {
+        if (AreaTableEntry const* zone = sAreaTableStore.LookupEntry(bot->GetZoneId()))
+        {
+            if (zone->flags & AREA_FLAG_CAPITAL)
+                return false;
+        }
+        if (urand(0, 100) >= sPlayerbotAIConfig.probTeleToBankers * 100)
+            return false;
+    }
+
+    LOG_DEBUG("playerbots", "[New RPG] Bot {} -> GO_CITY tasks={}", bot->GetName(), taskList.size());
+    botAI->rpgInfo.ChangeToGoCity(std::move(taskList));
+    return true;
+}
+
+bool NewRpgBaseAction::SelectNextQuestObjective(uint32& outQuestId, POIInfo& outPoi)
+{
+    float bestDist = FLT_MAX;
+    bool found = false;
+
+    for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 const questId = bot->GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+
+        if (botAI->lowPriorityQuest.find(questId) != botAI->lowPriorityQuest.end())
+            continue;
+
+        if (bot->GetQuestStatus(questId) != QUEST_STATUS_INCOMPLETE)
+            continue;
+
+        std::vector<POIInfo> poiInfo;
+        if (!GetQuestPOIPosAndObjectiveIdx(questId, poiInfo))
+            continue;
+
+        for (POIInfo const& poi : poiInfo)
+        {
+            float dist = bot->GetDistance2d(poi.pos.x, poi.pos.y);
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                outQuestId = questId;
+                outPoi = poi;
+                found = true;
+            }
+        }
+    }
+
+    return found;
+}
+
+bool NewRpgBaseAction::TryStartDoQuest()
+{
+    if (sPlayerbotAIConfig.newRpgIntentional)
+    {
+        // Nearest turn-in first; nearest incomplete objective otherwise.
+        float bestDist = FLT_MAX;
+        uint32 bestComplete = 0;
+
+        for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+        {
+            uint32 const questId = bot->GetQuestSlotQuestId(slot);
+            if (!questId)
+                continue;
+
+            if (botAI->lowPriorityQuest.find(questId) != botAI->lowPriorityQuest.end())
+                continue;
+
+            if (bot->GetQuestStatus(questId) != QUEST_STATUS_COMPLETE)
+                continue;
+
+            std::vector<POIInfo> poiInfo;
+            if (!GetQuestPOIPosAndObjectiveIdx(questId, poiInfo, true))
+                continue;
+
+            for (POIInfo const& poi : poiInfo)
+            {
+                float dist = bot->GetDistance2d(poi.pos.x, poi.pos.y);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestComplete = questId;
+                }
+            }
+        }
+
+        if (bestComplete)
+        {
+            Quest const* quest = sObjectMgr->GetQuestTemplate(bestComplete);
+            if (quest)
+            {
+                botAI->rpgInfo.ChangeToDoQuest(bestComplete, quest);
+                return true;
+            }
+        }
+
+        uint32 nearestId = 0;
+        POIInfo nearestPoi{};
+        if (!SelectNextQuestObjective(nearestId, nearestPoi))
+            return false;
+
+        Quest const* quest = sObjectMgr->GetQuestTemplate(nearestId);
+        if (!quest)
+            return false;
+
+        botAI->rpgInfo.ChangeToDoQuest(nearestId, quest);
+        return true;
+    }
+
+    // Legacy path: flat uniform pick across ALL quests that have POIs
+    // (complete and incomplete together), matching original pre-intentional behaviour.
+    std::vector<uint32> availableQuests;
+
+    for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 const questId = bot->GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+
+        if (botAI->lowPriorityQuest.find(questId) != botAI->lowPriorityQuest.end())
+            continue;
+
+        uint8 const status = bot->GetQuestStatus(questId);
+        if (status != QUEST_STATUS_COMPLETE && status != QUEST_STATUS_INCOMPLETE)
+            continue;
+
+        std::vector<POIInfo> poiInfo;
+        bool hasPoi = (status == QUEST_STATUS_COMPLETE)
+            ? GetQuestPOIPosAndObjectiveIdx(questId, poiInfo, true)
+            : GetQuestPOIPosAndObjectiveIdx(questId, poiInfo, false);
+        if (!hasPoi)
+            continue;
+
+        availableQuests.push_back(questId);
+    }
+
+    if (availableQuests.empty())
+        return false;
+
+    uint32 const questId = availableQuests[urand(0, availableQuests.size() - 1)];
+    Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+    if (!quest)
+        return false;
+
+    botAI->rpgInfo.ChangeToDoQuest(questId, quest);
+    return true;
+}
+
+bool NewRpgBaseAction::TryStartQuesting()
+{
+    // Step 1: if the quest log has workable or turn-in quests, do them.
+    if (TryStartDoQuest())
+        return true;
+
+    // Step 2: look for a level-appropriate quest hub.
+    NewRpgInfo& info = botAI->rpgInfo;
+
+    // If every candidate hub has been exhausted, clear once so we retry
+    // (level-up may have opened new quests).
+    std::vector<RpgQuestHub const*> hubs =
+        sTravelMgr.GetQuestHubsForBot(bot, info.exhaustedHubs);
+    if (hubs.empty() && !info.exhaustedHubs.empty())
+    {
+        info.exhaustedHubs.clear();
+        hubs = sTravelMgr.GetQuestHubsForBot(bot, info.exhaustedHubs);
+    }
+
+    if (hubs.empty())
+        return false;
+
+    // Score hubs: questCount * distanceDecay * perBotJitter.
+    RpgQuestHub const* bestHub = nullptr;
+    float bestScore = -1.0f;
+
+    for (RpgQuestHub const* hub : hubs)
+    {
+        uint32 questCount = sTravelMgr.CountHubQuestsForBot(*hub, bot);
+        if (questCount == 0)
+            continue;
+
+        // 2D distance: hub centroid z is resolved at commit and may differ from bot z.
+        float dist = bot->GetExactDist2d(hub->centroid);
+        float distDecay = 1.0f / (1.0f + dist / 1000.0f);
+
+        // Deterministic per-bot-per-hub jitter so different bots rank hubs differently.
+        uint32 h = bot->GetGUID().GetCounter() ^ (hub->hubId * 2654435761u);
+        h ^= h >> 16;
+        h *= 0x45d9f3bu;
+        h ^= h >> 16;
+        float jitter = 0.85f + (static_cast<float>(h) / static_cast<float>(0xFFFFFFFFu)) * 0.30f;
+
+        // Stickiness: return to the active hub rather than wandering.
+        float stickiness = (hub->hubId == info.activeHubId && info.activeHubId != 0) ? 1.5f : 1.0f;
+
+        float score = static_cast<float>(questCount) * distDecay * jitter * stickiness;
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestHub = hub;
+        }
+    }
+
+    if (!bestHub)
+        return false;
+
+    // Resolve a real z for the centroid (GetQuestHubsForBot only returns same-map
+    // hubs, so GetHeight is safe here). If the terrain query fails, skip the hub
+    // this pass rather than committing z=0 which breaks arrival checks.
+    float const cx = bestHub->centroid.GetPositionX();
+    float const cy = bestHub->centroid.GetPositionY();
+    float const cz = std::max(bot->GetMap()->GetHeight(cx, cy, MAX_HEIGHT),
+                              bot->GetMap()->GetWaterLevel(cx, cy));
+    if (cz == INVALID_HEIGHT || cz == VMAP_INVALID_HEIGHT_VALUE)
+        return false;
+
+    WorldPosition hubPos(bestHub->centroid.GetMapId(), cx, cy, cz);
+
+    info.activeHubId   = bestHub->hubId;
+    info.activeHubZone = bestHub->zoneId;
+    info.activeHubPos  = hubPos;
+    info.ChangeToQuestHub(bestHub->hubId, hubPos);
+
+    if (sPlayerbotAIConfig.newRpgIntentional)
+    {
+        RpgPersistedState state;
+        // Use explicit goal=Questing so map-0 (Eastern Kingdoms) hubs are
+        // restored correctly (hubMapId==0 is a valid EK map id, not a sentinel).
+        state.goal     = static_cast<uint8>(RpgGoal::Questing);
+        state.zoneId   = info.activeHubZone;
+        state.hubMapId = info.activeHubPos.GetMapId();
+        state.hubX     = info.activeHubPos.GetPositionX();
+        state.hubY     = info.activeHubPos.GetPositionY();
+        state.hubZ     = info.activeHubPos.GetPositionZ();
+        sPlayerbotRpgStateRepository.Save(bot->GetGUID().GetCounter(), state);
+    }
+
+    LOG_DEBUG("playerbots", "[New RPG] {} -> QUEST_HUB {} zone={} quests={}", bot->GetName(),
+              bestHub->hubId, bestHub->zoneId, sTravelMgr.CountHubQuestsForBot(*bestHub, bot));
+    return true;
 }

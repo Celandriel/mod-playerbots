@@ -65,6 +65,8 @@ enum NewRpgStatus : int
     RPG_OUTDOOR_PVP,
     // Travel to city
     RPG_GO_CITY,
+    // Goal-gated only — never rolled. Bot travels to a quest hub to accept a batch of quests.
+    RPG_QUEST_HUB,
     RPG_STATUS_END,
 };
 
@@ -382,6 +384,7 @@ public:
     bool autoLearnTrainerSpells;
     bool autoDoQuests;
     bool enableNewRpgStrategy;
+    bool newRpgIntentional;
     bool enableTravelNodes;
     std::unordered_map<NewRpgStatus, uint32> RpgStatusProbWeight;
     bool syncLevelWithPlayers;

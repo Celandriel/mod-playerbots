@@ -1,6 +1,9 @@
 #ifndef PLAYERBOTS_NEWRPGBASEACTION_H
 #define PLAYERBOTS_NEWRPGBASEACTION_H
 
+#include <utility>
+#include <vector>
+
 #include "Duration.h"
 #include "LastMovementValue.h"
 #include "MovementActions.h"
@@ -17,6 +20,9 @@ struct POIInfo
 {
     G3D::Vector2 pos;
     int32 objectiveIdx;
+    // Raw polygon points from QuestPOI::points (stored as float pairs to avoid
+    // pulling ObjectMgr types into every translation unit that includes this header).
+    std::vector<std::pair<float, float>> points;
 };
 
 /// A base (composition) class for all new rpg actions
@@ -63,6 +69,14 @@ protected:
     bool SelectRandomFlightTaxiNode(uint32& flightMasterEntry, WorldPosition& flightMasterPos, std::vector<uint32>& path);
     bool RandomChangeStatus(std::vector<NewRpgStatus> candidateStatus);
     bool CheckRpgStatusAvailable(NewRpgStatus status);
+    bool TryStartGoCity();
+    bool TryStartDoQuest();
+    // Questing dispatch: tries TryStartDoQuest first; if the log is empty/unworkable,
+    // finds a level-appropriate quest hub via the TravelMgr index and travels to it.
+    bool TryStartQuesting();
+    // Intentional-mode: scan all log quests and return the POI nearest to the bot.
+    // Skips lowPriorityQuest entries. Returns false when nothing workable is found.
+    bool SelectNextQuestObjective(uint32& outQuestId, POIInfo& outPoi);
 
 protected:
     /* FOR MOVE FAR */

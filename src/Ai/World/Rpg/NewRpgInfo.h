@@ -1,6 +1,10 @@
 #ifndef PLAYERBOTS_NEWRPGINFO_H
 #define PLAYERBOTS_NEWRPGINFO_H
 
+#include <set>
+#include <utility>
+#include <vector>
+
 #include "Define.h"
 #include "ObjectGuid.h"
 #include "ObjectMgr.h"
@@ -45,6 +49,19 @@ struct NewRpgInfo
         int32 objectiveIdx{0};
         WorldPosition pos{};
         uint32 lastReachPOI{0};
+
+        // Polygon patrol waypoints (intentional mode only).
+        // Capped at kMaxPatrolPoints on fill to bound memory and pathing cost.
+        static constexpr uint32 kMaxPatrolPoints = 12;
+        std::vector<std::pair<float, float>> patrolPoints;
+        uint32 patrolIdx{0};         // widened to uint32 to avoid uint8 overflow on modulo
+        uint32 lastPatrolMoveT{0};
+        uint32 patrolDwellMs{0};     // rolled once on waypoint arrival, compared each tick
+
+        // Throttled progress tracking and early abandon (intentional mode only).
+        uint32 lastProgressT{0};
+        uint32 lastLivenessCheckT{0};
+        uint32 progressSnapshot{0};
     };
     // RPG_TRAVEL_FLIGHT
     struct TravelFlight
@@ -63,6 +80,13 @@ struct NewRpgInfo
     struct OutdoorPvP
     {
         ObjectGuid::LowType capturePointSpawnId{0};
+    };
+    // RPG_QUEST_HUB
+    struct QuestHub
+    {
+        uint32        hubId{0};
+        WorldPosition pos{};
+        uint32        lastNoTargetT{0};  // timestamp when last questgiver search found nothing
     };
     struct Idle
     {
@@ -95,7 +119,8 @@ struct NewRpgInfo
         uint32         currentTaskAttempts{0};
     };
 
-    uint32 startT{0};  // start timestamp of the current status
+    uint32 startT{0};       // start timestamp of the current status
+    uint32 lastGoalEval{0}; // timestamp of the most recent goal-selector run
 
     // MOVE_FAR
     float nearestMoveFarDis{FLT_MAX};
@@ -114,9 +139,17 @@ struct NewRpgInfo
         Rest,
         TravelFlight,
         GoCity,
-        OutdoorPvP
+        OutdoorPvP,
+        QuestHub
     >;
     RpgData data;
+
+    // Persistent hub intent — survive status changes, cleared only in Reset().
+    uint32        activeHubId{0};
+    uint32        activeHubZone{0};
+    WorldPosition activeHubPos{};
+    // Hubs that yielded nothing for this bot this session (prevents ping-pong).
+    std::set<uint32> exhaustedHubs;
 
     NewRpgStatus GetStatus();
     bool HasStatusPersisted(uint32 maxDuration) { return GetMSTimeDiffToNow(startT) > maxDuration; }
@@ -128,6 +161,7 @@ struct NewRpgInfo
     void ChangeToDoQuest(uint32 questId, const Quest* quest);
     void ChangeToTravelFlight(uint32 flightMasterEntry, WorldPosition flightMasterPos, std::vector<uint32> path);
     void ChangeToOutdoorPvp(ObjectGuid::LowType capturePointSpawnId = 0);
+    void ChangeToQuestHub(uint32 hubId, WorldPosition pos);
     void ChangeToRest();
     void ChangeToIdle();
     bool CanChangeTo(NewRpgStatus status);

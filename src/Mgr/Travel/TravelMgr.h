@@ -9,6 +9,8 @@
 #include <boost/functional/hash.hpp>
 #include <map>
 #include <random>
+#include <set>
+#include <unordered_map>
 
 #include "AiObject.h"
 #include "CreatureData.h"
@@ -843,6 +845,29 @@ protected:
 };
 
 // General container for all travel destinations.
+// Lightweight per-quest descriptor used in the hub index.
+struct RpgQuestEntry
+{
+    uint32 questId{0};
+    int32  questLevel{0};
+    uint32 minLevel{0};
+    uint32 raceMask{0};    // 0 = all races
+};
+
+// A cluster of nearby quest-giver spawns (creatures + GOs) within ~100 yd.
+struct RpgQuestHub
+{
+    uint32        hubId{0};
+    uint32        mapId{0};
+    WorldPosition centroid{};
+    uint32        zoneId{0};  // majority zone from quest ZoneOrSort
+    // true if ANY questgiver in this hub's faction template is hostile to that team.
+    // Errs toward hostile so bots don't wander into enemy territory.
+    bool          hostileToAlliance{false};
+    bool          hostileToHorde{false};
+    std::vector<RpgQuestEntry> quests;
+};
+
 class TravelMgr
 {
 public:
@@ -904,6 +929,17 @@ public:
     // chosen destination zone, e.g. a neutral auction town, lacks the service).
     bool SelectCityServiceInAnyCapital(Player* bot, CityServiceType service, NpcLocation& out);
     const std::vector<WorldLocation>& GetLocsPerLevelCache(uint8 level) { return locsPerLevelCache[level]; }
+
+    // Quest hub index — built inside Init(), read-only on map threads after that.
+    // Returns hubs on the bot's current map that have at least one level-appropriate,
+    // race-appropriate quest, excluding any in the provided exhausted set.
+    std::vector<RpgQuestHub const*> GetQuestHubsForBot(
+        Player* bot, std::set<uint32> const& exhaustedHubs) const;
+    uint32 CountHubQuestsForBot(RpgQuestHub const& hub, Player* bot) const;
+    // Find the hub on the given map whose centroid is nearest to (x, y, z)
+    // and within maxDist yards. Returns nullptr if no hub qualifies.
+    // Used at login to re-match a persisted hub position to a live hub index.
+    RpgQuestHub const* FindNearestQuestHub(uint32 mapId, float x, float y, float z, float maxDist) const;
 
     template <class D, class W, class URBG>
     void weighted_shuffle(D first, D last, W first_weight, W last_weight, URBG&& g)
@@ -1030,6 +1066,15 @@ private:
     std::map<uint8, std::vector<WorldLocation>> locsPerLevelCache;
     std::unordered_map<uint32, std::vector<WorldLocation>> creatureSpawnsByTemplate;
     std::map<uint32, LevelBracket> zone2LevelBracket;
+
+    // Quest hub index (built in BuildQuestHubIndex, read-only after first build).
+    std::vector<RpgQuestHub> _questHubs;
+    std::unordered_map<uint32, std::vector<uint32>> _questHubsByMap;   // mapId → hub indices
+
+    // Returns true when the quest matches the bot's race/level filters and has not
+    // been completed or accepted by the bot yet.
+    static bool QuestEntryMatchesBot(RpgQuestEntry const& qe, Player* bot);
+    void BuildQuestHubIndex();
 };
 
 #define sTravelMgr TravelMgr::instance()

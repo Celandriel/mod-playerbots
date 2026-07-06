@@ -38,6 +38,13 @@
 #include "BroadcastHelper.h"
 #include "WorldSessionMgr.h"
 #include "DatabaseEnv.h"
+#include "GridTerrainData.h"
+#include "IVMapMgr.h"
+#include "Map.h"
+#include "NewRpgInfo.h"
+#include "PlayerbotRpgStateRepository.h"
+#include "RpgGoalSelector.h"
+#include "TravelMgr.h"
 
 class BotInitGuard
 {
@@ -479,6 +486,44 @@ void PlayerbotHolder::OnBotLogin(Player* const bot)
         // Log a warning here to indicate that the botAI is null
         LOG_DEBUG("mod-playerbots", "PlayerbotAI is null for bot with GUID: {}", bot->GetGUID().GetRawValue());
         return;
+    }
+
+    // Restore persisted RPG hub intent so the bot resumes its questing zone
+    // after a server restart. Runs only when the intentional engine is active.
+    // Use goal == Questing as the validity sentinel: hubMapId == 0 is a valid
+    // map id (Eastern Kingdoms), so it cannot be used as a "no data" sentinel.
+    if (sPlayerbotAIConfig.newRpgIntentional)
+    {
+        static constexpr float kHubRematchMaxDist = 300.0f;
+
+        RpgPersistedState persisted;
+        if (sPlayerbotRpgStateRepository.TryGet(bot->GetGUID().GetCounter(), persisted) &&
+            persisted.goal == static_cast<uint8>(RpgGoal::Questing))
+        {
+            RpgQuestHub const* hub = sTravelMgr.FindNearestQuestHub(
+                persisted.hubMapId, persisted.hubX, persisted.hubY, persisted.hubZ,
+                kHubRematchMaxDist);
+            if (hub)
+            {
+                botAI->rpgInfo.activeHubId   = hub->hubId;
+                botAI->rpgInfo.activeHubZone = hub->zoneId;
+                // Only z-resolve if the bot is already on the hub's map; otherwise
+                // keep the raw centroid (it only feeds re-matching, not movement).
+                WorldPosition hubPos = hub->centroid;
+                if (bot->GetMapId() == hub->centroid.GetMapId())
+                {
+                    float const hx = hub->centroid.GetPositionX();
+                    float const hy = hub->centroid.GetPositionY();
+                    float const hz = std::max(bot->GetMap()->GetHeight(hx, hy, MAX_HEIGHT),
+                                              bot->GetMap()->GetWaterLevel(hx, hy));
+                    if (hz != INVALID_HEIGHT && hz != VMAP_INVALID_HEIGHT_VALUE)
+                        hubPos = WorldPosition(hub->centroid.GetMapId(), hx, hy, hz);
+                }
+                botAI->rpgInfo.activeHubPos  = hubPos;
+                LOG_DEBUG("playerbots", "[New RPG] {} restored hub={} zone={} from persisted state",
+                          bot->GetName(), hub->hubId, hub->zoneId);
+            }
+        }
     }
 
     Player* master = botAI->GetMaster();

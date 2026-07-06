@@ -1,11 +1,15 @@
 #include "NewRpgAction.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 
 #include "AhActions.h"
 #include "AreaDefines.h"
 #include "BroadcastHelper.h"
+#include "Creature.h"
+#include "GameObject.h"
 #include "ChatHelper.h"
 #include "G3D/Vector2.h"
 #include "GossipDef.h"
@@ -18,6 +22,7 @@
 #include "ObjectGuid.h"
 #include "ObjectMgr.h"
 #include "PathGenerator.h"
+#include "PlayerbotAIConfig.h"
 #include "Player.h"
 #include "PlayerbotAI.h"
 #include "Playerbots.h"
@@ -25,7 +30,10 @@
 #include "BotAHUtil.h"
 #include "QuestDef.h"
 #include "Random.h"
+#include "PlayerbotRpgStateRepository.h"
+#include "RpgGoalSelector.h"
 #include "SharedDefines.h"
+#include "StringFormat.h"
 #include "Timer.h"
 #include "TravelMgr.h"
 
@@ -34,7 +42,25 @@ bool TellRpgStatusAction::Execute(Event event)
     Player* owner = event.getOwner();
     if (!owner)
         return false;
+
     std::string out = botAI->rpgInfo.ToString();
+
+    if (sPlayerbotAIConfig.newRpgIntentional)
+    {
+        float const mScore = RpgGoalSelector::ScoreGoal(botAI, RpgGoal::Maintenance);
+        float const qScore = RpgGoalSelector::ScoreGoal(botAI, RpgGoal::Questing);
+        float const lScore = RpgGoalSelector::ScoreGoal(botAI, RpgGoal::Leisure);
+        out += Acore::StringFormat("\nGoal scores: M={:.1f} Q={:.1f} L={:.1f}", mScore, qScore, lScore);
+
+        NewRpgInfo const& info = botAI->rpgInfo;
+        if (info.activeHubId != 0)
+        {
+            // Use 2D distance: hub centroid z may differ from bot z on multi-floor zones.
+            float const dist = bot->GetExactDist2d(info.activeHubPos);
+            out += Acore::StringFormat("\nhub={} zone={} dist={:.0f}", info.activeHubId, info.activeHubZone, dist);
+        }
+    }
+
     bot->Whisper(out.c_str(), LANG_UNIVERSAL, owner);
     return true;
 }
@@ -66,19 +92,26 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
     switch (status)
     {
         case RPG_IDLE:
-            return RandomChangeStatus({RPG_GO_CAMP, RPG_GO_GRIND, RPG_WANDER_RANDOM, RPG_WANDER_NPC, RPG_DO_QUEST,
-                                       RPG_TRAVEL_FLIGHT, RPG_GO_CITY, RPG_OUTDOOR_PVP, RPG_REST});
+        {
+            if (sPlayerbotAIConfig.newRpgIntentional)
+                return IntentionalChangeStatus();
+
+            return RandomChangeStatus({RPG_GO_CAMP, RPG_GO_GRIND, RPG_WANDER_RANDOM, RPG_WANDER_NPC,
+                                       RPG_DO_QUEST, RPG_TRAVEL_FLIGHT, RPG_GO_CITY, RPG_OUTDOOR_PVP, RPG_REST});
+        }
 
         case RPG_GO_GRIND:
         {
             auto& data = std::get<NewRpgInfo::GoGrind>(info.data);
             assert(data.pos != WorldPosition());
-            // GO_GRIND -> WANDER_RANDOM
+            // GO_GRIND -> WANDER_RANDOM on arrival
             if (bot->GetExactDist(data.pos) < 10.0f)
             {
                 info.ChangeToWanderRandom();
                 return true;
             }
+            if (CheckGoalCompetition(RpgGoal::Leisure))
+                return true;
             break;
         }
         case RPG_GO_CITY:
@@ -88,6 +121,8 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
                 info.ChangeToIdle();
                 return true;
             }
+            if (CheckGoalCompetition(RpgGoal::Maintenance))
+                return true;
             break;
         }
         case RPG_GO_CAMP:
@@ -95,22 +130,25 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
             auto& data = std::get<NewRpgInfo::GoCamp>(info.data);
             WorldPosition& originalPos = data.pos;
             assert(data.pos != WorldPosition());
-            // GO_CAMP -> WANDER_NPC
+            // GO_CAMP -> WANDER_NPC on arrival
             if (bot->GetExactDist(originalPos) < 10.0f)
             {
                 info.ChangeToWanderNpc();
                 return true;
             }
+            if (CheckGoalCompetition(RpgGoal::Leisure))
+                return true;
             break;
         }
         case RPG_WANDER_RANDOM:
         {
-            // WANDER_RANDOM -> IDLE
             if (info.HasStatusPersisted(statusWanderRandomDuration))
             {
                 info.ChangeToIdle();
                 return true;
             }
+            if (CheckGoalCompetition(RpgGoal::Leisure))
+                return true;
             break;
         }
         case RPG_WANDER_NPC:
@@ -120,16 +158,19 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
                 info.ChangeToIdle();
                 return true;
             }
+            if (CheckGoalCompetition(RpgGoal::Leisure))
+                return true;
             break;
         }
         case RPG_DO_QUEST:
         {
-            // DO_QUEST -> IDLE
             if (info.HasStatusPersisted(statusDoQuestDuration))
             {
                 info.ChangeToIdle();
                 return true;
             }
+            if (CheckGoalCompetition(RpgGoal::Questing))
+                return true;
             break;
         }
         case RPG_TRAVEL_FLIGHT:
@@ -137,7 +178,7 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
             auto& data = std::get<NewRpgInfo::TravelFlight>(info.data);
             if (data.inFlight && !bot->IsInFlight())
             {
-                // flight arrival
+                // Flight arrived — return to IDLE for a fresh goal evaluation.
                 info.ChangeToIdle();
                 return true;
             }
@@ -145,12 +186,13 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
         }
         case RPG_REST:
         {
-            // REST -> IDLE
             if (info.HasStatusPersisted(statusRestDuration))
             {
                 info.ChangeToIdle();
                 return true;
             }
+            if (CheckGoalCompetition(RpgGoal::Leisure))
+                return true;
             break;
         }
         case RPG_OUTDOOR_PVP:
@@ -160,12 +202,207 @@ bool NewRpgStatusUpdateAction::Execute(Event /*event*/)
                 info.ChangeToIdle();
                 return true;
             }
+            if (CheckGoalCompetition(RpgGoal::Leisure))
+                return true;
+            break;
+        }
+        case RPG_QUEST_HUB:
+        {
+            if (info.HasStatusPersisted(statusQuestHubDuration))
+            {
+                info.ChangeToIdle();
+                return true;
+            }
+            if (CheckGoalCompetition(RpgGoal::Questing))
+                return true;
             break;
         }
         default:
             break;
     }
     return false;
+}
+
+bool NewRpgStatusUpdateAction::IntentionalChangeStatus()
+{
+    NewRpgInfo& info = botAI->rpgInfo;
+    info.lastGoalEval = getMSTime();
+
+    // Guaranteed variety: roll for a leisure break before scoring so high-scoring
+    // maintenance/questing doesn't starve leisure completely. If leisure fails to
+    // start anything, fall through to normal goal ranking.
+    // roll_chance_f(p) returns true with probability p%.
+    if (roll_chance_f(kLeisureBreakChance))
+    {
+        if (RandomChangeStatus({RPG_GO_CAMP, RPG_GO_GRIND, RPG_WANDER_RANDOM, RPG_WANDER_NPC,
+                                RPG_TRAVEL_FLIGHT, RPG_OUTDOOR_PVP, RPG_REST}))
+        {
+            LOG_DEBUG("playerbots", "[New RPG] {} IDLE leisure break (chance={:.0f}%)", bot->GetName(),
+                      kLeisureBreakChance);
+            return true;
+        }
+    }
+
+    std::array<RpgGoalResult, 3> ranked = {
+        RpgGoalResult{RpgGoal::Maintenance, RpgGoalSelector::ScoreGoal(botAI, RpgGoal::Maintenance)},
+        RpgGoalResult{RpgGoal::Questing, RpgGoalSelector::ScoreGoal(botAI, RpgGoal::Questing)},
+        RpgGoalResult{RpgGoal::Leisure, RpgGoalSelector::ScoreGoal(botAI, RpgGoal::Leisure)}};
+    std::sort(ranked.begin(), ranked.end(),
+              [](RpgGoalResult const& a, RpgGoalResult const& b) { return a.score > b.score; });
+
+    // Best-first with fallthrough: a goal that fails to start yields to the
+    // next-best instead of forcing a bad activity.
+    RpgGoal startedGoal = RpgGoal::None;
+    for (RpgGoalResult const& candidate : ranked)
+    {
+        if (candidate.score <= 0.0f)
+            continue;
+
+        switch (candidate.goal)
+        {
+            case RpgGoal::Maintenance:
+                if (TryStartGoCity())
+                {
+                    startedGoal = RpgGoal::Maintenance;
+                }
+                break;
+            case RpgGoal::Questing:
+                if (TryStartQuesting())
+                {
+                    startedGoal = RpgGoal::Questing;
+                }
+                break;
+            case RpgGoal::Leisure:
+                if (RandomChangeStatus({RPG_GO_CAMP, RPG_GO_GRIND, RPG_WANDER_RANDOM, RPG_WANDER_NPC,
+                                        RPG_TRAVEL_FLIGHT, RPG_OUTDOOR_PVP, RPG_REST}))
+                {
+                    startedGoal = RpgGoal::Leisure;
+                }
+                break;
+            default:
+                break;
+        }
+        if (startedGoal != RpgGoal::None)
+        {
+            LOG_DEBUG("playerbots", "[New RPG] {} IDLE picks goal={} score={:.1f}", bot->GetName(),
+                      static_cast<int>(startedGoal), candidate.score);
+            return true;
+        }
+    }
+
+    // Safety default, matching the legacy dice roll's all-unavailable path.
+    info.ChangeToRest();
+    bot->SetStandState(UNIT_STAND_STATE_SIT);
+    return true;
+}
+
+bool NewRpgStatusUpdateAction::CheckGoalCompetition(RpgGoal incumbent)
+{
+    if (!sPlayerbotAIConfig.newRpgIntentional)
+        return false;
+
+    NewRpgInfo& info = botAI->rpgInfo;
+    // Needs don't interrupt instantly: require a minimum dwell in the current
+    // status, then re-evaluate at most once per check interval.
+    if (!info.HasStatusPersisted(statusMidActivityMinDwell))
+        return false;
+
+    if (GetMSTimeDiffToNow(info.lastGoalEval) < statusMidActivityCheckInterval)
+        return false;
+
+    info.lastGoalEval = getMSTime();
+    if (!RpgGoalSelector::ShouldPreempt(botAI, incumbent))
+        return false;
+
+    LOG_DEBUG("playerbots", "[New RPG] {} goal {} preempted by a higher-utility challenger", bot->GetName(),
+              static_cast<int>(incumbent));
+    info.ChangeToIdle();
+    return true;
+}
+
+bool NewRpgQuestHubAction::Execute(Event /*event*/)
+{
+    NewRpgInfo& info = botAI->rpgInfo;
+    auto* dataPtr = std::get_if<NewRpgInfo::QuestHub>(&info.data);
+    if (!dataPtr)
+        return false;
+    auto& data = *dataPtr;
+
+    // Travel to hub centroid first. Use 2D distance: centroid z is resolved at
+    // commit time and may not match the bot's current z.
+    if (bot->GetExactDist2d(data.pos) > 30.0f)
+    {
+        if (MoveFarTo(data.pos))
+            return true;
+        return MoveRandomNear(10.0f);
+    }
+
+    // Near hub: try to accept/turn-in quests within 80 yd.
+    if (SearchQuestGiverAndAcceptOrReward())
+    {
+        data.lastNoTargetT = 0;
+        return true;
+    }
+
+    // Nothing actionable from SearchQuestGiverAndAcceptOrReward — wander
+    // between questgivers in the cluster so we visit all of them.
+    ObjectGuid npcOrGo = ChooseNpcOrGameObjectToInteract(true);
+    if (npcOrGo)
+    {
+        data.lastNoTargetT = 0;
+        return MoveWorldObjectTo(npcOrGo);
+    }
+
+    // No questgiver at all in range.
+    if (!data.lastNoTargetT)
+    {
+        data.lastNoTargetT = getMSTime();
+        return false;
+    }
+
+    if (GetMSTimeDiffToNow(data.lastNoTargetT) < kHubNoTargetTimeout)
+        return false;
+
+    // Hub exhausted for this bot: decide next step.
+    bool hasWorkableQuests = false;
+    for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 questId = bot->GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+        if (botAI->lowPriorityQuest.find(questId) != botAI->lowPriorityQuest.end())
+            continue;
+        uint8 status = bot->GetQuestStatus(questId);
+        if (status == QUEST_STATUS_INCOMPLETE || status == QUEST_STATUS_COMPLETE)
+        {
+            hasWorkableQuests = true;
+            break;
+        }
+    }
+
+    if (!hasWorkableQuests)
+    {
+        info.exhaustedHubs.insert(data.hubId);
+        info.activeHubId = 0;
+        info.activeHubZone = 0;
+        info.activeHubPos = WorldPosition();
+
+        if (sPlayerbotAIConfig.newRpgIntentional)
+        {
+            RpgPersistedState state;
+            state.goal     = 0;
+            state.zoneId   = 0;
+            state.hubMapId = 0;
+            state.hubX     = 0.0f;
+            state.hubY     = 0.0f;
+            state.hubZ     = 0.0f;
+            sPlayerbotRpgStateRepository.Save(bot->GetGUID().GetCounter(), state);
+        }
+    }
+
+    LOG_DEBUG("playerbots", "[New RPG] {} hub {} done (workable={})", bot->GetName(), data.hubId, hasWorkableQuests);
+    info.ChangeToIdle();
+    return true;
 }
 
 bool NewRpgGoGrindAction::Execute(Event /*event*/)
@@ -290,11 +527,9 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
     uint32 questId = data.questId;
     if (data.pos != WorldPosition())
     {
-        /// @TODO: extract to a new function
         int32 currentObjective = data.objectiveIdx;
-        // check if the objective has completed
         Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
-        const QuestStatusData& q_status = bot->getQuestStatusMap().at(questId);
+        QuestStatusData const& q_status = bot->getQuestStatusMap().at(questId);
         bool completed = true;
         if (currentObjective < QUEST_OBJECTIVES_COUNT)
         {
@@ -307,40 +542,114 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
                 quest->RequiredItemCount[currentObjective - QUEST_OBJECTIVES_COUNT])
                 completed = false;
         }
-        // the current objective is completed, clear and find a new objective later
         if (completed)
         {
+            if (sPlayerbotAIConfig.newRpgIntentional)
+            {
+                // Cross-quest nearest-first: switch to the closest remaining
+                // objective across all log quests so overlapping camps are
+                // worked together without returning to IDLE.
+                uint32 nextQuestId = 0;
+                POIInfo nextPoi{};
+                if (SelectNextQuestObjective(nextQuestId, nextPoi))
+                {
+                    float dx = nextPoi.pos.x, dy = nextPoi.pos.y;
+                    float dz = std::max(bot->GetMap()->GetHeight(dx, dy, MAX_HEIGHT),
+                                        bot->GetMap()->GetWaterLevel(dx, dy));
+                    if (dz != INVALID_HEIGHT && dz != VMAP_INVALID_HEIGHT_VALUE)
+                    {
+                        if (nextQuestId != questId)
+                        {
+                            Quest const* nextQuest = sObjectMgr->GetQuestTemplate(nextQuestId);
+                            if (nextQuest)
+                            {
+                                data.quest   = nextQuest;
+                                data.questId = nextQuestId;
+                            }
+                            else
+                            {
+                                nextQuestId = questId;
+                            }
+                        }
+                        data.lastReachPOI       = 0;
+                        data.pos                = WorldPosition(bot->GetMapId(), dx, dy, dz);
+                        data.objectiveIdx       = nextPoi.objectiveIdx;
+                        data.patrolPoints       = nextPoi.points;
+                        data.patrolIdx          = 0;
+                        data.lastPatrolMoveT    = 0;
+                        data.lastProgressT      = 0;
+                        data.lastLivenessCheckT = 0;
+                        data.progressSnapshot   = 0;
+                        return true;
+                    }
+                }
+                botAI->rpgInfo.ChangeToIdle();
+                return true;
+            }
+            // Legacy: clear and re-select within same quest next tick.
             data.lastReachPOI = 0;
-            data.pos = WorldPosition();
+            data.pos          = WorldPosition();
             data.objectiveIdx = 0;
         }
     }
+
     if (data.pos == WorldPosition())
     {
-        std::vector<POIInfo> poiInfo;
-        if (!GetQuestPOIPosAndObjectiveIdx(questId, poiInfo))
+        if (sPlayerbotAIConfig.newRpgIntentional)
         {
-            // can't find a poi pos to go, stop doing quest for now
-            botAI->rpgInfo.ChangeToIdle();
-            return true;
+            uint32 nextQuestId = 0;
+            POIInfo nextPoi{};
+            if (!SelectNextQuestObjective(nextQuestId, nextPoi))
+            {
+                botAI->rpgInfo.ChangeToIdle();
+                return true;
+            }
+            float dx = nextPoi.pos.x, dy = nextPoi.pos.y;
+            float dz = std::max(bot->GetMap()->GetHeight(dx, dy, MAX_HEIGHT),
+                                bot->GetMap()->GetWaterLevel(dx, dy));
+            if (dz == INVALID_HEIGHT || dz == VMAP_INVALID_HEIGHT_VALUE)
+                return false;
+
+            if (nextQuestId != questId)
+            {
+                Quest const* nextQuest = sObjectMgr->GetQuestTemplate(nextQuestId);
+                if (nextQuest)
+                {
+                    data.quest   = nextQuest;
+                    data.questId = nextQuestId;
+                    questId      = nextQuestId;
+                }
+            }
+            data.lastReachPOI       = 0;
+            data.pos                = WorldPosition(bot->GetMapId(), dx, dy, dz);
+            data.objectiveIdx       = nextPoi.objectiveIdx;
+            data.patrolPoints       = nextPoi.points;
+            data.patrolIdx          = 0;
+            data.lastPatrolMoveT    = 0;
+            data.lastProgressT      = 0;
+            data.lastLivenessCheckT = 0;
+            data.progressSnapshot   = 0;
         }
-        uint32 rndIdx = urand(0, poiInfo.size() - 1);
-        G3D::Vector2 nearestPoi = poiInfo[rndIdx].pos;
-        int32 objectiveIdx = poiInfo[rndIdx].objectiveIdx;
-
-        float dx = nearestPoi.x, dy = nearestPoi.y;
-
-        // z = MAX_HEIGHT as we do not know accurate z
-        float dz = std::max(bot->GetMap()->GetHeight(dx, dy, MAX_HEIGHT), bot->GetMap()->GetWaterLevel(dx, dy));
-
-        // double check for GetQuestPOIPosAndObjectiveIdx
-        if (dz == INVALID_HEIGHT || dz == VMAP_INVALID_HEIGHT_VALUE)
-            return false;
-
-        WorldPosition pos(bot->GetMapId(), dx, dy, dz);
-        data.lastReachPOI = 0;
-        data.pos = pos;
-        data.objectiveIdx = objectiveIdx;
+        else
+        {
+            std::vector<POIInfo> poiInfo;
+            if (!GetQuestPOIPosAndObjectiveIdx(questId, poiInfo))
+            {
+                botAI->rpgInfo.ChangeToIdle();
+                return true;
+            }
+            uint32 rndIdx           = urand(0, poiInfo.size() - 1);
+            G3D::Vector2 nearestPoi = poiInfo[rndIdx].pos;
+            int32 objectiveIdx      = poiInfo[rndIdx].objectiveIdx;
+            float dx = nearestPoi.x, dy = nearestPoi.y;
+            float dz = std::max(bot->GetMap()->GetHeight(dx, dy, MAX_HEIGHT),
+                                bot->GetMap()->GetWaterLevel(dx, dy));
+            if (dz == INVALID_HEIGHT || dz == VMAP_INVALID_HEIGHT_VALUE)
+                return false;
+            data.lastReachPOI = 0;
+            data.pos          = WorldPosition(bot->GetMapId(), dx, dy, dz);
+            data.objectiveIdx = objectiveIdx;
+        }
     }
 
     if (bot->GetDistance(data.pos) > 10.0f && !data.lastReachPOI)
@@ -352,22 +661,196 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
         // different position instead of sitting idle.
         return MoveRandomNear(10.0f);
     }
-    // Now we are near the quest objective
+    // Now we are near the quest objective.
     // kill mobs and looting quest should be done automatically by grind strategy
 
     if (!data.lastReachPOI)
     {
         data.lastReachPOI = getMSTime();
+        if (sPlayerbotAIConfig.newRpgIntentional)
+        {
+            data.lastProgressT      = getMSTime();
+            data.lastLivenessCheckT = getMSTime();
+            Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+            QuestStatusData const& q_status = bot->getQuestStatusMap().at(questId);
+            int32 const obj = data.objectiveIdx;
+            if (obj < QUEST_OBJECTIVES_COUNT)
+                data.progressSnapshot = q_status.CreatureOrGOCount[obj];
+            else if (obj < QUEST_OBJECTIVES_COUNT + QUEST_ITEM_OBJECTIVES_COUNT)
+                data.progressSnapshot = q_status.ItemCount[obj - QUEST_OBJECTIVES_COUNT];
+        }
         return true;
     }
-    // stayed at this POI for more than 5 minutes
-    if (GetMSTimeDiffToNow(data.lastReachPOI) >= poiStayTime)
+
+    uint32 const timeAtPOI = GetMSTimeDiffToNow(data.lastReachPOI);
+
+    if (sPlayerbotAIConfig.newRpgIntentional)
+    {
+        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+        QuestStatusData const& q_status = bot->getQuestStatusMap().at(questId);
+        int32 const obj = data.objectiveIdx;
+
+        // --- Throttled progress tracking (every 15 s) ---
+        constexpr uint32 progressCheckInterval  = 15 * IN_MILLISECONDS;
+        constexpr uint32 earlyAbandonNoProgressT = 2 * MINUTE * IN_MILLISECONDS;
+
+        if (GetMSTimeDiffToNow(data.lastLivenessCheckT) >= progressCheckInterval)
+        {
+            data.lastLivenessCheckT = getMSTime();
+
+            uint32 currentCount = 0;
+            if (obj < QUEST_OBJECTIVES_COUNT)
+                currentCount = q_status.CreatureOrGOCount[obj];
+            else if (obj < QUEST_OBJECTIVES_COUNT + QUEST_ITEM_OBJECTIVES_COUNT)
+                currentCount = q_status.ItemCount[obj - QUEST_OBJECTIVES_COUNT];
+
+            if (currentCount > data.progressSnapshot)
+            {
+                data.progressSnapshot = currentCount;
+                data.lastProgressT    = getMSTime();
+            }
+
+            // Early abandon: no progress for 120 s AND entity verifiably absent
+            // (creature/GO objectives only; items use the flat timer).
+            if (obj < QUEST_OBJECTIVES_COUNT &&
+                GetMSTimeDiffToNow(data.lastProgressT) >= earlyAbandonNoProgressT)
+            {
+                int32 const required = quest->RequiredNpcOrGo[obj];
+                bool entityAbsent = false;
+                if (required > 0)
+                {
+                    Creature* c = bot->FindNearestCreature(static_cast<uint32>(required), 100.0f, true);
+                    entityAbsent = (c == nullptr);
+                }
+                else if (required < 0)
+                {
+                    GameObject* go = bot->FindNearestGameObject(static_cast<uint32>(-required), 100.0f);
+                    entityAbsent = (go == nullptr);
+                }
+
+                if (entityAbsent)
+                {
+                    botAI->lowPriorityQuest.insert(questId);
+                    botAI->rpgStatistic.questAbandoned++;
+                    LOG_DEBUG("playerbots", "[New RPG] {} marked as abandoned quest {} (entity absent, no progress)",
+                              bot->GetName(), questId);
+                    botAI->rpgInfo.ChangeToIdle();
+                    return true;
+                }
+            }
+        }
+
+        // --- Hard cap / productive-stay extension ---
+        bool const recentProgress = GetMSTimeDiffToNow(data.lastProgressT) < (60 * IN_MILLISECONDS);
+
+        if (timeAtPOI >= poiStayTime)
+        {
+            if (recentProgress && timeAtPOI < poiStayTimeHardCap)
+            {
+                // Still productive — allow staying up to hard cap; fall through to patrol.
+            }
+            else if (timeAtPOI >= poiStayTimeHardCap)
+            {
+                // Hard cap reached: unconditionally re-select POI.
+                data.lastReachPOI       = 0;
+                data.pos                = WorldPosition();
+                data.objectiveIdx       = 0;
+                data.patrolPoints.clear();
+                data.patrolIdx          = 0;
+                data.lastPatrolMoveT    = 0;
+                data.lastProgressT      = 0;
+                data.lastLivenessCheckT = 0;
+                data.progressSnapshot   = 0;
+                return true;
+            }
+            else
+            {
+                // Past soft cap, no recent progress: check entity presence.
+                bool hasProgression = false;
+                if (obj < QUEST_OBJECTIVES_COUNT)
+                {
+                    if (q_status.CreatureOrGOCount[obj] != 0 && quest->RequiredNpcOrGoCount[obj])
+                        hasProgression = true;
+                }
+                else if (obj < QUEST_OBJECTIVES_COUNT + QUEST_ITEM_OBJECTIVES_COUNT)
+                {
+                    if (q_status.ItemCount[obj - QUEST_OBJECTIVES_COUNT] != 0 &&
+                        quest->RequiredItemCount[obj - QUEST_OBJECTIVES_COUNT])
+                        hasProgression = true;
+                }
+
+                if (!hasProgression)
+                {
+                    botAI->lowPriorityQuest.insert(questId);
+                    botAI->rpgStatistic.questAbandoned++;
+                    LOG_DEBUG("playerbots", "[New RPG] {} marked as abandoned quest {}", bot->GetName(), questId);
+                    botAI->rpgInfo.ChangeToIdle();
+                    return true;
+                }
+                // Entities present but competition: re-select POI.
+                data.lastReachPOI       = 0;
+                data.pos                = WorldPosition();
+                data.objectiveIdx       = 0;
+                data.patrolPoints.clear();
+                data.patrolIdx          = 0;
+                data.lastPatrolMoveT    = 0;
+                data.lastProgressT      = 0;
+                data.lastLivenessCheckT = 0;
+                data.progressSnapshot   = 0;
+                return true;
+            }
+        }
+
+        // --- Polygon patrol ---
+        if (data.patrolPoints.size() >= 2)
+        {
+            constexpr uint32 patrolDwellMin = 3 * IN_MILLISECONDS;
+            constexpr uint32 patrolDwellMax = 6 * IN_MILLISECONDS;
+
+            if (!data.lastPatrolMoveT)
+            {
+                data.lastPatrolMoveT = getMSTime();
+                // Roll dwell once on arrival at a waypoint so the threshold is
+                // stable for the whole dwell period (re-rolling each tick biases
+                // toward the minimum).
+                data.patrolDwellMs = patrolDwellMin + urand(0, patrolDwellMax - patrolDwellMin);
+            }
+
+            if (GetMSTimeDiffToNow(data.lastPatrolMoveT) < data.patrolDwellMs)
+                return false;
+
+            // Advance to next patrol point, wrapping around.
+            // patrolIdx is uint32 to avoid uint8 overflow on large patrol sets.
+            data.patrolIdx = (data.patrolIdx + 1) % data.patrolPoints.size();
+            auto const& pt = data.patrolPoints[data.patrolIdx];
+            float const px = pt.first;
+            float const py = pt.second;
+            float const pz = std::max(bot->GetMap()->GetHeight(px, py, MAX_HEIGHT),
+                                      bot->GetMap()->GetWaterLevel(px, py));
+
+            if (pz == INVALID_HEIGHT || pz == VMAP_INVALID_HEIGHT_VALUE)
+            {
+                // Skip invalid point; retry next tick.
+                data.lastPatrolMoveT = getMSTime();
+                return false;
+            }
+
+            data.lastPatrolMoveT = getMSTime();
+            data.patrolDwellMs = patrolDwellMin + urand(0, patrolDwellMax - patrolDwellMin);
+            return MoveTo(bot->GetMapId(), px, py, pz, false, false, false, true);
+        }
+
+        // Fewer than 2 patrol points — small wander as before.
+        return MoveRandomNear(8.0f);
+    }
+
+    // Legacy path: flat 5-minute logic.
+    if (timeAtPOI >= poiStayTime)
     {
         bool hasProgression = false;
         int32 currentObjective = data.objectiveIdx;
-        // check if the objective has progression
-        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
-        const QuestStatusData& q_status = bot->getQuestStatusMap().at(questId);
+        Quest const* quest     = sObjectMgr->GetQuestTemplate(questId);
+        QuestStatusData const& q_status = bot->getQuestStatusMap().at(questId);
         if (currentObjective < QUEST_OBJECTIVES_COUNT)
         {
             if (q_status.CreatureOrGOCount[currentObjective] != 0 && quest->RequiredNpcOrGoCount[currentObjective])
@@ -381,8 +864,7 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
         }
         if (!hasProgression)
         {
-            // we has reach the poi for more than 5 mins but no progession
-            // may not be able to complete this quest, marked as abandoned
+            // reached the poi for more than 5 mins but no progression
             /// @TODO: It may be better to make lowPriorityQuest a global set shared by all bots (or saved in db)
             botAI->lowPriorityQuest.insert(questId);
             botAI->rpgStatistic.questAbandoned++;
@@ -392,7 +874,7 @@ bool NewRpgDoQuestAction::DoIncompleteQuest(NewRpgInfo::DoQuest& data)
         }
         // clear and select another poi later
         data.lastReachPOI = 0;
-        data.pos = WorldPosition();
+        data.pos          = WorldPosition();
         data.objectiveIdx = 0;
         return true;
     }
@@ -691,4 +1173,3 @@ bool NewRpgGoCityAction::RetryIfNotDone(NewRpgInfo::GoCity& data, bool actionRan
     constexpr uint32 maxCityTaskAttempts = 5;
     return ++data.currentTaskAttempts < maxCityTaskAttempts;
 }
-

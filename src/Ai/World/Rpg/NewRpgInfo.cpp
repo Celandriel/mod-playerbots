@@ -73,9 +73,20 @@ void NewRpgInfo::ChangeToRest()
     data = Rest{};
 }
 
+void NewRpgInfo::ChangeToQuestHub(uint32 hubId, WorldPosition pos)
+{
+    startT = getMSTime();
+    QuestHub hub;
+    hub.hubId = hubId;
+    hub.pos = pos;
+    hub.lastNoTargetT = 0;
+    data = hub;
+}
+
 void NewRpgInfo::ChangeToIdle()
 {
     startT = getMSTime();
+    lastGoalEval = 0;
     data = Idle{};
 }
 
@@ -88,6 +99,11 @@ void NewRpgInfo::Reset()
 {
     data = Idle{};
     startT = getMSTime();
+    lastGoalEval = 0;
+    activeHubId = 0;
+    activeHubZone = 0;
+    activeHubPos = WorldPosition();
+    exhaustedHubs.clear();
 }
 
 void NewRpgInfo::SetMoveFarTo(WorldPosition pos)
@@ -112,6 +128,7 @@ NewRpgStatus NewRpgInfo::GetStatus()
         if constexpr (std::is_same_v<T, TravelFlight>) return RPG_TRAVEL_FLIGHT;
         if constexpr (std::is_same_v<T, GoCity>) return RPG_GO_CITY;
         if constexpr (std::is_same_v<T, OutdoorPvP>) return RPG_OUTDOOR_PVP;
+        if constexpr (std::is_same_v<T, QuestHub>) return RPG_QUEST_HUB;
         return RPG_IDLE;
     }, data);
 }
@@ -200,6 +217,14 @@ std::string NewRpgInfo::ToString()
                 out << "\nNo capture point assigned.";
             else
                 out << "\ncapturePointSpawnId: " << arg.capturePointSpawnId;
+        }
+        else if constexpr (std::is_same_v<T, QuestHub>)
+        {
+            out << "QUEST_HUB";
+            out << "\nhubId: " << arg.hubId;
+            out << "\nhubPos: " << arg.pos.GetMapId() << " " << arg.pos.GetPositionX()
+                << " " << arg.pos.GetPositionY() << " " << arg.pos.GetPositionZ();
+            out << "\nlastNoTargetT: " << (arg.lastNoTargetT ? GetMSTimeDiffToNow(arg.lastNoTargetT) : 0);
         }
         else
             out << "UNKNOWN";

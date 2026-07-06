@@ -10,6 +10,7 @@
 #include "NewRpgInfo.h"
 #include "BotAHUtil.h"
 #include "PlayerbotDungeonRepository.h"
+#include "PlayerbotRpgStateRepository.h"
 #include "PlayerbotFactory.h"
 #include "Playerbots.h"
 #include "PlayerbotGuildMgr.h"
@@ -687,6 +688,7 @@ bool PlayerbotAIConfig::Initialize()
     autoTeleportForLevel = sConfigMgr->GetOption<bool>("AiPlayerbot.AutoTeleportForLevel", false);
     autoDoQuests = sConfigMgr->GetOption<bool>("AiPlayerbot.AutoDoQuests", true);
     enableNewRpgStrategy = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableNewRpgStrategy", true);
+    newRpgIntentional = sConfigMgr->GetOption<bool>("AiPlayerbot.NewRpgIntentional", true);
     enableTravelNodes = sConfigMgr->GetOption<bool>("AiPlayerbot.EnableTravelNodes", false);
 
     RpgStatusProbWeight[RPG_WANDER_RANDOM] = sConfigMgr->GetOption<int32>("AiPlayerbot.RpgStatusProbWeight.WanderRandom", 15);
@@ -741,6 +743,7 @@ bool PlayerbotAIConfig::Initialize()
         PlayerbotDungeonRepository::instance().LoadDungeonSuggestions();
     }
     sTravelMgr.Init();
+    sPlayerbotRpgStateRepository.LoadAll();
 
     if (sPlayerbotAIConfig.enableAuctionHouseBotting)
         sBotAHUtil.Initialize();

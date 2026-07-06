@@ -1041,6 +1041,13 @@ AiPlayerbot.RestrictedHealerDPSMaps = "33,34,36,43,47,48,70,90,109,129,209,229,2
 # Default: 1 (enabled)
 AiPlayerbot.EnableNewRpgStrategy = 1
 
+# Idle bots pick their next activity by scoring goals (maintenance errands, questing, leisure)
+# against their actual state instead of rolling weighted-random over all statuses.
+# Leisure activities are still picked with the RpgStatusProbWeight weights below.
+# Set to 0 to restore the legacy fully random selection.
+# Default: 1 (enabled)
+AiPlayerbot.NewRpgIntentional = 1
+
 # Use pre-computed travel node paths for long-distance movement (>300 yards).
 # When enabled, bots use the travel node graph (A*, flight paths, transports)
 # instead of repeated mmap hops. Experimental.
