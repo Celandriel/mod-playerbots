@@ -116,6 +116,8 @@ public:
 
     bool isUseful() override;
     bool Execute(Event event) override;
+    bool ShouldReactionInterruptCast() const override { return true; }
+    bool ShouldReactionInterruptMovement() const override { return true; }
 
 protected:
     bool AvoidAuraWithDynamicObj();

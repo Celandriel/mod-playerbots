@@ -109,6 +109,11 @@ void ChatCommandHandlerStrategy::InitTriggers(std::vector<TriggerNode*>& trigger
     triggers.push_back(new TriggerNode("roll", { NextAction("roll", relevance) }));
 }
 
+void ChatCommandHandlerStrategy::InitReactionTriggers(std::vector<TriggerNode*>& triggers)
+{
+    InitTriggers(triggers);
+}
+
 ChatCommandHandlerStrategy::ChatCommandHandlerStrategy(PlayerbotAI* botAI) : PassTroughStrategy(botAI)
 {
     actionNodeFactories.Add(new ChatCommandActionNodeFactoryInternal());

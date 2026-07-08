@@ -285,7 +285,7 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
 
     // Reaction engine: runs even when main engines are paused (e.g. during eat/drink).
     // Only update the main AI when no reaction is running and the internal delay allows it.
-    bool doMinimalReaction = minimal || !AllowActivity();
+    bool doMinimalReaction = minimal || !AllowActivity(REACT_ACTIVITY);
     if (!UpdateAIReaction(elapsed, doMinimalReaction, bot->IsTaxiFlying()) && CanUpdateAI())
     {
         // Handle the current spell
@@ -893,6 +893,8 @@ void PlayerbotAI::Reset(bool full)
     currentEngine = engines[BOT_STATE_NON_COMBAT];
     currentState = BOT_STATE_NON_COMBAT;
     nextAICheckDelay = 0;
+    if (reactionEngine)
+        reactionEngine->ResetReactions();
     whispers.clear();
 
     aiObjectContext->GetValue<Unit*>("old target")->Set(nullptr);
@@ -1815,6 +1817,7 @@ void PlayerbotAI::ResetStrategies(bool load)
     AiFactory::AddDefaultCombatStrategies(bot, this, engines[BOT_STATE_COMBAT]);
     AiFactory::AddDefaultNonCombatStrategies(bot, this, engines[BOT_STATE_NON_COMBAT]);
     AiFactory::AddDefaultDeadStrategies(bot, this, engines[BOT_STATE_DEAD]);
+    AiFactory::AddDefaultReactionStrategies(bot, this, reactionEngine);
     if (sPlayerbotAIConfig.applyInstanceStrategies)
         ApplyInstanceStrategies(bot->GetMapId());
 
@@ -4657,6 +4660,10 @@ bool PlayerbotAI::AllowActive(ActivityType activityType)
             return true;
         }
     }
+
+    // Reaction engine: always active when a player is visible nearby (unconditional, no config gate).
+    if (activityType == REACT_ACTIVITY && HasPlayerNearby())
+        return true;
 
     // Player is near. Always active.
     if (HasPlayerNearby(sPlayerbotAIConfig.BotActiveAloneForceWhenInRadius))

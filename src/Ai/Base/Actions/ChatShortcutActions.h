@@ -27,6 +27,7 @@ public:
     FollowChatShortcutAction(PlayerbotAI* botAI) : MovementAction(botAI, "follow chat shortcut") {}
 
     bool Execute(Event event) override;
+    bool isUsefulWhenStunned() override { return true; }
 };
 
 class StayChatShortcutAction : public PositionsResetAction
@@ -35,6 +36,7 @@ public:
     StayChatShortcutAction(PlayerbotAI* botAI) : PositionsResetAction(botAI, "stay chat shortcut") {}
 
     bool Execute(Event event) override;
+    bool isUsefulWhenStunned() override { return true; }
 };
 
 class MoveFromGroupChatShortcutAction : public Action
@@ -51,6 +53,7 @@ public:
     FleeChatShortcutAction(PlayerbotAI* botAI) : PositionsResetAction(botAI, "flee chat shortcut") {}
 
     bool Execute(Event event) override;
+    bool isUsefulWhenStunned() override { return true; }
 };
 
 class GoawayChatShortcutAction : public PositionsResetAction
@@ -67,6 +70,7 @@ public:
     GrindChatShortcutAction(PlayerbotAI* botAI) : PositionsResetAction(botAI, "grind chat shortcut") {}
 
     bool Execute(Event event) override;
+    bool isUsefulWhenStunned() override { return true; }
 };
 
 class TankAttackChatShortcutAction : public PositionsResetAction
