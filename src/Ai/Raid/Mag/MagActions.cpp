@@ -272,7 +272,7 @@ bool MagtheridonWarlockCcBurningAbyssalAction::Execute(Event /*event*/)
         }
     }
 
-    if (warlockIndex >= 0 && warlockIndex < abyssals.size())
+    if (warlockIndex >= 0 && static_cast<size_t>(warlockIndex) < abyssals.size())
     {
         Unit* assignedAbyssal = abyssals[warlockIndex];
         if (!botAI->HasAura("banish", assignedAbyssal) &&
@@ -468,7 +468,7 @@ bool MagtheridonUseManticronCubeAction::FindSafePositionNearCube(
         if (IsPositionInActiveDebris(bot->GetMap()->GetInstanceId(), x, y))
             continue;
 
-        if (IsPositionInActiveConflagration(botAI, bot, x, y))
+        if (IsPositionInActiveConflagration(botAI, x, y))
             continue;
 
         const float moveDistance = bot->GetExactDist2d(x, y);
@@ -540,7 +540,7 @@ bool MagtheridonMoveOutOfDebrisAction::FindSafePosition(Position& outPos)
             if (IsPositionInActiveDebris(instanceId, x, y))
                 continue;
 
-            if (IsPositionInActiveConflagration(botAI, bot, x, y))
+            if (IsPositionInActiveConflagration(botAI, x, y))
                 continue;
 
             float const moveDistance = bot->GetExactDist2d(x, y);
