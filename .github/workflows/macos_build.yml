@@ -18,16 +18,24 @@ jobs:
           - macos-14
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os }}
+    # Deliberately no -Wfatal-errors: it stops each translation unit at its first
+    # diagnostic, so a single run reports one problem per file and hides the rest.
+    env:
+      CXXFLAGS: "-Wall -Wextra -Winit-self -Woverloaded-virtual -Werror -Wno-error=deprecated-declarations"
     steps:
       - name: Checkout AzerothCore
         uses: actions/checkout@v4
         with:
           repository: 'mod-playerbots/azerothcore-wotlk'
           ref: ${{ (github.base_ref || github.ref_name) == 'test-staging' && 'test-staging' || 'Playerbot' }}
+      # No `repository:` here on purpose: this workflow lives in mod-playerbots, so
+      # actions/checkout picks up the event context and checks out the pull request
+      # merged into its target branch (refs/pull/N/merge). Naming the repository
+      # explicitly would silently check out its default branch instead, and the build
+      # would grade code the pull request does not contain.
       - name: Checkout Playerbot Module
         uses: actions/checkout@v4
         with:
-          repository: 'mod-playerbots/mod-playerbots'
           path: 'modules/mod-playerbots'
       - name: Cache
         uses: actions/cache@v4
