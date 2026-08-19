@@ -1388,7 +1388,10 @@ bool MovementAction::Flee(Unit* target)
         }
     }
 
-    Unit* currentVictim = target->GetThreatMgr().GetCurrentVictim();
+    // Only creatures maintain a threat list. GetCurrentVictim() funnels into ProcessAIUpdates(),
+    // which asserts on _owner->ToCreature(), so calling it on a player target aborts the server.
+    Unit* currentVictim =
+        target->GetThreatMgr().CanHaveThreatList() ? target->GetThreatMgr().GetCurrentVictim() : nullptr;
     if (currentVictim && currentVictim == bot)  // bot is target - try to flee to tank or master
     {
         if (Group* group = bot->GetGroup())
