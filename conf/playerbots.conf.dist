@@ -1771,6 +1771,8 @@ AiPlayerbot.PermanentlyInWorldTime = 31104000
 
 # AiPlayerbot.PremadeSpecName.<class>.<specno> = <name>         #Name of the talent specialisation
 # AiPlayerbot.PremadeSpecLink.<class>.<specno>.<level> = <link> #Wowhead style link the bot should work towards at given level.
+# Bots follow the build defined at the nearest level at or above its own (e.g. a level 45 bot with
+# defined specs at 60 and 80 will use the 60 build).
 # AiPlayerbot.PremadeSpecGlyph.<class>.<specno> = <major 1>,<minor 1>,<major 2>,<minor 2>,<minor 3>,<major 3>   #ItemId of the glyphs
 # e.g., formulate the link on https://www.wowhead.com/wotlk/talent-calc/warrior/3022032123335100202012013031251-32505010002
 # 0 <= specno < 20, 1 <= level <= 80
