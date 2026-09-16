@@ -98,6 +98,7 @@ constexpr uint32 SPELL_IMPROVED_ICY_TALONS = 55610;
 constexpr uint32 SPELL_SUDDEN_DOOM = 49529;
 constexpr uint32 SPELL_ACCLIMATION = 50152;
 constexpr uint32 SPELL_MAGIC_SUPPRESSION = 49611;
+constexpr uint32 SPELL_BLADE_BARRIER = 55226;  // rank 5, tank marker in WorldBuffAction
 
 constexpr uint32 SPELL_SHAMAN_DUAL_WIELD = 30798;
 constexpr uint32 SPELL_ASTRAL_SHIFT = 51479;
@@ -1726,12 +1727,14 @@ uint32 PlayerbotFactory::InitTalentsTree(bool increment /*false*/, bool use_temp
     {
         InitTalentsByTemplate(specTab);
     }
-    // if LimitTalentsExpansion = 1 there may be unused talent points
+    // Spend what the template could not place (LimitTalentsExpansion, or a build shorter than the bot's points):
+    // first in the tree the build already favours, then in the other two.
     if (bot->GetFreeTalentPoints())
-        InitTalents((specTab + 1) % 3);
-
-    if (bot->GetFreeTalentPoints())
-        InitTalents((specTab + 2) % 3);
+    {
+        uint8 mainTab = AiFactory::GetPlayerSpecTab(bot);
+        for (uint8 i = 0; i < 3 && bot->GetFreeTalentPoints(); ++i)
+            InitTalents((mainTab + i) % 3);
+    }
 
     if (bot->getClass() == CLASS_SHAMAN && bot->HasSpell(SPELL_SHAMAN_DUAL_WIELD))
     {
@@ -1752,6 +1755,53 @@ static std::vector<std::vector<uint32>> const& TargetSpecLinkOrder(uint32 cls, u
         level++;
     }
     return sPlayerbotAIConfig.parsedSpecLinkOrder[cls][specNo][level];
+}
+
+static bool IsTalentRowAllowed(uint32 botLevel, uint32 row, uint32 col)
+{
+    if (!sPlayerbotAIConfig.limitTalentsExpansion)
+        return true;
+    if (botLevel <= 60 && (row > 6 || (row == 6 && col != 1)))
+        return false;
+    if (botLevel <= 70 && (row > 8 || (row == 8 && col != 1)))
+        return false;
+    return true;
+}
+
+// Make sure we dont randomly put talent points into talents which may change the bots defined spec or glyphs.
+static bool IsSpecMarkerTalent(TalentEntry const* talentInfo)
+{
+    static std::unordered_set<uint32> const markers = {
+        // Druid
+        SPELL_DRUID_THICK_HIDE, SPELL_OWLKIN_FRENZY, SPELL_PRIMAL_TENACITY, SPELL_IMPROVED_BARKSKIN,
+        // Warrior
+        SPELL_SECOND_WIND, SPELL_BLOOD_CRAZE, SPELL_GAG_ORDER,
+        // Paladin
+        SPELL_SACRED_CLEANSING, SPELL_RECKONING, SPELL_DIVINE_PURPOSE,
+        // Hunter
+        SPELL_HUNTER_THICK_HIDE, SPELL_CONCUSSIVE_BARRAGE, SPELL_ENTRAPMENT,
+        // Rogue
+        SPELL_DEADLY_BREW, SPELL_THROWING_SPECIALIZATION, SPELL_WAYLAY,
+        // Priest
+        SPELL_IMPROVED_MANA_BURN, SPELL_BODY_AND_SOUL, SPELL_IMPROVED_VAMPIRIC_EMBRACE,
+        // Death Knight
+        SPELL_ABOMINATIONS_MIGHT, SPELL_IMPROVED_ICY_TALONS, SPELL_SUDDEN_DOOM, SPELL_ACCLIMATION,
+        SPELL_MAGIC_SUPPRESSION, SPELL_BLADE_BARRIER,
+        // Shaman
+        SPELL_ASTRAL_SHIFT, SPELL_EARTHEN_POWER, SPELL_FOCUSED_MIND,
+        // Mage
+        SPELL_BURNOUT, SPELL_ICE_SHARDS, SPELL_IMPROVED_BLINK, SPELL_FIERY_PAYBACK, SPELL_SHATTERED_BARRIER,
+        // Warlock
+        SPELL_IMPROVED_HOWL_OF_TERROR, SPELL_NEMESIS, SPELL_INTENSITY, SPELL_NETHER_PROTECTION};
+
+    if (!talentInfo)
+        return false;
+    for (uint32 spellId : talentInfo->RankID)
+    {
+        if (spellId && markers.count(spellId))
+            return true;
+    }
+    return false;
 }
 
 void PlayerbotFactory::InitTalentsBySpecNo(Player* bot, int specNo, bool reset)
@@ -3615,6 +3665,22 @@ void PlayerbotFactory::InitTalents(uint32 specNo)
         if ((classMask & talentTabInfo->ClassMask) == 0)
             continue;
 
+        if (!IsTalentRowAllowed(bot->GetLevel(), talentInfo->Row, talentInfo->Col))
+            continue;
+
+        if (IsSpecMarkerTalent(talentInfo) ||
+            (talentInfo->DependsOn && IsSpecMarkerTalent(sTalentStore.LookupEntry(talentInfo->DependsOn))))
+            continue;
+
+        uint32 topRank = 0;
+        for (uint32 rank = 0; rank < MAX_TALENT_RANK; ++rank)
+        {
+            if (talentInfo->RankID[rank])
+                topRank = rank;
+        }
+        if (bot->HasTalent(talentInfo->RankID[topRank], bot->GetActiveSpec()))
+            continue;
+
         spells[talentInfo->Row].push_back(talentInfo);
     }
 
@@ -3684,10 +3750,7 @@ void PlayerbotFactory::InitTalentsByTemplate(uint32 specTab)
     for (std::vector<uint32> const& p : TargetSpecLinkOrder(cls, specIndex, bot->GetLevel()))
     {
         uint32 tab = p[0], row = p[1], col = p[2], lvl = p[3];
-        if (sPlayerbotAIConfig.limitTalentsExpansion && bot->GetLevel() <= 60 && (row > 6 || (row == 6 && col != 1)))
-            continue;
-
-        if (sPlayerbotAIConfig.limitTalentsExpansion && bot->GetLevel() <= 70 && (row > 8 || (row == 8 && col != 1)))
+        if (!IsTalentRowAllowed(bot->GetLevel(), row, col))
             continue;
 
         uint32 talentID = 0;
