@@ -71,7 +71,9 @@ public:
     static float CalculateEnchantScore(uint32 enchant_id, Player* bot);
     uint32 InitTalentsTree(bool incremental = false, bool use_template = true, bool reset = false);
     static void InitTalentsBySpecNo(Player* bot, int specNo, bool reset);
-    static void InitTalentsByParsedSpecLink(Player* bot, std::vector<std::vector<uint32>> parsedSpecLink, bool reset);
+    static void InitTalentsByParsedSpecLink(Player* bot, std::vector<std::vector<uint32>> const& parsedSpecLink,
+                                            bool reset);
+    void ApplyTalentBuild(std::vector<std::vector<uint32>> const& build, bool reset);
     void InitAvailableSpells();
     static bool IsTrainerSpellAllowedForBot(Player* bot, Trainer::Trainer const* trainer,
                                              Trainer::Spell const* trainerSpell);
@@ -194,7 +196,6 @@ private:
     void ClearSpells();
     void ClearSkills();
     void InitTalents(uint32 specNo);
-    void InitTalentsByTemplate(uint32 specNo);
     void InitQuests(std::list<uint32>& questMap, bool withRewardItem = true);
     void ClearInventory();
     void ClearAllItems();
