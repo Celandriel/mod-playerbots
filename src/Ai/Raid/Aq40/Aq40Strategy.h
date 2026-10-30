@@ -8,8 +8,7 @@
 #define PLAYERBOTS_AQ40STRATEGY_H
 
 #include "Strategy.h"
-
-class Aq40ControlAction;
+#include <vector>
 
 class RaidAq40Strategy : public Strategy
 {
@@ -21,10 +20,7 @@ public:
     void AppendTargetExclusions(GuidSet& exclusions, TargetValueExclusionType type) override;
 
 private:
-    // Target selection can ask for exclusions several times per tick; reuse them within the tick.
     GuidSet _exclusions;
-    Aq40ControlAction const* _exclusionsControl = nullptr;
-    uint32 _exclusionsVersion = 0;
     uint32 _exclusionsTime = 0;
 };
 
