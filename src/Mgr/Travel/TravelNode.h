@@ -52,11 +52,11 @@ struct AreaTrigger;
 //    teleportSpell(5) — Spell-based teleport (e.g. mage portals)
 //    staticPortal(6)  — Manually defined teleport link (DB only, not pruned by generation)
 //
-//  On server start saved nodes and links are loaded via TravelNodeMap::Init(). Init() precomputes undirected connected components for O(1) reachability checks
-//  (see PrecomputeReachability), and builds a taxi BFS graph. Paths and routes are calculated once during generation
-//  and saved for future use — runtime path-building was removed (H3) because it mutated the shared graph from bot
-//  map threads under only a shared_lock. Nodes are only added at startup or via the console `.generate` command —
-//  runtime mutation was removed because taking a unique_lock caused 100-250ms contention spikes against bot threads.
+//  On server start saved nodes and links are loaded via TravelNodeMap::Init(). Init() precomputes undirected connected
+//  components for O(1) reachability checks (see PrecomputeReachability), and builds a taxi BFS graph. Paths and routes
+//  are calculated once during generation and saved for future use. Bots never build paths or add nodes at runtime: the
+//  graph is shared across map threads, and editing it would need a unique_lock that stalls them (100-250ms spikes).
+//  Nodes are only added at startup or by the `.playerbots travel generatenode` console command.
 //
 //  Initially the current nodes have been made:
 //  Flightmasters and Inns (Bots can use these to fast-travel so eventually they will be included in the route
@@ -66,10 +66,10 @@ struct AreaTrigger;
 //  (Again used to travel in and in maps) (sub)Zone means (These are the center most point for each sub-zone which is
 //  good for global coverage).
 //
-//  To increase coverage/linking extra nodes must be manually created via the "playerbot travel generatenode"
+//  To increase coverage/linking extra nodes must be manually created via the ".playerbots travel generatenode"
 //  console command after importing the specified node. Current implementation places nodes on paths (including
 //  complete) at sub-zone transitions or randomly. After calculating possible links the node is removed if it
-//  does not create local coverage (.fullgenerate only).
+//  does not create local coverage.
 //
 //  Travel Flow:
 //
@@ -83,15 +83,14 @@ struct AreaTrigger;
 //  If setup cannot resolve (no node, no route, no flight), the bot teleports directly to the destination
 //  as a fallback.
 //
-//  The use of hearthstones and mage teleporting was removed — it caused route mutations requiring locking that no longer made sense. Mage portals may be future item.
+//  Hearthstones and mage teleports are not used for routing; they would need per-bot route edits under a lock.
+//  Mage portals may be added later.
 //
 //  Thread Safety:
 //
 //  The graph is built once at startup on the world thread (LoadNodeStore + generation in Init()) and is never
-//  mutated by bot AI afterward: H3 removed the last runtime mutation path, where TravelNodeRoute::BuildPath's
-//  canBuildHere branch called TravelNode::BuildPath (a Detour query that also calls setPathTo/setComplete) from
-//  bot map threads. A missing/incomplete same-map segment now falls straight through to the existing node-point
-//  hop instead (see TravelNodeRoute::BuildPath).
+//  changed by bot AI afterward. A missing or incomplete same-map segment falls through to the node-point hop
+//  (see TravelNodeRoute::BuildPath) instead of being built from a bot map thread.
 //
 //  GetFullPath takes m_nMapMtx with try_lock_shared before reading the graph and returns an empty path when an
 //  edit holds the lock, so bots fail a resolve instead of blocking their map thread. saveNodeStore() takes NO
@@ -176,7 +175,7 @@ public:
     // Setters
     void setComplete(bool complete1) { complete = complete1; }
 
-    void setPath(std::vector<WorldPosition> path1) { path = path1; }
+    void setPath(std::vector<WorldPosition> path1) { path = std::move(path1); }
 
     void setPathAndCost(std::vector<WorldPosition> path1, float speed)
     {
@@ -445,7 +444,7 @@ protected:
     std::unordered_map<TravelNode*, TravelNodePath*> links;
 
     // Undirected connected-component ids assigned by
-    // TravelNodeMap::PrecomputeReachability() (H2). 0 = unassigned. See
+    // TravelNodeMap::PrecomputeReachability(). 0 = unassigned. See
     // hasRouteTo for how these are used and why the grouping is safe to
     // over-approximate.
     uint32 componentId = 0;
@@ -607,7 +606,8 @@ public:
 
     std::vector<TravelNode*> const& getNodes() { return nodes; }
 
-    TravelPath BuildPath(std::vector<WorldPosition> pathToStart = {}, std::vector<WorldPosition> pathToEnd = {}, Unit* bot = nullptr);
+    TravelPath BuildPath(std::vector<WorldPosition> pathToStart = {}, std::vector<WorldPosition> pathToEnd = {},
+                         Unit* bot = nullptr);
 
     std::ostringstream const print();
 
@@ -698,8 +698,8 @@ public:
 
     // Finds the best nodePath between two nodes (A* over the node graph).
     // For a cross-map goal the route may end at the first walkable node
-    // past a map crossing instead of at goal (caller detects this as
-    // back() != goal); the executor re-plans after each crossing anyway.
+    // on the goal's map instead of at goal (caller detects this as
+    // back() != goal); the executor re-plans after the crossing anyway.
     // searchBudget caps expansions; exhaustion returns an empty route,
     // same as no route.
     TravelNodeRoute GetNodeRoute(TravelNode* start, TravelNode* goal, Player* bot,
@@ -709,8 +709,8 @@ public:
     // Picks the nearest start/end nodes for two world positions and runs A*
     // between them. Debug command only; a cross-map route may end at a map
     // seam rather than at the end node.
-    TravelNodeRoute FindRouteNearestNodes(WorldPosition startPos, WorldPosition endPos, std::vector<WorldPosition>& startPath,
-                                          Player* bot = nullptr);
+    TravelNodeRoute FindRouteNearestNodes(WorldPosition startPos, WorldPosition endPos,
+                                          std::vector<WorldPosition>& startPath, Player* bot = nullptr);
 
     void setHasToGen() { hasToGen = true; }
 

@@ -168,7 +168,8 @@ protected:
     // context such as RPG status and target name. Optional `extra`
     // is appended verbatim (use it to attach hop labels like
     // "node:Stormwind innkeeper" or fallback reasons).
-    virtual void EmitDebugMove(char const* method, char const* generator, float x, float y, float z, char const* extra = nullptr);
+    virtual void EmitDebugMove(char const* method, char const* generator, float x, float y, float z,
+                               char const* extra = nullptr);
 
     bool JumpTo(uint32 mapId, float x, float y, float z, MovementPriority priority = MovementPriority::MOVEMENT_NORMAL);
     bool MoveNear(uint32 mapId, float x, float y, float z, float distance = sPlayerbotAIConfig.ContactDistance,
@@ -214,6 +215,7 @@ protected:
     bool IsDuplicateMove(float x, float y, float z);
     bool IsMovingAllowed();
     bool CanOverrideMovement(MovementPriority priority);
+    bool IsMoveAccepted(float x, float y, float z, MovementPriority priority);
     bool IsWaitingForLastMove(MovementPriority priority);
     bool IsHoldingAtDockWait() const;
     bool Flee(Unit* target);
@@ -230,7 +232,8 @@ protected:
     bool FleePosition(Position pos, float radius, uint32 minInterval = 1000);
     bool CheckLastFlee(float curAngle, std::list<FleeInfo>& infoList);
 
-    PathResult GeneratePath(float x, float y, float z, uint32 acceptMask = DEFAULT_PATH_ACCEPT_MASK, bool forceDestination = false);
+    PathResult GeneratePath(float x, float y, float z, uint32 acceptMask = DEFAULT_PATH_ACCEPT_MASK,
+                            bool forceDestination = false);
 
     // Stage 8: returns a unified TravelPath for the move. Stateless —
     // `lastMove` is read (cache reuse, regression guard) and never written,

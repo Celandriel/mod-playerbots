@@ -167,11 +167,14 @@ public:
     {
         if (!sPlayerbotAIConfig.EnableTravelNodes)
         {
-            handler->PSendSysMessage("Travel node generation refused: AiPlayerbot.EnableTravelNodes is disabled, so the node store was never loaded and generating now would overwrite it.");
+            handler->PSendSysMessage(
+                "Travel node generation refused: Playerbots.EnableTravelNodes is disabled, so the "
+                "node store was never loaded and generating now would overwrite it.");
             return true;
         }
 
-        handler->PSendSysMessage("Regenerating travel node paths (all maps)... The world thread is blocked until this finishes.");
+        handler->PSendSysMessage(
+            "Regenerating travel node paths (all maps)... The world thread is blocked until this finishes.");
         LOG_INFO("playerbots", "Manual travel node regeneration started via console command.");
         {
             std::unique_lock<std::shared_timed_mutex> lock(sTravelNodeMap.m_nMapMtx);
@@ -273,7 +276,8 @@ public:
         }
         if (nodes.empty())
         {
-            handler->PSendSysMessage("No travel nodes registered in zone {} (is the travel node system loaded?)", zoneId);
+            handler->PSendSysMessage("No travel nodes registered in zone {} (is the travel node system loaded?)",
+                                     zoneId);
             return true;
         }
 

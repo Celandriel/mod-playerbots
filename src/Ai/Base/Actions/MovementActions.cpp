@@ -91,7 +91,8 @@ MovementAction::MovementAction(PlayerbotAI* botAI, std::string const name) : Act
 
 // Whispers a "[M] / method / generator / status / distance / target" trace line to the
 // master when the "debug move" strategy is active.
-void MovementAction::EmitDebugMove(char const* method, char const* generator, float x, float y, float z, char const* extra)
+void MovementAction::EmitDebugMove(char const* method, char const* generator, float x, float y, float z,
+                                   char const* extra)
 {
     if (!botAI->HasStrategy("debug move", BOT_STATE_NON_COMBAT))
         return;
@@ -381,10 +382,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
     }
 
     // 3. Check if movement action is allowed.
-    if (!CanOverrideMovement(priority))
-        return false;
-
-    if (IsDuplicateMove(x, y, z))
+    if (!IsMoveAccepted(x, y, z, priority))
         return false;
 
     bool generatePath = !bot->IsFlying() && !bot->isSwimming();
@@ -568,6 +566,11 @@ bool MovementAction::CanOverrideMovement(MovementPriority priority)
     return !lastMove.IsHoldActive() || priority > lastMove.priority;
 }
 
+bool MovementAction::IsMoveAccepted(float x, float y, float z, MovementPriority priority)
+{
+    return CanOverrideMovement(priority) && !IsDuplicateMove(x, y, z);
+}
+
 bool MovementAction::IsWaitingForLastMove(MovementPriority priority)
 {
     return !CanOverrideMovement(priority);
@@ -728,8 +731,9 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
     if (FollowOnTransport(target))
         return true;
 
-    if (!bot->InBattleground() && ServerFacade::instance().IsDistanceLessOrEqualThan(ServerFacade::instance().GetDistance2d(bot, target),
-                                                                           sPlayerbotAIConfig.FollowDistance))
+    if (!bot->InBattleground() &&
+        ServerFacade::instance().IsDistanceLessOrEqualThan(ServerFacade::instance().GetDistance2d(bot, target),
+                                                           sPlayerbotAIConfig.FollowDistance))
     {
         return false;
     }
@@ -2548,7 +2552,8 @@ TravelPath MovementAction::ResolveMovePath(WorldPosition startPos, WorldPosition
         lastMove.lastPath.getBack().distance(endPos) < maxDistChange)
         return lastMove.lastPath;
 
-    // Check if we must use travel node system to arrive to destination. Long path = cross-map or beyond sight; otherwise pure mmap probe.
+    // Check if we must use travel node system to arrive to destination.
+    // Long path = cross-map or beyond sight; otherwise pure mmap probe.
     bool const needsLongPath =
         crossMap || //between maps
         totalDistance > sPlayerbotAIConfig.SightDistance || //distance beyond pathfinding distance
@@ -2857,8 +2862,7 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
                 lm.lastTransportEntry = 0;
             }
             // Throttle re-evaluation after disembark so the post-teleport
-            // state settles. Milliseconds — the old WaitForReach(1000.0f)
-            // treated 1000 as yards and stalled 5s (maxWaitForMove clamp).
+            // state settles.
             botAI->SetNextCheckDelay(1000);
             return teleported;
         }
@@ -2888,9 +2892,7 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
             // Probe at the bot's z, not the stored route-point z: ship
             // route points sit at water level (z~0) while the deck is
             // several yards higher, so a probe at the stored z misses
-            // the hull even with the docked ship right there (observed:
-            // BoardTransport never fired; the legacy auto-sync raycast
-            // boarded the bot by accident instead).
+            // the hull even with the docked ship right there.
             Transport* transport = GetTransportForPosTolerant(
                 map, bot, bot->GetPhaseMask(),
                 next.point.GetPositionX(),
@@ -2910,9 +2912,6 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
                 bot->StopMoving();
             }
 
-            // 1s throttle in MILLISECONDS. The old WaitForReach(1000.0f)
-            // fed 1000 *yards* into a distance→time conversion, which
-            // clamped to maxWaitForMove (5s) instead of the intended 1s.
             botAI->SetNextCheckDelay(1000);
             return true;
         }
@@ -2981,8 +2980,7 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
             // activation doesn't fail on an undiscovered node.
             bot->GetSession()->SendLearnNewTaxiNode(flightMaster);
 
-            // Legacy cheat-gold behaviour (restored — pre-nav_polish):
-            // cover the fare with the "gold" cheat so activation doesn't
+            // Cover the fare with the "gold" cheat so activation doesn't
             // fail on an empty purse, then put the bot's real money back
             // regardless of outcome. Bots without the cheat pay normally.
             uint32 const botMoney = bot->GetMoney();
@@ -3013,7 +3011,8 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
 
 // GetTransportForPos with a small vertical tolerance — deck height varies and an
 // exact-z probe often misses the hull.
-Transport* MovementAction::GetTransportForPosTolerant(Map* map, WorldObject* ref, uint32 phaseMask, float x, float y, float z)
+Transport* MovementAction::GetTransportForPosTolerant(Map* map, WorldObject* ref, uint32 phaseMask, float x, float y,
+                                                      float z)
 {
     if (!map || !ref)
         return nullptr;
@@ -3255,7 +3254,8 @@ bool MovementAction::MoveTo2(WorldPosition endPos,
             return true;
     }
 
-    // 11. TRANSPORT LOGISTICS.  Approaching a dock: ship present → board; absent → wait.  Mid-ride: disembark when the cached path says the stop has been reached.
+    // 11. TRANSPORT LOGISTICS.  Approaching a dock: ship present → board; absent → wait.
+    // Mid-ride: disembark when the cached path says the stop has been reached.
     if (onTransport)
     {
         Transport* trans = bot->GetTransport();
@@ -3367,7 +3367,8 @@ bool MovementAction::MoveTo2(WorldPosition endPos,
     // hop / drifted past reactDistance / > 125 sqDist jump. Combat callers
     // pass ignoreEnemyTargets=true so the chase doesn't stop at an
     // intermediate enemy.
-    path.ClipPath(botAI, bot, ignoreEnemyTargets);
+    bool const localMove = totalDistance <= sPlayerbotAIConfig.ReactDistance;
+    path.ClipPath(botAI, bot, ignoreEnemyTargets || localMove);
 
     // If destination is on land, snap any underwater waypoints to the
     // water surface so the bot swims along the top instead of diving.
@@ -3493,8 +3494,6 @@ bool MovementAction::DispatchMovement(TravelPath path, [[maybe_unused]] WorldPos
     bot->ClearEmoteState();
     if (!bot->IsStandState())
         bot->SetStandState(UNIT_STAND_STATE_STAND);
-
-    bot->CastStop();
 
     // mm.Clear → exactly one generator
     MotionMaster* mm = bot->GetMotionMaster();

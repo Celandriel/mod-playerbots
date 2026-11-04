@@ -1105,7 +1105,7 @@ void TravelPath::ClipPath(PlayerbotAI* ai, Unit* mover, bool ignoreEnemyTargets)
             Creature* cre = unit->ToCreature();
             if (!cre)
                 continue;
-            if (!cre->CanCreatureAttack(mover, true) || !unit->IsWithinLOSInMap(mover))
+            if (!cre->IsHostileTo(mover) || !cre->CanCreatureAttack(mover, true) || !unit->IsWithinLOSInMap(mover))
                 continue;
             float const range = cre->GetAttackDistance(mover);
             threats.emplace_back(WorldPosition(unit), range * range);
@@ -1200,7 +1200,8 @@ bool TravelPath::makeShortCut(WorldPosition startPos, float maxDist, Unit* bot)
                 newPath.clear();
             }
 
-            if (p.type != PathNodeType::NODE_PREPATH)  // Only look at the part after the first node and in the same map.
+            // Only look at the part after the first node and in the same map.
+            if (p.type != PathNodeType::NODE_PREPATH)
             {
                 if (!firstNode)
                     firstNode = p.point;
@@ -1309,12 +1310,14 @@ TravelPath TravelNodeRoute::BuildPath(std::vector<WorldPosition> pathToStart, st
 
             if (nodePath->getPathType() == TravelNodePathType::areaTrigger)
             {
-                travelPath.addPoint(*prevNode->getPosition(), PathNodeType::NODE_AREA_TRIGGER, nodePath->getPathObject());
+                travelPath.addPoint(*prevNode->getPosition(), PathNodeType::NODE_AREA_TRIGGER,
+                                    nodePath->getPathObject());
                 travelPath.addPoint(*node->getPosition(), PathNodeType::NODE_AREA_TRIGGER, nodePath->getPathObject());
             }
             else if (nodePath->getPathType() == TravelNodePathType::staticPortal)
             {
-                travelPath.addPoint(*prevNode->getPosition(), PathNodeType::NODE_STATIC_PORTAL, nodePath->getPathObject());
+                travelPath.addPoint(*prevNode->getPosition(), PathNodeType::NODE_STATIC_PORTAL,
+                                    nodePath->getPathObject());
                 travelPath.addPoint(*node->getPosition(), PathNodeType::NODE_STATIC_PORTAL, nodePath->getPathObject());
             }
             else if (nodePath->getPathType() == TravelNodePathType::transport)
@@ -1559,12 +1562,11 @@ TravelNodeRoute TravelNodeMap::GetNodeRoute(TravelNode* start, TravelNode* goal,
         currentNode->closed = true;
         expansions++;
 
-        // For a cross-map goal, stop at the first walkable node on another map:
-        // the route is re-planned after every map crossing anyway. Callers detect
+        // For a cross-map goal, stop at the first walkable node on the goal's map:
+        // the route is re-planned after the map crossing anyway. Callers detect
         // the truncation as back() != goal.
         if (currentNode->dataNode == goal ||
-            (crossMap && currentNode->dataNode->GetMapId() != start->GetMapId() &&
-             currentNode->dataNode->isWalking()))
+            (crossMap && currentNode->dataNode->GetMapId() == goal->GetMapId() && currentNode->dataNode->isWalking()))
         {
             TravelNodeStub* parent = currentNode->parent;
 
@@ -1676,7 +1678,8 @@ TravelNodeRoute TravelNodeMap::FindRouteNearestNodes(WorldPosition startPos, Wor
             if (startNodePosition.GetMapId() == bot->GetMapId())
             {
                 PathGenerator path(bot);
-                path.CalculatePath(startNodePosition.GetPositionX(), startNodePosition.GetPositionY(), startNodePosition.GetPositionZ());
+                path.CalculatePath(startNodePosition.GetPositionX(), startNodePosition.GetPositionY(),
+                                   startNodePosition.GetPositionZ());
                 PathType type = path.GetPathType();
                 bool reachable = !(type & ~(PATHFIND_NORMAL | PATHFIND_INCOMPLETE | PATHFIND_FARFROMPOLY));
 
@@ -1873,7 +1876,7 @@ TravelPath TravelNodeMap::GetFullPath(WorldPosition botPos,
     }
 
     // Fallback when the graph gave no usable route: try a direct chained mmap probe
-    // on the bot's own map (step budget: AiPlayerbot.TravelNodeProbeSteps, 0 = off).
+    // on the bot's own map (step budget: Playerbots.TravelNodeProbeSteps, 0 = off).
     if (sPlayerbotAIConfig.TravelNodeProbeSteps > 0 &&
         botPos.GetMapId() == destination.GetMapId())
     {
@@ -2840,7 +2843,8 @@ uint32 TravelNodeMap::pruneCheatingWalkLinks(std::vector<TravelNode*> const& sca
             // removePaths=true so the stored geometry is gone too, not just
             // the link flag (a lingering path would re-link on a later pass).
             startNode->removeLinkTo(endNode, true);
-            endNode->removeLinkTo(startNode, true);
+            if (!endNode->hasPathTo(startNode) || endNode->getPathTo(startNode)->getBuiltDuringRun())
+                endNode->removeLinkTo(startNode, true);
             ++removed;
         }
     }
@@ -3108,7 +3112,8 @@ void TravelNodeMap::saveNodeStore()
             std::string name = node->getName();
             name.erase(remove(name.begin(), name.end(), '\''), name.end());
 
-            PlayerbotsDatabasePreparedStatement* stmt = PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_INS_TRAVELNODE);
+            PlayerbotsDatabasePreparedStatement* stmt =
+                PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_INS_TRAVELNODE);
             stmt->SetData(0, i);
             stmt->SetData(1, name);
             stmt->SetData(2, node->GetMapId());
@@ -3174,7 +3179,7 @@ void TravelNodeMap::saveNodeStore()
     }
 
     // Phase 4: path points, committed every ~10000 rows. A single mega-transaction
-    // (~1.5M rows) used to exceed MySQL limits and partial-commit, corrupting the store.
+    // (~1.5M rows) exceeds MySQL limits and partially commits, corrupting the store.
     constexpr uint32 BATCH_SIZE = 500;
     constexpr uint32 BATCHES_PER_COMMIT = 20;  // 20 * 500 = 10000 rows per tx
     uint32 points = 0;
@@ -3222,7 +3227,8 @@ void TravelNodeMap::saveNodeStore()
                 WorldPosition& point = ppath[j];
 
                 if (batchCount == 0)
-                    ss << "INSERT INTO `playerbots_travelnode_path` (`node_id`,`to_node_id`,`nr`,`map_id`,`x`,`y`,`z`) VALUES ";
+                    ss << "INSERT INTO `playerbots_travelnode_path` (`node_id`,`to_node_id`,`nr`,`map_id`,`x`,`y`,`z`) "
+                          "VALUES ";
 
                 ss << std::fixed << std::setprecision(4)
                    << "(" << i << "," << toId << "," << j << ","
@@ -3328,6 +3334,8 @@ void TravelNodeMap::LoadNodeStore()
         if (PreparedQueryResult result =
                 PlayerbotsDatabase.Query(PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_SEL_TRAVELNODE_PATH)))
         {
+            TravelNodePath* current = nullptr;
+            std::vector<WorldPosition> points;
             do
             {
                 Field* fields = result->Fetch();
@@ -3345,17 +3353,24 @@ void TravelNodeMap::LoadNodeStore()
                     continue;
 
                 TravelNodePath* path = startNode->getPathTo(endNode);
+                if (path != current)
+                {
+                    if (current)
+                        current->setPath(std::move(points));
+                    current = path;
+                    points = current->GetPath();
+                }
 
-                std::vector<WorldPosition> ppath = path->GetPath();
-                ppath.push_back(WorldPosition(fields[3].Get<uint32>(), fields[4].Get<float>(), fields[5].Get<float>(),
-                                              fields[6].Get<float>()));
-
-                path->setPath(ppath);
+                points.push_back(WorldPosition(fields[3].Get<uint32>(), fields[4].Get<float>(), fields[5].Get<float>(),
+                                               fields[6].Get<float>()));
 
                 if (path->getCalculated())
                     path->setComplete(true);
 
             } while (result->NextRow());
+
+            if (current)
+                current->setPath(std::move(points));
 
             LOG_INFO("playerbots", ">> Loaded {} travelNode paths points.", result->GetRowCount());
         }
