@@ -2946,7 +2946,11 @@ void TravelMgr::PrepareDestinationCache()
             float totalX = 0, totalY = 0, totalZ = 0;
             for (auto const& loc : locList)
             {
+                totalX += loc.GetPositionX();
+                totalY += loc.GetPositionY();
+                totalZ += loc.GetPositionZ();
             }
+            float avgX = totalX / locList.size();
             float avgY = totalY / locList.size();
             float avgZ = totalZ / locList.size();
             creatureSpawnsByTemplate[entry].push_back(WorldLocation(locList[0].GetMapId(), avgX, avgY, avgZ, 0));
