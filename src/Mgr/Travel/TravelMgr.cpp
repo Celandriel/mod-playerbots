@@ -1220,7 +1220,10 @@ bool QuestObjectiveTravelDestination::isActive(Player* bot)
     if (getEntry() > 0)
     {
         CreatureTemplate const* cInfo = sObjectMgr->GetCreatureTemplate(getEntry());
-        if (cInfo && (int)cInfo->maxlevel - (int)bot->GetLevel() > 4)
+        if (!cInfo)
+            return false;
+
+        if ((int)cInfo->maxlevel - (int)bot->GetLevel() > 4)
             return false;
 
         // Do not try to hand-in dungeon/elite quests in instances without a group.
@@ -2507,7 +2510,11 @@ std::vector<std::vector<uint32>> TravelMgr::GetOptimalFlightDestinations(Player*
 
 const std::vector<WorldLocation> TravelMgr::GetTeleportLocations(Player* bot)
 {
-    uint32 level = bot->GetLevel();
+    return GetTeleportLocations(bot, bot->GetLevel());
+}
+
+const std::vector<WorldLocation> TravelMgr::GetTeleportLocations(Player* bot, uint32 level)
+{
     std::map<uint8, std::vector<WorldLocation>> const& cache =
         !sPlayerbotAIConfig.EnableNewRpgStrategy ? locsPerLevelCache
         : bot->GetTeamId() == TEAM_ALLIANCE      ? allianceHubsPerLevelCache
@@ -2912,28 +2919,20 @@ void TravelMgr::PrepareDestinationCache()
             CreatureTemplate const* creatureTemplate = sObjectMgr->GetCreatureTemplate(creatureDataList[0].id);
             uint32 level = (creatureTemplate->minlevel + creatureTemplate->maxlevel + 1) / 2;
 
-            float totalX = 0.0f;
-            float totalY = 0.0f;
-            float totalZ = 0.0f;
+            std::vector<WorldPosition> spawns;
+            spawns.reserve(creatureDataList.size());
             for (CreatureData const& creatureData : creatureDataList)
-            {
-                totalX += creatureData.posX;
-                totalY += creatureData.posY;
-                totalZ += creatureData.posZ;
-            }
+                spawns.emplace_back(std::get<0>(gridTuple), creatureData.posX, creatureData.posY, creatureData.posZ);
 
-            float avgX = totalX / creatureDataList.size();
-            float avgY = totalY / creatureDataList.size();
-            float avgZ = totalZ / creatureDataList.size();
-            uint32 mapId = std::get<0>(gridTuple);
-
+            // A real spawn, not the grid key * 50, which can be up to 25 yd in the air or underground.
+            WorldLocation const loc = WorldPosition(spawns, WP_MEAN_CENTROID);
             for (int32 l = (int32)level - (int32)sPlayerbotAIConfig.RandomBotTeleLowerLevel;
                  l <= (int32)level + (int32)sPlayerbotAIConfig.RandomBotTeleHigherLevel; l++)
             {
                 if (l < 1 || l > int32(maxLevel))
                     continue;
 
-                locsPerLevelCache[(uint8)l].push_back(WorldLocation(mapId, avgX, avgY, avgZ, 0.0f));
+                locsPerLevelCache[(uint8)l].push_back(loc);
             }
         }
     }
@@ -2947,11 +2946,7 @@ void TravelMgr::PrepareDestinationCache()
             float totalX = 0, totalY = 0, totalZ = 0;
             for (auto const& loc : locList)
             {
-                totalX += loc.GetPositionX();
-                totalY += loc.GetPositionY();
-                totalZ += loc.GetPositionZ();
             }
-            float avgX = totalX / locList.size();
             float avgY = totalY / locList.size();
             float avgZ = totalZ / locList.size();
             creatureSpawnsByTemplate[entry].push_back(WorldLocation(locList[0].GetMapId(), avgX, avgY, avgZ, 0));
