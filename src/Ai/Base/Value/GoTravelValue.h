@@ -7,6 +7,7 @@
 #ifndef PLAYERBOTS_GOTRAVELVALUE_H
 #define PLAYERBOTS_GOTRAVELVALUE_H
 
+#include "Player.h"
 #include "TravelMgr.h"
 #include "Value.h"
 
