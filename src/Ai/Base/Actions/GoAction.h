@@ -10,8 +10,6 @@
 #include "MovementActions.h"
 
 class PlayerbotAI;
-class TravelDestination;
-class WorldPosition;
 
 class GoAction : public MovementAction
 {
@@ -19,6 +17,9 @@ public:
     GoAction(PlayerbotAI* botAI) : MovementAction(botAI, "Go") {}
 
     bool Execute(Event event) override;
+
+private:
+    bool GoTravelTo(std::string const& name);
 };
 
 #endif

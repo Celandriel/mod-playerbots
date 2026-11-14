@@ -8,16 +8,34 @@
 #define PLAYERBOTS_TRAVELACTION_H
 
 #include "MovementActions.h"
+#include "NewRpgBaseAction.h"
 
 class PlayerbotAI;
 
-class TravelAction : public MovementAction
+// Starts and ends the trips the `travel` strategy runs for `go travel <name>`.
+class GoTravel
 {
 public:
-    TravelAction(PlayerbotAI* botAI) : MovementAction(botAI, "travel") {}
+    static void Start(PlayerbotAI* botAI, WorldPosition const& destination, std::string const& name);
+    static void End(PlayerbotAI* botAI, bool restoreFollow);
+    static bool IsActive(PlayerbotAI* botAI);
+};
+
+class MoveToGoTravelDestinationAction : public NewRpgBaseAction
+{
+public:
+    MoveToGoTravelDestinationAction(PlayerbotAI* botAI) : NewRpgBaseAction(botAI, "move to go travel destination") {}
 
     bool Execute(Event event) override;
     bool isUseful() override;
+};
+
+class EndGoTravelAction : public Action
+{
+public:
+    EndGoTravelAction(PlayerbotAI* botAI) : Action(botAI, "end go travel") {}
+
+    bool Execute(Event event) override;
 };
 
 class MoveToDarkPortalAction : public MovementAction

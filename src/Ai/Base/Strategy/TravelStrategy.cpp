@@ -9,28 +9,22 @@
 
 TravelStrategy::TravelStrategy(PlayerbotAI* botAI) : Strategy(botAI) {}
 
-std::vector<NextAction> TravelStrategy::getDefaultActions()
-{
-    return {
-        NextAction("travel", 1.0f)
-    };
-}
-
 void TravelStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
+    // Above "new rpg status update" (11) so a trip outranks new rpg.
     triggers.push_back(
         new TriggerNode(
-            "no travel target",
+            "go travel finished",
             {
-                NextAction("choose travel target", 6.f)
+                NextAction("end go travel", ACTION_NORMAL + 3)
             }
         )
     );
     triggers.push_back(
         new TriggerNode(
-            "far from travel target",
+            "go travel active",
             {
-                NextAction("move to travel target", 1)
+                NextAction("move to go travel destination", ACTION_NORMAL + 2)
             }
         )
     );

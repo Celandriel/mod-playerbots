@@ -10,6 +10,7 @@
 #include "PlayerbotTextMgr.h"
 #include "Playerbots.h"
 #include "PositionValue.h"
+#include "TravelAction.h"
 
 void PositionsResetAction::ResetReturnPosition()
 {
@@ -50,6 +51,9 @@ bool FollowChatShortcutAction::Execute(Event /*event*/)
         return false;
 
     // botAI->Reset();
+    if (GoTravel::IsActive(botAI))
+        GoTravel::End(botAI, false);
+
     botAI->ChangeStrategy("+follow,-passive,-grind,-move from group", BOT_STATE_NON_COMBAT);
     botAI->ChangeStrategy("-stay,-follow,-passive,-grind,-move from group", BOT_STATE_COMBAT);
     botAI->GetAiObjectContext()->GetValue<GuidVector>("prioritized targets")->Reset();
@@ -122,6 +126,9 @@ bool StayChatShortcutAction::Execute(Event /*event*/)
         return false;
 
     botAI->Reset();
+    if (GoTravel::IsActive(botAI))
+        GoTravel::End(botAI, false);
+
     botAI->ChangeStrategy("+stay,-passive,-move from group", BOT_STATE_NON_COMBAT);
     botAI->ChangeStrategy("+stay,-follow,-passive,-move from group", BOT_STATE_COMBAT);
 

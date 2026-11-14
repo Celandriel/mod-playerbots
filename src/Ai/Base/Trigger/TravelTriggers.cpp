@@ -5,14 +5,20 @@
  */
 
 #include "TravelTriggers.h"
+#include "GoTravelValue.h"
 #include "Playerbots.h"
 #include "ServerFacade.h"
 
-bool NoTravelTargetTrigger::IsActive() { return !context->GetValue<TravelTarget*>("travel target")->Get()->isActive(); }
-
-bool FarFromTravelTargetTrigger::IsActive()
+bool GoTravelActiveTrigger::IsActive()
 {
-    return context->GetValue<TravelTarget*>("travel target")->Get()->isTraveling();
+    GoTravelInfo const& info = AI_VALUE(GoTravelInfo&, "go travel");
+    return info.active && !info.HasArrived(bot);
+}
+
+bool GoTravelFinishedTrigger::IsActive()
+{
+    GoTravelInfo const& info = AI_VALUE(GoTravelInfo&, "go travel");
+    return !info.active || info.HasArrived(bot);
 }
 
 bool NearDarkPortalTrigger::IsActive() { return bot->GetAreaId() == 72; }
