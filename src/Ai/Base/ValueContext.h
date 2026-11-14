@@ -31,6 +31,7 @@
 #include "EstimatedLifetimeValue.h"
 #include "FishValues.h"
 #include "Formations.h"
+#include "GoTravelValue.h"
 #include "GrindTargetValue.h"
 #include "GroupLeaderValue.h"
 #include "GroupValues.h"
@@ -247,6 +248,7 @@ public:
         creators["ignore rpg target"] = &ValueContext::ignore_rpg_target;
         creators["next rpg action"] = &ValueContext::next_rpg_action;
         creators["travel target"] = &ValueContext::travel_target;
+        creators["go travel"] = &ValueContext::go_travel;
         creators["talk target"] = &ValueContext::talk_target;
         creators["pull target"] = &ValueContext::pull_target;
         creators["pull strategy target"] = &ValueContext::pull_strategy_target;
@@ -511,6 +513,7 @@ private:
     static UntypedValue* talk_target(PlayerbotAI* botAI) { return new TalkTargetValue(botAI); }
     static UntypedValue* next_rpg_action(PlayerbotAI* botAI) { return new NextRpgActionValue(botAI); }
     static UntypedValue* travel_target(PlayerbotAI* botAI) { return new TravelTargetValue(botAI); }
+    static UntypedValue* go_travel(PlayerbotAI* botAI) { return new GoTravelValue(botAI); }
     static UntypedValue* pull_target(PlayerbotAI* botAI) { return new PullTargetValue(botAI); }
     static UntypedValue* pull_strategy_target(PlayerbotAI* botAI) { return new PullStrategyTargetValue(botAI); }
     static UntypedValue* focus_heal_targets(PlayerbotAI* botAI) { return new FocusHealTargetValue(botAI); }

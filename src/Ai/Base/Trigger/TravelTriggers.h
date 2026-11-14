@@ -11,18 +11,19 @@
 
 class PlayerbotAI;
 
-class NoTravelTargetTrigger : public Trigger
+class GoTravelActiveTrigger : public Trigger
 {
 public:
-    NoTravelTargetTrigger(PlayerbotAI* botAI) : Trigger(botAI, "no travel target") {}
+    GoTravelActiveTrigger(PlayerbotAI* botAI) : Trigger(botAI, "go travel active") {}
 
     bool IsActive() override;
 };
 
-class FarFromTravelTargetTrigger : public Trigger
+// Fires on arrival, and when the `travel` strategy is on without a trip (e.g. `nc +travel`).
+class GoTravelFinishedTrigger : public Trigger
 {
 public:
-    FarFromTravelTargetTrigger(PlayerbotAI* botAI) : Trigger(botAI, "far from travel target") {}
+    GoTravelFinishedTrigger(PlayerbotAI* botAI) : Trigger(botAI, "go travel finished") {}
 
     bool IsActive() override;
 };

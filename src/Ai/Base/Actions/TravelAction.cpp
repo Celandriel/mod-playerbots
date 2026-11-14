@@ -5,59 +5,61 @@
  */
 
 #include "TravelAction.h"
-#include "CellImpl.h"
-#include "GridNotifiers.h"
-#include "GridNotifiersImpl.h"
+#include "GoTravelValue.h"
+#include "PlayerbotTextMgr.h"
 #include "Playerbots.h"
 
-bool TravelAction::Execute(Event /*event*/)
+void GoTravel::Start(PlayerbotAI* botAI, WorldPosition const& destination, std::string const& name)
 {
-    TravelTarget* target = AI_VALUE(TravelTarget*, "travel target");
+    GoTravelInfo& info = botAI->GetAiObjectContext()->GetValue<GoTravelInfo&>("go travel")->Get();
 
-    if (bot->isMoving())
-        return false;
+    // A new destination mid-trip keeps the follow state from before the first one.
+    if (!info.active)
+        info.restoreFollow = botAI->HasStrategy("follow", BOT_STATE_NON_COMBAT);
 
-    target->setStatus(TRAVEL_STATUS_WORK);
+    info.destination = destination;
+    info.name = name;
+    info.active = true;
 
-    Unit* newTarget = nullptr;
-    std::list<Unit*> targets;
-    Acore::AnyUnitInObjectRangeCheck u_check(bot, sPlayerbotAIConfig.SightDistance * 2);
-    Acore::UnitListSearcher<Acore::AnyUnitInObjectRangeCheck> searcher(bot, targets, u_check);
-    Cell::VisitObjects(bot, searcher, sPlayerbotAIConfig.SightDistance);
+    botAI->ChangeStrategy("-follow,+travel", BOT_STATE_NON_COMBAT);
+}
 
-    for (Unit* unit : targets)
-    {
-        newTarget = unit;
-        if (!newTarget || !newTarget->IsInWorld() || newTarget->IsDuringRemoveFromWorld())
-            continue;
+void GoTravel::End(PlayerbotAI* botAI, bool restoreFollow)
+{
+    GoTravelInfo& info = botAI->GetAiObjectContext()->GetValue<GoTravelInfo&>("go travel")->Get();
+    bool const addFollow = restoreFollow && info.active && info.restoreFollow;
 
-        if (newTarget->GetMapId() != bot->GetMapId())
-            continue;
+    info = GoTravelInfo();
 
-        if (!newTarget->IsAlive())
-            continue;
+    botAI->ChangeStrategy(addFollow ? "-travel,+follow" : "-travel", BOT_STATE_NON_COMBAT);
+}
 
-        if (newTarget->GetEntry() == uint32(target->getDestination()->getEntry()))
-            continue;
+bool GoTravel::IsActive(PlayerbotAI* botAI)
+{
+    return botAI->GetAiObjectContext()->GetValue<GoTravelInfo&>("go travel")->Get().active;
+}
 
-        if (newTarget->IsInCombat())
-            continue;
+bool MoveToGoTravelDestinationAction::Execute(Event /*event*/)
+{
+    MoveFarTo(AI_VALUE(GoTravelInfo&, "go travel").destination);
 
-        if (bot->IsHostileTo(newTarget))
-            SET_AI_VALUE(ObjectGuid, "pull target", newTarget->GetGUID());
-        else
-            SET_AI_VALUE(GuidPosition, "rpg target", GuidPosition(newTarget));
-
-        break;
-    }
-
+    // Claim the tick even while a spline is still running, so lower-relevance movement
+    // (new rpg) never redirects the bot mid-trip.
     return true;
 }
 
-bool TravelAction::isUseful()
+bool MoveToGoTravelDestinationAction::isUseful() { return AI_VALUE(GoTravelInfo&, "go travel").active; }
+
+bool EndGoTravelAction::Execute(Event /*event*/)
 {
-    return false && AI_VALUE(TravelTarget*, "travel target")->isActive() &&
-           (!AI_VALUE(GuidPosition, "rpg target") || !AI_VALUE(ObjectGuid, "pull target"));
+    GoTravelInfo const& info = AI_VALUE(GoTravelInfo&, "go travel");
+
+    if (info.active)
+        botAI->TellMasterNoFacing(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+            "go_travel_arrived", "Arrived at %destination", {{"%destination", info.name}}));
+
+    GoTravel::End(botAI, true);
+    return true;
 }
 
 bool MoveToDarkPortalAction::Execute(Event /*event*/)

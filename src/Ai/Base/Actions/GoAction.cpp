@@ -5,13 +5,17 @@
  */
 
 #include "GoAction.h"
-#include "ChooseTravelTargetAction.h"
 #include "Event.h"
 #include "Formations.h"
+#include "ObjectMgr.h"
 #include "PathGenerator.h"
+#include "PlayerbotTextMgr.h"
 #include "Playerbots.h"
 #include "PositionValue.h"
 #include "ServerFacade.h"
+#include "TravelAction.h"
+
+#include <algorithm>
 
 std::vector<std::string> split(std::string const s, char delim);
 char* strstri(char const* haystack, char const* needle);
@@ -35,37 +39,8 @@ bool GoAction::Execute(Event event)
         return true;
     }
 
-    if (param.find("travel") != std::string::npos && param.size() > 7)
-    {
-        WorldPosition botPos(bot);
-
-        std::string const destination = param.substr(7);
-
-        TravelTarget* target = context->GetValue<TravelTarget*>("travel target")->Get();
-
-        if (TravelDestination* dest = ChooseTravelTargetAction::FindDestination(bot, destination))
-        {
-            std::vector<WorldPosition*> points = dest->nextPoint(const_cast<WorldPosition*>(&botPos), true);
-            if (points.empty())
-                return false;
-
-            target->setTarget(dest, points.front());
-            target->setForced(true);
-
-            std::ostringstream out;
-            out << "Traveling to " << dest->getTitle();
-            botAI->TellMasterNoFacing(out.str());
-
-            return true;
-        }
-        else
-        {
-            botAI->TellMasterNoFacing("Clearing travel target");
-            target->setTarget(TravelMgr::instance().nullTravelDestination, TravelMgr::instance().nullWorldPosition);
-            target->setForced(false);
-            return true;
-        }
-    }
+    if (param.rfind("travel ", 0) == 0 && param.size() > 7)
+        return GoTravelTo(param.substr(7));
 
     GuidVector gos = ChatHelper::parseGameobjects(param);
     if (!gos.empty())
@@ -223,4 +198,43 @@ bool GoAction::Execute(Event event)
 
     botAI->TellMaster("Whisper 'go x,y', 'go [game object]', 'go unit' or 'go position' and I will go there");
     return false;
+}
+
+bool GoAction::GoTravelTo(std::string const& name)
+{
+    if (name == "cancel")
+    {
+        if (!GoTravel::IsActive(botAI))
+        {
+            botAI->TellMasterNoFacing(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                "go_travel_not_traveling", "I'm not traveling anywhere", {}));
+            return false;
+        }
+
+        GoTravel::End(botAI, true);
+        botAI->TellMasterNoFacing(
+            PlayerbotTextMgr::instance().GetBotTextOrDefault("go_travel_cancelled", "Travel cancelled", {}));
+        return true;
+    }
+
+    // game_tele names have no spaces ("TheBarrens"); the lookup itself ignores case.
+    std::string teleName = name;
+    teleName.erase(std::remove(teleName.begin(), teleName.end(), ' '), teleName.end());
+
+    // An empty name would substring-match the first game_tele entry.
+    GameTele const* tele = teleName.empty() ? nullptr : sObjectMgr->GetGameTele(teleName);
+    if (!tele)
+    {
+        botAI->TellMasterNoFacing(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+            "go_travel_unknown", "I don't know where %destination is", {{"%destination", name}}));
+        return false;
+    }
+
+    GoTravel::Start(botAI,
+                    WorldPosition(tele->mapId, tele->position_x, tele->position_y, tele->position_z, tele->orientation),
+                    tele->name);
+
+    botAI->TellMasterNoFacing(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+        "go_travel_start", "Traveling to %destination", {{"%destination", tele->name}}));
+    return true;
 }

@@ -22,7 +22,6 @@
 #include "CheckValuesAction.h"
 #include "ChooseRpgTargetAction.h"
 #include "ChooseTargetActions.h"
-#include "ChooseTravelTargetAction.h"
 #include "DelayAction.h"
 #include "DestroyItemAction.h"
 #include "DropQuestAction.h"
@@ -42,7 +41,6 @@
 #include "LootAction.h"
 #include "LootRollAction.h"
 #include "MoveToRpgTargetAction.h"
-#include "MoveToTravelTargetAction.h"
 #include "MovementActions.h"
 #include "NewRpgAction.h"
 #include "NewRpgDoGather.h"
@@ -84,9 +82,8 @@ public:
         creators["crpg"] = &ActionContext::crpg;
         creators["choose rpg target"] = &ActionContext::choose_rpg_target;
         creators["move to rpg target"] = &ActionContext::move_to_rpg_target;
-        creators["travel"] = &ActionContext::travel;
-        creators["choose travel target"] = &ActionContext::choose_travel_target;
-        creators["move to travel target"] = &ActionContext::move_to_travel_target;
+        creators["move to go travel destination"] = &ActionContext::move_to_go_travel_destination;
+        creators["end go travel"] = &ActionContext::end_go_travel;
         creators["move out of collision"] = &ActionContext::move_out_of_collision;
         creators["move random"] = &ActionContext::move_random;
         creators["attack"] = &ActionContext::melee;
@@ -298,9 +295,8 @@ private:
     static Action* crpg(PlayerbotAI* botAI) { return new CRpgAction(botAI); }
     static Action* choose_rpg_target(PlayerbotAI* botAI) { return new ChooseRpgTargetAction(botAI); }
     static Action* move_to_rpg_target(PlayerbotAI* botAI) { return new MoveToRpgTargetAction(botAI); }
-    static Action* travel(PlayerbotAI* botAI) { return new TravelAction(botAI); }
-    static Action* choose_travel_target(PlayerbotAI* botAI) { return new ChooseTravelTargetAction(botAI); }
-    static Action* move_to_travel_target(PlayerbotAI* botAI) { return new MoveToTravelTargetAction(botAI); }
+    static Action* move_to_go_travel_destination(PlayerbotAI* botAI) { return new MoveToGoTravelDestinationAction(botAI); }
+    static Action* end_go_travel(PlayerbotAI* botAI) { return new EndGoTravelAction(botAI); }
     static Action* move_out_of_collision(PlayerbotAI* botAI) { return new MoveOutOfCollisionAction(botAI); }
     static Action* move_random(PlayerbotAI* botAI) { return new MoveRandomAction(botAI); }
     static Action* check_values(PlayerbotAI* botAI) { return new CheckValuesAction(botAI); }
