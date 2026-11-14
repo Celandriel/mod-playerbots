@@ -63,6 +63,13 @@ bool NewRpgBaseAction::MoveFarTo(WorldPosition dest)
         botAI->rpgInfo.SetMoveFarTo(dest);
     }
 
+    bool const inCombat = bot->IsInCombat();
+    if (inCombat)
+    {
+        botAI->rpgInfo.stuckTs = getMSTime();
+        botAI->rpgInfo.stuckAttempts = 0;
+    }
+
     // First check if there is some activity where a bot being stationary does not
     // mean they are stuck. Transport or waiting for a ship/zeppelin (taxi is
     // handled by the early return above).
@@ -90,7 +97,8 @@ bool NewRpgBaseAction::MoveFarTo(WorldPosition dest)
         botAI->rpgInfo.stuckTs = getMSTime();
         botAI->rpgInfo.stuckAttempts = 0;
     }
-    else if (++botAI->rpgInfo.stuckAttempts >= 5 && GetMSTimeDiffToNow(botAI->rpgInfo.stuckTs) >= stuckTime)
+    else if (!inCombat && ++botAI->rpgInfo.stuckAttempts >= 5 &&
+             GetMSTimeDiffToNow(botAI->rpgInfo.stuckTs) >= stuckTime)
     {
         // No meaningful progress toward dest for `stuckTime`: fall
         // back to teleporting directly so the bot can get on with
