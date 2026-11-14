@@ -18,6 +18,8 @@
 #include <type_traits>
 #include <vector>
 
+enum ReactStates : uint8;
+
 class Creature;
 class Player;
 class PlayerbotAI;
@@ -441,6 +443,8 @@ struct Aq40BotCache
     float waitAngle = 0.0f;
     uint32 spitAttemptTime = 0;
     uint32 exitAttemptTime = 0;
+    // The pet's stance before Twin Emperors made it passive; the core saves the stance with the pet.
+    std::optional<ReactStates> petReactBeforeTwins;
 };
 
 // General

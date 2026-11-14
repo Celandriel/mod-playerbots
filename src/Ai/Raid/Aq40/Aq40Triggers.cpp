@@ -125,10 +125,7 @@ bool FankrissTheUnyieldingSpawnShouldBeTankedTrigger::IsActiveInEncounter()
 
 // Viscidus
 
-bool ViscidusShouldBeFrozenTrigger::IsActiveInEncounter()
-{
-    return ViscidusShouldBeFrozen(bot) && IsFreeToAct();
-}
+bool ViscidusShouldBeFrozenTrigger::IsActiveInEncounter() { return ViscidusShouldBeFrozen(bot) && IsFreeToAct(); }
 
 bool ViscidusIsFrozenTrigger::IsActiveInEncounter()
 {
