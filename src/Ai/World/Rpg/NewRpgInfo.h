@@ -97,8 +97,6 @@ struct NewRpgInfo
     uint32 stuckTs{0};
     uint32 stuckAttempts{0};
     WorldPosition moveFarPos;
-    // Quest log signature of the last cross-zone log-pressure pass (see OrganizeQuestLog).
-    uint64 pressureLogKey{0};
     // END MOVE_FAR
 
     // QUEST GIVER
@@ -147,9 +145,8 @@ enum class QuestDropReason : uint8
     NotWorth,
     NotCapable,
     Failed,
-    OtherZone,
-    ClassOrHoliday,
     LogFull,
+    Expired,
     Count
 };
 
@@ -172,12 +169,10 @@ inline char const* QuestDropReasonName(QuestDropReason reason)
             return "not_capable";
         case QuestDropReason::Failed:
             return "failed";
-        case QuestDropReason::OtherZone:
-            return "other_zone";
-        case QuestDropReason::ClassOrHoliday:
-            return "class_or_holiday";
         case QuestDropReason::LogFull:
             return "log_full";
+        case QuestDropReason::Expired:
+            return "expired";
         default:
             return "unknown";
     }

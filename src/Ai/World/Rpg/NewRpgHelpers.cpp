@@ -97,8 +97,9 @@ bool CanInteractWithQuestGiver(Player* bot, Object* questGiver)
     return false;
 }
 
-bool HasQuestToAcceptOrReward(Player* bot, WorldObject* object)
+bool HasQuestToAcceptOrReward(PlayerbotAI* botAI, WorldObject* object)
 {
+    Player* bot = botAI->GetBot();
     ObjectGuid guid = object->GetGUID();
     bot->PrepareQuestMenu(guid);
     QuestMenu const& menu = bot->PlayerTalkClass->GetQuestMenu();
@@ -121,23 +122,18 @@ bool HasQuestToAcceptOrReward(Player* bot, WorldObject* object)
     {
         QuestMenuItem const& item = menu.GetItem(idx);
         Quest const* quest = sObjectMgr->GetQuestTemplate(item.QuestId);
-        if (!quest)
-            continue;
-
-        // Dropped under log pressure: the accept menu refuses it, so targeting its giver
-        // would only park the bot at the NPC until the give-up timer. Never treat it as an
-        // acceptable offer; completed quests still turn in through the loop above.
-        if (PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot); botAI && botAI->lowPriorityQuest.count(item.QuestId))
-            continue;
-
-        QuestStatus const& status = bot->GetQuestStatus(item.QuestId);
-        if (status == QUEST_STATUS_NONE && bot->CanTakeQuest(quest, false) && bot->CanAddQuest(quest, false) &&
-            IsQuestWorthDoing(bot, quest) && IsQuestCapableDoing(bot, quest))
-        {
+        if (quest && CanAcceptQuest(botAI, quest))
             return true;
-        }
     }
     return false;
+}
+
+bool CanAcceptQuest(PlayerbotAI* botAI, Quest const* quest)
+{
+    Player* bot = botAI->GetBot();
+    return !botAI->lowPriorityQuest.count(quest->GetQuestId()) &&
+           bot->GetQuestStatus(quest->GetQuestId()) == QUEST_STATUS_NONE && bot->CanTakeQuest(quest, false) &&
+           bot->CanAddQuest(quest, false) && IsQuestWorthDoing(bot, quest) && IsQuestCapableDoing(bot, quest);
 }
 
 bool IsQuestWorthDoing(Player* bot, Quest const* quest)
@@ -196,7 +192,7 @@ ObjectGuid FindQuestGiver(PlayerbotAI* botAI, float distanceLimit)
             if (distanceLimit && bot->GetDistance(object) > distanceLimit)
                 continue;
 
-            if (CanInteractWithQuestGiver(bot, object) && HasQuestToAcceptOrReward(bot, object))
+            if (CanInteractWithQuestGiver(bot, object) && HasQuestToAcceptOrReward(botAI, object))
             {
                 if (!nearestObject || bot->GetExactDist(nearestObject) > bot->GetExactDist(object))
                     nearestObject = object;

@@ -8,6 +8,7 @@
 #include "BroadcastHelper.h"
 #include "ChatHelper.h"
 #include "Creature.h"
+#include "GameEventMgr.h"
 #include "GameObject.h"
 #include "GatherNodeMgr.h"
 #include "GossipDef.h"
@@ -330,7 +331,7 @@ bool NewRpgBaseAction::InteractWithNpcOrGameObjectForQuest(ObjectGuid guid)
         if (!quest)
             continue;
 
-        if (IsQuestAcceptableFromMenu(item.QuestId, quest))
+        if (NewRpgHelpers::CanAcceptQuest(botAI, quest))
         {
             AcceptQuest(quest, guid);
             if (botAI->GetMaster())
@@ -490,6 +491,56 @@ uint32 NewRpgBaseAction::BestRewardIndex(Quest const* quest)
     }
 }
 
+namespace
+{
+constexpr int32 minFreeQuestSlots = 2;
+
+// Log-pressure drop order: lowest tier first, then the furthest quest inside a tier.
+enum class PressureTier : uint8
+{
+    Expired,  // its game event is no longer active
+    GivenUp,  // in lowPriorityQuest: quest selection skips it
+    Normal,
+    Completed,  // dropping it loses the reward
+};
+
+struct PressureCandidate
+{
+    uint16 slot;
+    Quest const* quest;
+    PressureTier tier;
+    float dist;
+};
+
+// x/y only: a height or zone lookup would load terrain for a distant grid on the map thread.
+float PressurePoiDist(Player* bot, uint32 questId, bool complete)
+{
+    float dist = std::numeric_limits<float>::max();
+    QuestPOIVector const* pois = sObjectMgr->GetQuestPOIVector(questId);
+    if (!pois)
+        return dist;
+
+    for (QuestPOI const& poi : *pois)
+    {
+        // ObjectiveIndex -1 is the turn-in POI.
+        if ((complete && poi.ObjectiveIndex != -1) || poi.points.empty() || poi.MapId != bot->GetMapId())
+            continue;
+
+        float x = 0.0f, y = 0.0f;
+        for (QuestPOIPoint const& point : poi.points)
+        {
+            x += point.x;
+            y += point.y;
+        }
+
+        float const count = float(poi.points.size());
+        dist = std::min(dist, bot->GetDistance2d(x / count, y / count));
+    }
+
+    return dist;
+}
+}  // namespace
+
 bool NewRpgBaseAction::OrganizeQuestLog()
 {
     int32 freeSlotNum = 0;
@@ -501,28 +552,31 @@ bool NewRpgBaseAction::OrganizeQuestLog()
             freeSlotNum++;
     }
 
-    // it's ok if we have two more free slots
-    if (freeSlotNum >= 2)
+    if (freeSlotNum >= minFreeQuestSlots)
         return false;
 
-    auto dropSlot = [&](uint16 slot, Quest const* quest, QuestDropReason reason)
+    // The core refuses the drop when it cannot take the quest's source item back.
+    auto dropSlot = [&](uint16 slot, Quest const* quest, QuestDropReason reason) -> bool
     {
-        LOG_DEBUG("playerbots", "[New RPG] {} drop quest {}", bot->GetName(), quest->GetQuestId());
         WorldPacket packet(CMSG_QUESTLOG_REMOVE_QUEST);
         packet << (uint8)slot;
         WorldPackets::Quest::QuestLogRemoveQuest removeQuest(std::move(packet));
         removeQuest.Read();
         bot->GetSession()->HandleQuestLogRemoveQuest(removeQuest);
+        if (bot->GetQuestSlotQuestId(slot))
+            return false;
+
+        LOG_DEBUG("playerbots", "[New RPG] {} drop quest {}", bot->GetName(), quest->GetQuestId());
         if (botAI->GetMaster())
             botAI->TellMasterNoFacing(PlayerbotTextMgr::instance().GetBotTextOrDefault(
                 "new_rpg_quest_dropped",
                 "Quest dropped %quest",
                 {{"%quest", ChatHelper::FormatQuest(quest)}}));
         botAI->RecordQuestDropped(quest->GetQuestId(), reason);
+        return true;
     };
 
     // remove quests that not worth doing or not capable of doing
-    int32 dropped = 0;
     for (uint16 i = 0; i < MAX_QUEST_LOG_SIZE; ++i)
     {
         uint32 questId = bot->GetQuestSlotQuestId(i);
@@ -530,7 +584,11 @@ bool NewRpgBaseAction::OrganizeQuestLog()
             continue;
 
         Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
-        bool const worthDoing = NewRpgHelpers::IsQuestWorthDoing(bot, quest);
+        if (!quest)
+            continue;
+
+        // Seasonal quests fail IsQuestWorthDoing. The ranking below orders them by event state.
+        bool const worthDoing = quest->IsSeasonal() || NewRpgHelpers::IsQuestWorthDoing(bot, quest);
         bool const capableDoing = NewRpgHelpers::IsQuestCapableDoing(bot, quest);
         bool const failed = bot->GetQuestStatus(questId) == QUEST_STATUS_FAILED;
         if (!worthDoing || !capableDoing || failed)
@@ -538,104 +596,59 @@ bool NewRpgBaseAction::OrganizeQuestLog()
             QuestDropReason const reason = !worthDoing    ? QuestDropReason::NotWorth
                                            : !capableDoing ? QuestDropReason::NotCapable
                                                            : QuestDropReason::Failed;
-            dropSlot(i, quest, reason);
-            dropped++;
+            if (dropSlot(i, quest, reason))
+                freeSlotNum++;
         }
     }
 
-    // Cross-zone questing: quests from other zones are kept, so free slots only under pressure by
-    // dropping the quest whose objective/turn-in is the furthest away. Class/sort quests
-    // (ZoneOrSort < 0) are never dropped.
-    freeSlotNum += dropped;
-    if (freeSlotNum < 2)
-    {
-        // The pressure pass only changes when the quest log does: the same scan would pick the
-        // same quest again. Re-run only after the log changed (accept, reward, drop).
-        uint64 logKey = 1469598103934665603ull;
-        for (uint16 i = 0; i < MAX_QUEST_LOG_SIZE; ++i)
-        {
-            logKey ^= bot->GetQuestSlotQuestId(i);
-            logKey *= 1099511628211ull;
-        }
+    if (freeSlotNum >= minFreeQuestSlots)
+        return true;
 
-        if (botAI->rpgInfo.pressureLogKey == logKey)
-            return true;
-        botAI->rpgInfo.pressureLogKey = logKey;
+    std::vector<PressureCandidate> candidates;
+    candidates.reserve(MAX_QUEST_LOG_SIZE);
+    for (uint16 i = 0; i < MAX_QUEST_LOG_SIZE; ++i)
+    {
+        uint32 questId = bot->GetQuestSlotQuestId(i);
+        if (!questId)
+            continue;
+
+        Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
+        if (!quest)
+            continue;
+
+        bool const complete = bot->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE;
+        uint16 const eventId = quest->GetEventIdForQuest();
+        PressureTier tier = PressureTier::Normal;
+        if (eventId && !sGameEventMgr->IsActiveEvent(eventId))
+            tier = PressureTier::Expired;
+        else if (botAI->lowPriorityQuest.count(questId))
+            tier = PressureTier::GivenUp;
+        else if (complete)
+            tier = PressureTier::Completed;
+
+        candidates.push_back({i, quest, tier, PressurePoiDist(bot, questId, complete)});
     }
-    while (freeSlotNum < 2)
+
+    std::sort(candidates.begin(), candidates.end(),
+              [](PressureCandidate const& a, PressureCandidate const& b)
+              {
+                  if (a.tier != b.tier)
+                      return a.tier < b.tier;
+                  return a.dist > b.dist;
+              });
+
+    for (PressureCandidate const& candidate : candidates)
     {
-        uint16 worstSlot = MAX_QUEST_LOG_SIZE;
-        float worstDist = -1.0f;
-        for (uint16 i = 0; i < MAX_QUEST_LOG_SIZE; ++i)
-        {
-            uint32 questId = bot->GetQuestSlotQuestId(i);
-            if (!questId)
-                continue;
-
-            Quest const* quest = sObjectMgr->GetQuestTemplate(questId);
-            if (quest->GetZoneOrSort() < 0)
-                continue;
-
-            // Rank candidates by their nearest reachable POI. Scoring needs x/y only: no height
-            // or zone lookup, so the map thread never loads terrain for a distant grid. Drop
-            // order: no POI data at all (unprogressable) first, then cross-map-only quests
-            // (travelable under cross-zone retention, but deliberately ranked below same-map),
-            // then the furthest same-map quest. Class/sort quests are never dropped.
-            bool const complete = bot->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE;
-            float dist = std::numeric_limits<float>::max();
-            bool hasSameMapPoi = false;
-            bool hasOtherMapPoi = false;
-            if (QuestPOIVector const* pois = sObjectMgr->GetQuestPOIVector(questId))
-            {
-                for (QuestPOI const& poi : *pois)
-                {
-                    // Completed quests are ranked by their turn-in POI (same filter as
-                    // GetQuestPOIPosAndObjectiveIdx).
-                    if (complete && poi.ObjectiveIndex != -1)
-                        continue;
-
-                    if (poi.points.empty())
-                        continue;
-
-                    if (poi.MapId != bot->GetMapId())
-                    {
-                        hasOtherMapPoi = true;
-                        continue;
-                    }
-
-                    float dx = 0.0f, dy = 0.0f;
-                    for (QuestPOIPoint const& point : poi.points)
-                    {
-                        dx += point.x;
-                        dy += point.y;
-                    }
-                    dx /= float(poi.points.size());
-                    dy /= float(poi.points.size());
-
-                    hasSameMapPoi = true;
-                    float const d = bot->GetDistance2d(dx, dy);
-                    if (d < dist)
-                        dist = d;
-                }
-            }
-
-            if (!hasSameMapPoi)
-                dist = hasOtherMapPoi ? 1.0e9f : std::numeric_limits<float>::max();
-
-            if (dist > worstDist)
-            {
-                worstDist = dist;
-                worstSlot = i;
-            }
-        }
-
-        if (worstSlot == MAX_QUEST_LOG_SIZE)
+        if (freeSlotNum >= minFreeQuestSlots)
             break;
 
-        Quest const* worstQuest = sObjectMgr->GetQuestTemplate(bot->GetQuestSlotQuestId(worstSlot));
-        dropSlot(worstSlot, worstQuest, QuestDropReason::LogFull);
-        // Remember it so the accept menu does not instantly take it again.
-        botAI->lowPriorityQuest.insert(worstQuest->GetQuestId());
+        QuestDropReason const reason =
+            candidate.tier == PressureTier::Expired ? QuestDropReason::Expired : QuestDropReason::LogFull;
+        if (!dropSlot(candidate.slot, candidate.quest, reason))
+            continue;
+
+        // Otherwise the next quest giver offers it again and the log fills back up.
+        botAI->lowPriorityQuest.insert(candidate.quest->GetQuestId());
         freeSlotNum++;
     }
 
@@ -679,17 +692,6 @@ bool NewRpgBaseAction::SearchQuestGiverAndAcceptOrReward()
     return MoveWorldObjectTo(npcOrGo);
 }
 
-bool NewRpgBaseAction::IsQuestAcceptableFromMenu(uint32 questId, Quest const* quest)
-{
-    // Dropped under log pressure: do not immediately re-accept it (accept->drop loops).
-    if (botAI->lowPriorityQuest.find(questId) != botAI->lowPriorityQuest.end())
-        return false;
-
-    return bot->GetQuestStatus(questId) == QUEST_STATUS_NONE && bot->CanTakeQuest(quest, false) &&
-           bot->CanAddQuest(quest, false) && NewRpgHelpers::IsQuestWorthDoing(bot, quest) &&
-           NewRpgHelpers::IsQuestCapableDoing(bot, quest);
-}
-
 static std::vector<float> GenerateRandomWeights(int n)
 {
     std::vector<float> weights(n);
@@ -707,10 +709,10 @@ static std::vector<float> GenerateRandomWeights(int n)
     return weights;
 }
 
-bool NewRpgBaseAction::AddQuestPoi(QuestPOI const& qPoi, std::vector<POIInfo>& poiInfo)
+void NewRpgBaseAction::AddQuestPoi(QuestPOI const& qPoi, std::vector<POIInfo>& poiInfo)
 {
     if (qPoi.points.empty())
-        return false;
+        return;
 
     float dx = 0.0f, dy = 0.0f;
     std::vector<float> weights = GenerateRandomWeights(qPoi.points.size());
@@ -722,14 +724,13 @@ bool NewRpgBaseAction::AddQuestPoi(QuestPOI const& qPoi, std::vector<POIInfo>& p
     }
 
     if (bot->GetDistance2d(dx, dy) >= 1500.0f)
-        return false;
+        return;
 
     float const dz = std::max(bot->GetMap()->GetHeight(dx, dy, MAX_HEIGHT), bot->GetMap()->GetWaterLevel(dx, dy));
     if (dz == INVALID_HEIGHT || dz == VMAP_INVALID_HEIGHT_VALUE)
-        return false;
+        return;
 
     poiInfo.push_back({{dx, dy}, qPoi.ObjectiveIndex});
-    return true;
 }
 
 bool NewRpgBaseAction::GetQuestPOIPosAndObjectiveIdx(uint32 questId, std::vector<POIInfo>& poiInfo, bool toComplete)
